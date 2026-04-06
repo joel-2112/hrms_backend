@@ -21,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
       comment:   'The DocType this restriction applies TO e.g. "Branch", "Department"',
     },
     allowValue: {
-      type:      DataTypes.STRING(255),
+      type:      DataTypes.UUID,
       allowNull: false,
       comment:   'The specific record the user is allowed to see e.g. "Nairobi", "Finance"',
     },
@@ -43,9 +43,5 @@ module.exports = (sequelize, DataTypes) => {
       },
     ],
   });
-
-  // Associations are declared in models/index.js
-  UserPermission.associate = () => {};
-
   return UserPermission;
 };

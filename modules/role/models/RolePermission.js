@@ -117,18 +117,13 @@ module.exports = (sequelize, DataTypes) => {
       {
         // One rule per role+resource+permLevel combination
         unique: true,
-        fields: ['role_id', 'resource_name', 'perm_level'],
-        name:   'uq_role_permissions_role_resource_level',
+        fields: ['role_id','module_name', 'resource_name', 'perm_level'],
       },
       {
         fields: ['module_name'],
-        name:   'idx_role_permissions_module',
       },
     ],
   });
-
-  // Associations are declared in models/index.js
-  RolePermission.associate = () => {};
 
   return RolePermission;
 };

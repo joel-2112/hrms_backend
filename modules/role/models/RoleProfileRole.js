@@ -29,9 +29,5 @@ module.exports = (sequelize, DataTypes) => {
       },
     ],
   });
-
-  // Associations are declared in models/index.js
-  RoleProfileRole.associate = () => {};
-
   return RoleProfileRole;
 };

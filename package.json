@@ -9,7 +9,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:seed": "sequelize-cli db:seed:all",
+    "db:reset": "sequelize-cli db:migrate:undo:all && npm run db:migrate"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

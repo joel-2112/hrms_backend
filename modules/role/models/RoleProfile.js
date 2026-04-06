@@ -14,11 +14,6 @@ module.exports = (sequelize, DataTypes) => {
       unique:    true,
       comment:   'Template name e.g. "HR Manager", "Finance User"',
     },
-    description: {
-      type:      DataTypes.TEXT,
-      allowNull: true,
-    },
-
     // ── Behaviour flags ────────────────────────────────────────
     disabled: {
       type:         DataTypes.BOOLEAN,
@@ -29,9 +24,5 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'role_profiles',
     comment:   'Bundles multiple Roles into one template for mass user assignment',
   });
-
-  // Associations are declared in models/index.js
-  RoleProfile.associate = () => {};
-
   return RoleProfile;
 };

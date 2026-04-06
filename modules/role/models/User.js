@@ -18,11 +18,7 @@ module.exports = (sequelize, DataTypes) => {
       unique:    true,
       validate:  { isEmail: true },
     },
-    firstName: {
-      type:      DataTypes.STRING(100),
-      allowNull: false,
-    },
-    lastName: {
+    fullName: {
       type:      DataTypes.STRING(100),
       allowNull: false,
     },
@@ -85,7 +81,7 @@ module.exports = (sequelize, DataTypes) => {
 
     // Provide a named scope when you explicitly need the hash (login only)
     scopes: {
-      withPassword: { attributes: {} },
+      withPassword: { attributes: { include: ['passwordHash'] } },
     },
 
     hooks: {
@@ -106,9 +102,5 @@ module.exports = (sequelize, DataTypes) => {
   User.prototype.fullName = function () {
     return `${this.firstName} ${this.lastName}`;
   };
-
-  // Associations are declared in models/index.js
-  User.associate = () => {};
-
   return User;
 };

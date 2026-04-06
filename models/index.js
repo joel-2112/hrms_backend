@@ -1,6 +1,6 @@
-'use strict';
 
 const { Sequelize, DataTypes } = require('sequelize');
+const sequelize = require('../config/database').sequelize;
 require('dotenv').config();
 
 // ─────────────────────────────────────────────
@@ -8,32 +8,32 @@ require('dotenv').config();
 //     One instance, shared across the entire app
 //     via Node's require() module caching.
 // ─────────────────────────────────────────────
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASS,
-  {
-    host:    process.env.DB_HOST || 'localhost',
-    port:    parseInt(process.env.DB_PORT) || 5432,
-    dialect: 'postgres',
+// const sequelize = new Sequelize(
+//   process.env.DB_NAME,
+//   process.env.DB_USER,
+//   process.env.DB_PASS,
+//   {
+//     host:    process.env.DB_HOST || 'localhost',
+//     port:    parseInt(process.env.DB_PORT) || 5432,
+//     dialect: 'postgres',
 
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+//     logging: process.env.NODE_ENV === 'development' ? console.log : false,
 
-    pool: {
-      max:     10,
-      min:     2,
-      acquire: 30000,   // ms before throwing a connection error
-      idle:    10000,   // ms a connection can be idle before release
-    },
+//     pool: {
+//       max:     10,
+//       min:     2,
+//       acquire: 30000,   // ms before throwing a connection error
+//       idle:    10000,   // ms a connection can be idle before release
+//     },
 
-    define: {
-      underscored:     true,   // column names use snake_case in the DB
-      freezeTableName: false,  // Sequelize will pluralize table names
-      timestamps:      true,   // createdAt + updatedAt on every table
-      paranoid:        true,   // deletedAt soft-delete on every table
-    },
-  },
-);
+//     define: {
+//       underscored:     true,   // column names use snake_case in the DB
+//       freezeTableName: false,  // Sequelize will pluralize table names
+//       timestamps:      true,   // createdAt + updatedAt on every table
+//       paranoid:        true,   // deletedAt soft-delete on every table
+//     },
+//   },
+// );
 
 // ─────────────────────────────────────────────
 //  2. IMPORT ALL MODELS
