@@ -58,8 +58,5 @@ module.exports = (sequelize, DataTypes) => {
       },
     ],
   });
-
-  Department.associate = () => {};
-
   return Department;
 };

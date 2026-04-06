@@ -55,8 +55,5 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['sort_order'], name: 'idx_employee_grades_sort_order' },
     ],
   });
-
-  EmployeeGrade.associate = () => {};
-
   return EmployeeGrade;
 };

@@ -45,8 +45,5 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'employment_types',
     comment:   'Contract type master — referenced only by Employee',
   });
-
-  EmploymentType.associate = () => {};
-
   return EmploymentType;
 };

@@ -62,8 +62,5 @@ module.exports = (sequelize, DataTypes) => {
       },
     ],
   });
-
-  Branch.associate = () => {};
-
   return Branch;
 };

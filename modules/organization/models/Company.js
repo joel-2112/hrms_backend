@@ -105,7 +105,5 @@ module.exports = (sequelize, DataTypes) => {
     ],
   });
 
-  Company.associate = () => {};
-
   return Company;
 };

@@ -14,11 +14,6 @@ module.exports = (sequelize, DataTypes) => {
       unique:    true,
       comment:   'Job title e.g. "Software Engineer", "HR Manager", "Finance Director"',
     },
-    description: {
-      type:      DataTypes.TEXT,
-      allowNull: true,
-    },
-
     // ── Classification ─────────────────────────────────────────
     jobFunction: {
       type:      DataTypes.STRING(100),
@@ -36,8 +31,5 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'designations',
     comment:   'Job title master — referenced by Employee, JobOpening, JobOffer, AppraisalTemplate',
   });
-
-  Designation.associate = () => {};
-
   return Designation;
 };
