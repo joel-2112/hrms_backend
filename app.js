@@ -2,7 +2,7 @@
 const express = require('express');
 const app = express();
 const { notFoundHandler, errorHandler } = require('./middlewares/errorMiddleware');
-const roleRoutes = require('./modules/role/roleRoute');
+const roleRoutes = require('./modules/role/routes/roleRoutes');
 
 // ── Body parsing ──────────────────────────────────────────────
 app.use(express.json());
