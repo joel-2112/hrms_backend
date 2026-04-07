@@ -153,8 +153,5 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['last_working_day'],          name: 'idx_employee_separations_lwd' },
     ],
   });
-
-  EmployeeSeparation.associate = () => {};
-
   return EmployeeSeparation;
 };

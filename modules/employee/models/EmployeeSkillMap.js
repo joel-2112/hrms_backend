@@ -64,8 +64,5 @@ module.exports = (sequelize, DataTypes) => {
       { unique: true, fields: ['employee_id'], name: 'uq_employee_skill_maps_employee' },
     ],
   });
-
-  EmployeeSkillMap.associate = () => {};
-
   return EmployeeSkillMap;
 };

@@ -116,8 +116,5 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['expiry_date'],               name: 'idx_employee_health_insurances_expiry' },
     ],
   });
-
-  EmployeeHealthInsurance.associate = () => {};
-
   return EmployeeHealthInsurance;
 };

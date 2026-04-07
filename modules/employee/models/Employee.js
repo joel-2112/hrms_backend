@@ -355,8 +355,5 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['date_of_joining'],                name: 'idx_employees_joining' },
     ],
   });
-
-  Employee.associate = () => {};
-
   return Employee;
 };

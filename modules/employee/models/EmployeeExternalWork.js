@@ -118,8 +118,5 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['from_date'],   name: 'idx_employee_external_works_from' },
     ],
   });
-
-  EmployeeExternalWork.associate = () => {};
-
   return EmployeeExternalWork;
 };

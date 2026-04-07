@@ -94,8 +94,5 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['employee_id'], name: 'idx_employee_educations_employee' },
     ],
   });
-
-  EmployeeEducation.associate = () => {};
-
   return EmployeeEducation;
 };

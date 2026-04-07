@@ -123,8 +123,5 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['status'],        name: 'idx_employee_transfers_status' },
     ],
   });
-
-  EmployeeTransfer.associate = () => {};
-
   return EmployeeTransfer;
 };
