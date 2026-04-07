@@ -1,6 +1,7 @@
 
 const express = require('express');
 const app = express();
+const { notFoundHandler, errorHandler } = require('./middlewares/errorMiddleware');
 
 // ── Body parsing ──────────────────────────────────────────────
 app.use(express.json());
@@ -11,18 +12,9 @@ const roleRoutes = require('./modules/role/roleRoute');
 
 app.use('/roles', roleRoutes);
 
-// ── 404 ───────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' });
-});
+// ── Error handling middleware ─────────────────────────────────
+app.use(notFoundHandler);  
+app.use(errorHandler);      
 
-// ── Global error handler ──────────────────────────────────────
-app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal server error',
-  });
-});
 
 module.exports = app;
