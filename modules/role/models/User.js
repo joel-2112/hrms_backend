@@ -18,10 +18,19 @@ module.exports = (sequelize, DataTypes) => {
       unique:    true,
       validate:  { isEmail: true },
     },
-    fullName: {
+    firstName: {
       type:      DataTypes.STRING(100),
       allowNull: false,
     },
+    middleName: {
+      type:      DataTypes.STRING(100),
+      allowNull: false,
+    },
+    lastName: {
+      type:      DataTypes.STRING(100),
+      allowNull: false,
+    },
+
 
     // ── Auth ───────────────────────────────────────────────────
     passwordHash: {
@@ -100,7 +109,7 @@ module.exports = (sequelize, DataTypes) => {
   };
 
   User.prototype.fullName = function () {
-    return `${this.firstName} ${this.lastName}`;
+    return `${this.firstName} ${this.middleName} ${this.lastName}`;
   };
   return User;
 };

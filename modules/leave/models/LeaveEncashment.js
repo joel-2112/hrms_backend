@@ -43,7 +43,7 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Docstatus ──────────────────────────────────────────────
     docStatus: {
-      type:         DataTypes.TINYINT,
+      type:         DataTypes.SMALLINT,
       allowNull:    false,
       defaultValue: 0,
       comment:      '0 = Draft, 1 = Submitted, 2 = Cancelled',
