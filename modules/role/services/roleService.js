@@ -157,7 +157,7 @@ const getRoleById = async (id) => {
   const role = await Role.findByPk(id, {
     include: [{
       model:      RolePermission,
-      as:         'rolePermissions',
+      as:         'RolePermissions',
       order:      [['moduleName', 'ASC'], ['resourceName', 'ASC'], ['permLevel', 'ASC']],
     }],
   });
