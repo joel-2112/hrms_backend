@@ -5,7 +5,7 @@ const { sequelize,
         Company, Branch, Department,
         Designation, EmploymentType,
         EmployeeGrade }             = require('../../../models');
-const { AppError }  = require('../../../utils/AppError');
+const { AppError }  = require('../../../middlewares/errorMiddleware');
 
 // ══════════════════════════════════════════════
 //  COMPANY
