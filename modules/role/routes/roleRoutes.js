@@ -10,30 +10,269 @@ const { authorize, action } = require('../../../middlewares/rbacMiddleware');
 // All role routes require authentication
 router.use(authenticate);
 
+/**
+ * @swagger
+ * tags:
+ *   - name: Roles
+ *     description: Role management - CRUD operations for roles
+ *   - name: RoleProfiles
+ *     description: Role profiles - Group multiple roles into profiles
+ *   - name: UserPermissions
+ *     description: User permissions - Record-level access control
+ */
+
 // ══════════════════════════════════════════════
 //  ROLE CRUD
 // ══════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /roles:
+ *   post:
+ *     summary: Create a new role
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Role name
+ *                 example: HR Manager
+ *               description:
+ *                 type: string
+ *                 description: Role description
+ *                 example: Manages all HR operations
+ *     responses:
+ *       201:
+ *         description: Role created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Role created successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Validation error
+ *       409:
+ *         description: Role already exists
+ */
 router.post('/', 
   authorize('Role', action.CREATE), 
   roleController.createRole
 );
 
+/**
+ * @swagger
+ * /roles:
+ *   get:
+ *     summary: Get all roles
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: includeDisabled
+ *         schema:
+ *           type: boolean
+ *         description: Include disabled roles
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by role name
+ *     responses:
+ *       200:
+ *         description: List of all roles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Roles fetched successfully
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     roles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           name:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           disabled:
+ *                             type: boolean
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ */
 router.get('/', 
   // authorize('Role', action.READ), 
   roleController.getAllRoles
 );
 
+/**
+ * @swagger
+ * /roles/{id}:
+ *   get:
+ *     summary: Get a specific role by ID
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role ID
+ *     responses:
+ *       200:
+ *         description: Role details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     permissions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           resource:
+ *                             type: string
+ *                           action:
+ *                             type: string
+ *       404:
+ *         description: Role not found
+ */
 router.get('/:id', 
   authorize('Role', action.READ), 
   roleController.getRole
 );
 
+/**
+ * @swagger
+ * /roles/{id}:
+ *   patch:
+ *     summary: Update a role
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Senior HR Manager
+ *               description:
+ *                 type: string
+ *                 example: Senior role with additional permissions
+ *               disabled:
+ *                 type: boolean
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Role updated successfully
+ *       404:
+ *         description: Role not found
+ */
 router.patch('/:id', 
   authorize('Role', action.WRITE), 
   roleController.updateRole
 );
 
+/**
+ * @swagger
+ * /roles/{id}:
+ *   delete:
+ *     summary: Delete a role
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role ID
+ *     responses:
+ *       204:
+ *         description: Role deleted successfully
+ *       404:
+ *         description: Role not found
+ *       409:
+ *         description: Cannot delete - role is in use
+ */
 router.delete('/:id', 
   authorize('Role', action.DELETE), 
   roleController.deleteRole
@@ -43,16 +282,149 @@ router.delete('/:id',
 //  ROLE PERMISSIONS
 // ══════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /roles/{id}/permissions:
+ *   get:
+ *     summary: Get all permissions for a role
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role ID
+ *     responses:
+ *       200:
+ *         description: List of role permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     roleId:
+ *                       type: string
+ *                     roleName:
+ *                       type: string
+ *                     permissions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           resource:
+ *                             type: string
+ *                           action:
+ *                             type: string
+ *                           effect:
+ *                             type: string
+ *                             enum: [allow, deny]
+ */
 router.get('/:id/permissions', 
   authorize('Role', action.READ), 
   roleController.getRolePermissions
 );
 
+/**
+ * @swagger
+ * /roles/{id}/permissions:
+ *   put:
+ *     summary: Set/update permissions for a role (full replace)
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [permissions]
+ *             properties:
+ *               permissions:
+ *                 type: array
+ *                 description: List of permissions to assign
+ *                 items:
+ *                   type: object
+ *                   required: [resource, action]
+ *                   properties:
+ *                     resource:
+ *                       type: string
+ *                       example: Employee
+ *                     action:
+ *                       type: string
+ *                       enum: [create, read, write, delete, manage]
+ *                       example: manage
+ *                     effect:
+ *                       type: string
+ *                       enum: [allow, deny]
+ *                       default: allow
+ *                       example: allow
+ *                 example: [
+ *                   { resource: "Employee", action: "create", effect: "allow" },
+ *                   { resource: "Employee", action: "read", effect: "allow" },
+ *                   { resource: "Employee", action: "write", effect: "allow" }
+ *                 ]
+ *     responses:
+ *       200:
+ *         description: Permissions updated successfully
+ *       400:
+ *         description: Invalid permission data
+ *       404:
+ *         description: Role not found
+ */
 router.put('/:id/permissions', 
   authorize('Role', action.SET_PERMISSIONS), 
   roleController.upsertPermission
 );
 
+/**
+ * @swagger
+ * /roles/{id}/permissions/{permissionId}:
+ *   delete:
+ *     summary: Remove a specific permission from a role
+ *     tags: [Roles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role ID
+ *       - in: path
+ *         name: permissionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Permission ID
+ *     responses:
+ *       204:
+ *         description: Permission removed successfully
+ *       404:
+ *         description: Role or permission not found
+ */
 router.delete('/:id/permissions/:permissionId', 
   authorize('Role', action.SET_PERMISSIONS), 
   roleController.deletePermission
@@ -62,31 +434,228 @@ router.delete('/:id/permissions/:permissionId',
 //  ROLE PROFILE ROUTES
 // ══════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /roles/profiles:
+ *   post:
+ *     summary: Create a new role profile
+ *     tags: [RoleProfiles]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Senior Management
+ *               description:
+ *                 type: string
+ *                 example: Profile for senior management roles
+ *               roleIds:
+ *                 type: array
+ *                 description: Array of role IDs to include in this profile
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example: ["550e8400-e29b-41d4-a716-446655440000"]
+ *     responses:
+ *       201:
+ *         description: Role profile created successfully
+ *       409:
+ *         description: Profile name already exists
+ */
 router.post('/profiles', 
   authorize('RoleProfile', action.CREATE), 
   roleProfileController.createRoleProfile
 );
 
+/**
+ * @swagger
+ * /roles/profiles:
+ *   get:
+ *     summary: Get all role profiles
+ *     tags: [RoleProfiles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: includeDisabled
+ *         schema:
+ *           type: boolean
+ *         description: Include disabled profiles
+ *     responses:
+ *       200:
+ *         description: List of role profiles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     profiles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           roles:
+ *                             type: array
+ *                           disabled:
+ *                             type: boolean
+ */
 router.get('/profiles', 
   authorize('RoleProfile', action.READ), 
   roleProfileController.getAllRoleProfiles
 );
 
+/**
+ * @swagger
+ * /roles/profiles/{id}:
+ *   get:
+ *     summary: Get a specific role profile by ID
+ *     tags: [RoleProfiles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role profile ID
+ *     responses:
+ *       200:
+ *         description: Role profile details
+ *       404:
+ *         description: Role profile not found
+ */
 router.get('/profiles/:id', 
   authorize('RoleProfile', action.READ), 
   roleProfileController.getRoleProfile
 );
 
+/**
+ * @swagger
+ * /roles/profiles/{id}:
+ *   patch:
+ *     summary: Update a role profile
+ *     tags: [RoleProfiles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role profile ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Executive Management
+ *               description:
+ *                 type: string
+ *               disabled:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Role profile updated successfully
+ *       404:
+ *         description: Role profile not found
+ */
 router.patch('/profiles/:id', 
   authorize('RoleProfile', action.WRITE), 
   roleProfileController.updateRoleProfile
 );
 
+/**
+ * @swagger
+ * /roles/profiles/{id}:
+ *   delete:
+ *     summary: Delete a role profile
+ *     tags: [RoleProfiles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role profile ID
+ *     responses:
+ *       204:
+ *         description: Role profile deleted successfully
+ *       404:
+ *         description: Role profile not found
+ *       409:
+ *         description: Cannot delete - profile is assigned to users
+ */
 router.delete('/profiles/:id', 
   authorize('RoleProfile', action.DELETE), 
   roleProfileController.deleteRoleProfile
 );
 
+/**
+ * @swagger
+ * /roles/profiles/{id}/roles:
+ *   put:
+ *     summary: Set roles for a profile (bulk assign)
+ *     tags: [RoleProfiles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role profile ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleIds]
+ *             properties:
+ *               roleIds:
+ *                 type: array
+ *                 description: Array of role IDs to assign to this profile
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example: ["550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440001"]
+ *     responses:
+ *       200:
+ *         description: Roles assigned successfully
+ *       404:
+ *         description: Role profile not found
+ */
 router.put('/profiles/:id/roles', 
   authorize('RoleProfile', action.WRITE), 
   roleProfileController.setProfileRoles
@@ -96,26 +665,246 @@ router.put('/profiles/:id/roles',
 //  USER PERMISSION ROUTES (Record-level)
 // ══════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /roles/users/{userId}/permissions:
+ *   get:
+ *     summary: Get all explicit permissions for a user
+ *     tags: [UserPermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: List of user permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId:
+ *                       type: string
+ *                     permissions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           resource:
+ *                             type: string
+ *                           resourceId:
+ *                             type: string
+ *                           action:
+ *                             type: string
+ *                           effect:
+ *                             type: string
+ */
 router.get('/users/:userId/permissions', 
   authorize('UserPermission', action.READ), 
   userPermissionController.getUserPermissions
 );
 
+/**
+ * @swagger
+ * /roles/users/{userId}/permissions:
+ *   post:
+ *     summary: Add a new permission for a user
+ *     tags: [UserPermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [resource, action]
+ *             properties:
+ *               resource:
+ *                 type: string
+ *                 description: Resource type (e.g., Employee, Document)
+ *                 example: Employee
+ *               resourceId:
+ *                 type: string
+ *                 description: Specific resource ID (null for all resources of this type)
+ *                 example: "550e8400-e29b-41d4-a716-446655440000"
+ *               action:
+ *                 type: string
+ *                 enum: [create, read, write, delete, manage]
+ *                 example: read
+ *               effect:
+ *                 type: string
+ *                 enum: [allow, deny]
+ *                 default: allow
+ *                 example: allow
+ *     responses:
+ *       201:
+ *         description: Permission added successfully
+ *       400:
+ *         description: Invalid permission data
+ */
 router.post('/users/:userId/permissions', 
   authorize('UserPermission', action.SET_PERMISSIONS), 
   userPermissionController.addUserPermission
 );
 
+/**
+ * @swagger
+ * /roles/users/{userId}/permissions:
+ *   put:
+ *     summary: Replace all permissions for a user (full replace)
+ *     tags: [UserPermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [permissions]
+ *             properties:
+ *               permissions:
+ *                 type: array
+ *                 description: Complete list of permissions for the user
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     resource:
+ *                       type: string
+ *                     resourceId:
+ *                       type: string
+ *                     action:
+ *                       type: string
+ *                     effect:
+ *                       type: string
+ *                 example: [
+ *                   { resource: "Employee", resourceId: null, action: "read", effect: "allow" },
+ *                   { resource: "Document", resourceId: "550e8400...", action: "write", effect: "allow" }
+ *                 ]
+ *     responses:
+ *       200:
+ *         description: Permissions replaced successfully
+ */
 router.put('/users/:userId/permissions', 
   authorize('UserPermission', action.SET_PERMISSIONS), 
   userPermissionController.replaceUserPermissions
 );
 
+/**
+ * @swagger
+ * /roles/users/{userId}/permissions/{permissionId}:
+ *   delete:
+ *     summary: Remove a specific permission from a user
+ *     tags: [UserPermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *       - in: path
+ *         name: permissionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Permission ID
+ *     responses:
+ *       204:
+ *         description: Permission removed successfully
+ *       404:
+ *         description: Permission not found
+ */
 router.delete('/users/:userId/permissions/:permissionId', 
   authorize('UserPermission', action.SET_PERMISSIONS), 
   userPermissionController.deleteUserPermission
 );
 
+/**
+ * @swagger
+ * /roles/users/{userId}/effective-permissions:
+ *   get:
+ *     summary: Get effective permissions for a user (role-based + explicit)
+ *     tags: [UserPermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Computed effective permissions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId:
+ *                       type: string
+ *                     roles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     effectivePermissions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           resource:
+ *                             type: string
+ *                           resourceId:
+ *                             type: string
+ *                           actions:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                           effect:
+ *                             type: string
+ */
 router.get('/users/:userId/effective-permissions', 
   authorize('UserPermission', action.READ), 
   userPermissionController.getUserEffectivePermissions

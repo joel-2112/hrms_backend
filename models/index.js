@@ -199,7 +199,7 @@ Document.belongsTo(Employee, { as: 'uploadedBy', foreignKey: 'uploadedById' });
 
 // DocumentVersion → Document
 DocumentVersion.belongsTo(Document, { foreignKey: 'documentId', allowNull: false });
-Document.hasMany(DocumentVersion,   { foreignKey: 'documentId' });
+Document.hasMany(DocumentVersion,   { foreignKey: 'documentId', as: 'versions' });
 
 // DocumentVersion → Employee (who replaced it)
 DocumentVersion.belongsTo(Employee, { as: 'replacedBy', foreignKey: 'replacedById' });

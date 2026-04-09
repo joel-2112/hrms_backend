@@ -23,7 +23,7 @@ const { AppError }     = require('../../../middlewares/errorMiddleware');
 const documentIncludes = [
   {
     model:      DocumentType,
-    as:         'documentType',
+    as:         'DocumentType',
     attributes: ['id', 'name', 'category', 'description'],
   },
   {
@@ -314,7 +314,7 @@ const searchDocuments = async ({
     where,
     include: documentIncludes,
     order:   [
-      [{ model: DocumentType, as: 'documentType' }, 'name', 'ASC'],
+      [{ model: DocumentType, as: 'DocumentType' }, 'name', 'ASC'],
       ['uploaded_at', 'DESC'],
     ],
     limit,
