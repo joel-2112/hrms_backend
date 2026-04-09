@@ -106,31 +106,39 @@ const attachDocument = catchAsync(async (req, res) => {
     documentTypeId,
     voucherType,
     voucherNo,
-    fileName,
-    fileUrl,
-    fileSize,
-    mimeType,
     description,
     expiryDate,
     isPrivate,
   } = req.body;
 
+  // Get file from multer middleware
+  const uploadedFile = req.file;
+  
   // uploadedById resolved from the authenticated session
   const uploadedById = req.user?.employeeId || req.user?.id || null;
 
-  if (!documentTypeId || !voucherType || !voucherNo || !fileName || !fileUrl || !mimeType) {
-    return badRequest(res, 'documentTypeId, voucherType, voucherNo, fileName, fileUrl and mimeType are required');
+  // Validate required fields
+  if (!documentTypeId || !voucherType || !voucherNo) {
+    return badRequest(res, 'documentTypeId, voucherType, and voucherNo are required');
   }
+  
+  if (!uploadedFile) {
+    return badRequest(res, 'No file uploaded');
+  }
+
+  // Get relative path for database storage
+  const { getRelativePath } = require('../../../middlewares/upload.middleware');
+  const fileUrl = getRelativePath(uploadedFile);
 
   const document = await documentService.attachDocument({
     documentTypeId,
     voucherType,
     voucherNo,
     uploadedById,
-    fileName,
-    fileUrl,
-    fileSize,
-    mimeType,
+    fileName: uploadedFile.originalname,      // From multer
+    fileUrl,                                   // Generated from multer
+    fileSize: uploadedFile.size,               // From multer
+    mimeType: uploadedFile.mimetype,           // From multer
     description,
     expiryDate,
     isPrivate,

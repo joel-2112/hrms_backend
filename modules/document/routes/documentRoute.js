@@ -41,6 +41,9 @@ const {
   expireOverdueDocuments,
 } = require('../controllers/documentController');
 
+// Upload middleware
+const { uploadDocument } = require('../../../middlewares/upload.middleware');
+
 // const { authenticate }   = require('../../../middlewares/authMiddleware');
 // const { authorize }      = require('../../../middlewares/rbacMiddleware');
 // Uncomment and configure auth/RBAC to match your Frappe role model:
@@ -159,12 +162,30 @@ router.get('/document-versions/:versionId', getDocumentVersionById);
 /**
  * POST /api/hrms/documents
  * Attach a new document to any HRMS record (voucher pattern).
- * Body: { documentTypeId, voucherType, voucherNo, fileName,
- *         fileUrl, mimeType, fileSize?, description?,
- *         expiryDate?, isPrivate? }
+ * 
+ * This endpoint uses uploadDocument middleware which:
+ *   - Creates dynamic folder structure: uploads/documents/{voucherType}/{documentTypeId}/
+ *   - Validates file type (PDF, images, Office docs)
+ *   - Limits file size to 10MB
+ *   - Renames file to: doc-{uuid}.{ext}
+ *   - Stores file info in req.file
+ * 
+ * Body (multipart/form-data):
+ *   - file: (binary) The actual file to upload
+ *   - documentTypeId: UUID of the document type (shelf)
+ *   - voucherType: "Employee", "SalarySlip", "ExpenseClaim", etc.
+ *   - voucherNo: Record identifier (e.g., "EMP-0042")
+ *   - description: (optional) Document description
+ *   - expiryDate: (optional) ISO date string
+ *   - isPrivate: (optional) true/false (defaults to true)
+ * 
  * Frappe roles: HR Manager, HR User, Employee (own record)
  */
-router.post('/documents', attachDocument);
+router.post(
+  '/documents',
+  uploadDocument.single('file'),  // 'file' is the field name in the form
+  attachDocument
+);
 
 router
   .route('/documents/:id')
@@ -187,10 +208,20 @@ router.patch('/documents/:id/metadata', updateDocumentMetadata);
  * POST /api/hrms/documents/:id/replace
  * Replace the physical file — archives old file as a DocumentVersion.
  * The ONLY correct way to change a document's file in the system.
- * Body: { newFileName, newFileUrl, newMimeType, newFileSize?, replacedReason? }
+ * 
+ * This endpoint uses uploadDocument middleware for the new file.
+ * 
+ * Body (multipart/form-data):
+ *   - file: (binary) The new file to replace with
+ *   - replacedReason: (optional) Why the file was replaced
+ * 
  * Frappe roles: HR Manager, HR User
  */
-router.post('/documents/:id/replace', replaceDocument);
+router.post(
+  '/documents/:id/replace',
+  uploadDocument.single('file'),
+  replaceDocument
+);
 
 /**
  * PATCH /api/hrms/documents/:id/status
