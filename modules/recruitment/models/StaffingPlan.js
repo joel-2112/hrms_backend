@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Engineering Hiring Plan Q1 2025"',
     },
 
@@ -77,6 +77,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'staffing_plans',
     comment:   'Headcount plan per company/department for a period — restricts how many JobOpenings can be created per Designation',
     indexes: [
+      { unique: true, fields: ['name', 'company_id'], name: 'uq_staffing_plans_name_company' },
       { fields: ['company_id'],               name: 'idx_staffing_plans_company' },
       { fields: ['department_id'],            name: 'idx_staffing_plans_department' },
       { fields: ['from_date', 'to_date'],     name: 'idx_staffing_plans_period' },

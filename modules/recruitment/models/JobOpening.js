@@ -76,10 +76,16 @@ module.exports = (sequelize, DataTypes) => {
     // ── Status ─────────────────────────────────────────────────
     // Frappe: Open / Closed — once Closed no new JobApplicants can be created
     status: {
-      type:         DataTypes.ENUM('Open', 'Closed'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Open',
-      comment:      'Closed openings reject new JobApplicant submissions',
+      validate: {
+        isIn: {
+          args: [['Open', 'Closed']],
+          msg: 'Status must be either Open or Closed',
+        },
+      },
+      comment:      'Open = accepting applications; Closed = no new applications allowed',
     },
     closedDate: {
       type:      DataTypes.DATEONLY,

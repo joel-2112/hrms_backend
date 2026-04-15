@@ -1,3 +1,4 @@
+const { validate } = require("uuid");
 
 module.exports = (sequelize, DataTypes) => {
   const DocumentVersion = sequelize.define('DocumentVersion', {
@@ -58,8 +59,14 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Snapshot of status at the time of archival ─────────────
     statusAtArchival: {
-      type:      DataTypes.ENUM('Pending', 'Verified', 'Rejected', 'Expired'),
+      type:      DataTypes.STRING,
       allowNull: true,
+      validate: {
+        isIn: {
+          args: [['Pending', 'Verified', 'Rejected', 'Expired']],
+          msg: 'Status at archival must be one of: Pending, Verified, Rejected, Expired',
+        },
+      },
       comment:   'The verification status of the document at the moment this version was superseded',
     },
   }, {

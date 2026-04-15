@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'Template name e.g. "HR Manager", "Finance User"',
     },
     // ── Behaviour flags ────────────────────────────────────────
@@ -23,6 +23,12 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'role_profiles',
     comment:   'Bundles multiple Roles into one template for mass user assignment',
+    indexes: [
+      {
+        unique: true,
+        fields: ['name'],
+      },
+    ],
   });
   return RoleProfile;
 };

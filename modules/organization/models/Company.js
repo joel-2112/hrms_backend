@@ -20,12 +20,12 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
     },
     abbr: {
       type:      DataTypes.STRING(10),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'Short code used as prefix in document naming e.g. "ACME"',
     },
 
@@ -102,6 +102,7 @@ module.exports = (sequelize, DataTypes) => {
     comment:   'Top-level legal entity — root of the organization hierarchy',
     indexes: [
       { fields: ['parent_company_id'], name: 'idx_companies_parent' },
+      { unique: true, fields: ['abbr'], name: 'uq_companies_abbr' },
     ],
   });
 

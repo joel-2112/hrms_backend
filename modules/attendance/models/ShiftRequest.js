@@ -41,9 +41,15 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Request type ───────────────────────────────────────────
     requestType: {
-      type:      DataTypes.ENUM('Permanent', 'Temporary'),
+      type:      DataTypes.STRING,
       allowNull: false,
       defaultValue: 'Temporary',
+      validate: {
+        isIn: {
+          args: [['Permanent', 'Temporary']],
+          msg: 'Request type must be one of: Permanent, Temporary',
+        },
+      },
       comment:   'Permanent updates the ShiftAssignment on approval; Temporary is date-bounded only',
     },
 

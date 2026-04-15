@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Year-End Freeze 2025", "Q4 Block"',
     },
 
@@ -58,7 +58,13 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'leave_block_lists',
     comment:   'Dates on which leave applications are blocked company or department wide',
     indexes: [
-      { fields: ['company_id'], name: 'idx_leave_block_lists_company' },
+      {
+        unique: true,
+        fields: ['name', 'company_id'],
+        name:   'uq_leave_block_lists_name_company',
+      },
+      {
+         fields: ['company_id'], name: 'idx_leave_block_lists_company' },
     ],
   });
 

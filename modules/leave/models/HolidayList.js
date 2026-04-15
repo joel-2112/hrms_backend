@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Kenya Public Holidays 2025", "Nairobi Office 2025"',
     },
 
@@ -52,6 +52,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'holiday_lists',
     comment:   'Named list of public/company holidays for a year — referenced by ShiftType, Employee, LeaveApplication',
     indexes: [
+      { unique: true, fields: ['name', 'company_id'], name: 'uq_holiday_lists_name_company' },
       { fields: ['company_id'], name: 'idx_holiday_lists_company' },
       { fields: ['from_date', 'to_date'], name: 'idx_holiday_lists_period' },
     ],

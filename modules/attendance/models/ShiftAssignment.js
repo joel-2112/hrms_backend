@@ -1,3 +1,4 @@
+const { validate } = require("uuid");
 
 module.exports = (sequelize, DataTypes) => {
   const ShiftAssignment = sequelize.define('ShiftAssignment', {
@@ -35,9 +36,15 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Status ─────────────────────────────────────────────────
     status: {
-      type:         DataTypes.ENUM('Active', 'Inactive'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Active',
+      validate: {
+        isIn: {
+          args: [['Active', 'Inactive', 'Pending', 'Cancelled']],
+          msg: 'Status must be one of: Active, Inactive, Pending, Cancelled',
+        },
+      },
       comment:      'Only one Active assignment should exist per employee at any time',
     },
 

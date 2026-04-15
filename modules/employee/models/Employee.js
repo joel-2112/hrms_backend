@@ -58,7 +58,7 @@ module.exports = (sequelize, DataTypes) => {
     employeeNumber: {
       type:      DataTypes.STRING(50),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'HR-assigned employee ID e.g. "EMP-00042"',
     },
     firstName: {

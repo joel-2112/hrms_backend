@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'Contract category e.g. "Full-time", "Part-time", "Contract", "Intern"',
     },
     description: {
@@ -44,6 +44,12 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'employment_types',
     comment:   'Contract type master — referenced only by Employee',
+    indexes: [
+      {
+        unique: true,
+        fields: ['name'],
+      },
+    ],
   });
   return EmploymentType;
 };

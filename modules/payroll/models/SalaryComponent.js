@@ -1,3 +1,5 @@
+const { validate } = require("uuid");
+
 module.exports = (sequelize, DataTypes) => {
   const SalaryComponent = sequelize.define('SalaryComponent', {
     id: {
@@ -10,13 +12,13 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Basic Salary", "House Rent Allowance", "Income Tax"',
     },
     abbreviation: {
       type:      DataTypes.STRING(10),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'Short code used in formulas e.g. "BS", "HRA", "IT"',
     },
     description: {
@@ -27,11 +29,16 @@ module.exports = (sequelize, DataTypes) => {
     // ── Type ───────────────────────────────────────────────────
     // Frappe: only Earnings show in earnings table, only Deductions in deductions table
     type: {
-      type:      DataTypes.ENUM('Earning', 'Deduction'),
+      type:      DataTypes.STRING,
       allowNull: false,
+      validate: {
+        isIn: {
+          args: [['Earning', 'Deduction']],
+          msg: 'Type must be either Earning or Deduction',
+        },
+      },
       comment:   'Earning = adds to gross; Deduction = subtracted from gross',
     },
-
     // ── Formula / amount ───────────────────────────────────────
     // Frappe allows either a fixed amount or a formula string.
     // The formula is evaluated at slip generation time by the service layer.

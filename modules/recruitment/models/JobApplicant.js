@@ -1,3 +1,5 @@
+const { validate } = require("uuid");
+
 module.exports = (sequelize, DataTypes) => {
   const JobApplicant = sequelize.define('JobApplicant', {
     id: {
@@ -37,9 +39,15 @@ module.exports = (sequelize, DataTypes) => {
     // ── Application source ─────────────────────────────────────
     // Frappe: Campaign / Employee Referral / Walk In / Website Listing
     source: {
-      type:      DataTypes.ENUM('Campaign', 'Employee Referral', 'Walk In', 'Website Listing', 'Internal'),
+      type:      DataTypes.STRING,
       allowNull: false,
       defaultValue: 'Website Listing',
+        validate: {
+          isIn: {
+            args: [['Website Listing', 'Employee Referral', 'Campaign', 'Walk In']],
+            msg: 'Source must be one of Website Listing, Employee Referral, Campaign, Walk In',
+          },
+        },
       comment:   'How the applicant learned about and applied to the opening',
     },
 
@@ -71,9 +79,15 @@ module.exports = (sequelize, DataTypes) => {
     // ── Status ─────────────────────────────────────────────────
     // Frappe: Open → Replied → Rejected / Accepted / Hold
     status: {
-      type:         DataTypes.ENUM('Open', 'Replied', 'Hold', 'Accepted', 'Rejected'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Open',
+      validate: {
+        isIn: {
+          args: [['Open', 'Replied', 'Hold', 'Accepted', 'Rejected']],
+          msg: 'Status must be one of Open, Replied, Accepted, Rejected, Hold',
+        },
+      },
       comment:      'Accepted triggers JobOffer creation; Rejected closes the pipeline for this applicant',
     },
 

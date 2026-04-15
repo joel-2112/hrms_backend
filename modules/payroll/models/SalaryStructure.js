@@ -1,3 +1,5 @@
+const { validate } = require("uuid");
+
 module.exports = (sequelize, DataTypes) => {
   const SalaryStructure = sequelize.define('SalaryStructure', {
     id: {
@@ -10,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Standard Full-Time Structure", "Executive Structure"',
     },
 
@@ -24,9 +26,15 @@ module.exports = (sequelize, DataTypes) => {
     // ── Payroll frequency ──────────────────────────────────────
     // Frappe: Monthly / Bimonthly / Fortnightly / Weekly / Daily
     payrollFrequency: {
-      type:      DataTypes.ENUM('Monthly', 'Bimonthly', 'Fortnightly', 'Weekly', 'Daily'),
+      type:      DataTypes.STRING,
       allowNull: false,
       defaultValue: 'Monthly',
+      validate: {
+        isIn: {
+          args: [['Monthly', 'Bimonthly', 'Fortnightly', 'Weekly', 'Daily']],
+          msg: 'Payroll frequency must be one of Monthly, Bimonthly, Fortnightly, Weekly, Daily',
+        },
+      },
       comment:   'How often salaries are paid under this structure',
     },
 

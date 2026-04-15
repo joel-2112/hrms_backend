@@ -44,11 +44,16 @@ module.exports = (sequelize, DataTypes) => {
       comment:   'Sum of all maximumScore values — denominator for percentage calculation',
     },
     result: {
-      type:      DataTypes.ENUM('Cleared', 'Not Cleared', 'On Hold'),
+      type:      DataTypes.STRING,
       allowNull: false,
-      comment:   'This panelist\'s recommendation for the applicant',
+      validate: {
+        isIn: {
+          args: [['Cleared', 'Not Cleared', 'On Hold']],
+          msg: 'Result must be one of Cleared, Not Cleared, On Hold',
+        },
+      },
+      comment:   'Panelist\'s overall recommendation based on the interview — Pending until they submit feedback',
     },
-
     // ── Competency ratings (Frappe HR structure) ───────────────
     // Each entry: { competency, description, rating (1–5) }
     competencyRatings: {

@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "2025 (Jan-Dec)", "2025-26 (Apr-Mar)"',
     },
 

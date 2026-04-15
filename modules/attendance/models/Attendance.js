@@ -1,3 +1,4 @@
+const { valid } = require("joi");
 
 module.exports = (sequelize, DataTypes) => {
   const Attendance = sequelize.define('Attendance', {
@@ -36,17 +37,21 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Status ─────────────────────────────────────────────────
     status: {
-      type:      DataTypes.ENUM(
-        'Present',
+      type:      DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Present',
+      validate: {
+        isIn: {
+          args: [['Present',
         'Absent',
         'Half Day',
         'Work From Home',
         'On Leave',
         'Holiday',
-        'Weekly Off'
-      ),
-      allowNull: false,
-      comment:   'Primary attendance classification for payroll and reporting',
+        'Weekly Off']],
+          msg: 'Status must be one of: Present, Absent, Half Day, On Leave, Holiday, Weekly Off',
+        },
+      },
     },
 
     // ── Actual checkin / checkout times ───────────────────────
@@ -95,9 +100,15 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Source of record ───────────────────────────────────────
     attendanceSource: {
-      type:      DataTypes.ENUM('Auto', 'Manual', 'Biometric', 'Mobile'),
+      type:      DataTypes.STRING,
       allowNull: false,
       defaultValue: 'Manual',
+      validate: {
+        isIn: {
+          args: [['Auto', 'Manual', 'Biometric', 'Mobile']],
+          msg: 'Attendance source must be one of: Manual, Auto, Leave Application, Shift Assignment',
+        },
+      },
       comment:   'How this record was created — Auto = from EmployeeCheckin job',
     },
 

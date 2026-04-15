@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "India Tax 2025-26 - New Regime", "Kenya PAYE 2025"',
     },
 
@@ -71,6 +71,7 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'income_tax_slabs',
     comment:   'Tax bracket table for a PayrollPeriod — referenced by SalaryStructureAssignment and SalarySlip for TDS computation',
     indexes: [
+      { unique: true, fields: ['name', 'payroll_period_id'], name: 'uq_income_tax_slabs_name_period' },
       { fields: ['payroll_period_id'], name: 'idx_income_tax_slabs_period' },
     ],
   });

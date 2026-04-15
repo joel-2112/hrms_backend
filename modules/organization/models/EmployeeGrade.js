@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'Seniority tier e.g. "Grade A", "Senior", "Associate", "Executive"',
     },
     description: {
@@ -53,6 +53,7 @@ module.exports = (sequelize, DataTypes) => {
     comment:   'Pay band / seniority tier — referenced by Employee and SalaryStructure',
     indexes: [
       { fields: ['sort_order'], name: 'idx_employee_grades_sort_order' },
+      { unique: true, fields: ['name'], name: 'uq_employee_grades_name' },
     ],
   });
   return EmployeeGrade;

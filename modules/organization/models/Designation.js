@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'Job title e.g. "Software Engineer", "HR Manager", "Finance Director"',
     },
     // ── Classification ─────────────────────────────────────────
@@ -30,6 +30,13 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'designations',
     comment:   'Job title master — referenced by Employee, JobOpening, JobOffer, AppraisalTemplate',
+    indexes: [
+      {
+        unique: true,
+        fields: ['name'],
+      },
+    ],
+
   });
   return Designation;
 };

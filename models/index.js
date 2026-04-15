@@ -98,21 +98,6 @@ const InterviewFeedback = require('../modules/recruitment/models/InterviewFeedba
 const JobOffer          = require('../modules/recruitment/models/JobOffer')(sequelize, DataTypes);
 const AppointmentLetter = require('../modules/recruitment/models/AppointmentLetter')(sequelize, DataTypes);
 const JobRequisition      = require('../modules/recruitment/models/JobRequisition')(sequelize, DataTypes);
-
-// JobRequisition → Department + Designation + Company + EmploymentType
-JobRequisition.belongsTo(Department,     { foreignKey: 'departmentId',     allowNull: false });
-JobRequisition.belongsTo(Designation,    { foreignKey: 'designationId',    allowNull: false });
-JobRequisition.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false });
-JobRequisition.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId' });
-
-// JobRequisition → Employee (requester, HR manager, GM)
-JobRequisition.belongsTo(Employee, { as: 'requestedBy',    foreignKey: 'requestedById', allowNull: false });
-JobRequisition.belongsTo(Employee, { as: 'hrManager',      foreignKey: 'hrManagerId' });
-JobRequisition.belongsTo(Employee, { as: 'generalManager', foreignKey: 'gmId' });
-
-// JobRequisition → JobOpening
-JobRequisition.hasOne(JobOpening, { foreignKey: 'requisitionId' });
-JobOpening.belongsTo(JobRequisition, { foreignKey: 'requisitionId' });
 // ── performance/ ───────────────────────────────
 const AppraisalTemplate           = require('../modules/performance/models/AppraisalTemplate')(sequelize, DataTypes);
 const AppraisalCycle              = require('../modules/performance/models/AppraisalCycle')(sequelize, DataTypes);
@@ -459,7 +444,20 @@ JobApplicant.hasOne(JobOffer,    { foreignKey: 'jobApplicantId' });
 AppointmentLetter.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false });
 AppointmentLetter.belongsTo(JobOffer,     { foreignKey: 'jobOfferId',     allowNull: false });
 JobOffer.hasOne(AppointmentLetter,        { foreignKey: 'jobOfferId' });
+// JobRequisition → Department + Designation + Company + EmploymentType
+JobRequisition.belongsTo(Department,     { foreignKey: 'departmentId',     allowNull: false });
+JobRequisition.belongsTo(Designation,    { foreignKey: 'designationId',    allowNull: false });
+JobRequisition.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false });
+JobRequisition.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId' });
 
+// JobRequisition → Employee (requester, HR manager, GM)
+JobRequisition.belongsTo(Employee, { as: 'requestedBy',    foreignKey: 'requestedById', allowNull: false });
+JobRequisition.belongsTo(Employee, { as: 'hrManager',      foreignKey: 'hrManagerId' });
+JobRequisition.belongsTo(Employee, { as: 'generalManager', foreignKey: 'gmId' });
+
+// JobRequisition → JobOpening
+JobRequisition.hasOne(JobOpening, { foreignKey: 'requisitionId' });
+JobOpening.belongsTo(JobRequisition, { foreignKey: 'requisitionId' });
 
 // ══════════════════════════════════════════════
 //  PERFORMANCE

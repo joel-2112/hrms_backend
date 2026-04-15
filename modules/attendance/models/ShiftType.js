@@ -20,7 +20,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Morning Shift", "Night Shift", "Flexible"',
     },
     description: {
@@ -138,6 +138,13 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'shift_types',
     comment:   'Shift schedule master — defines timings, break rules, late/early thresholds and auto-attendance config',
+    indexes: [
+      {
+        unique: true,
+        fields: ['name'],
+        name: 'uq_shift_types_name',
+      },
+    ],
   });
   return ShiftType;
 };

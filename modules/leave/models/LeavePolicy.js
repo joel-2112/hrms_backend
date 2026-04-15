@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Standard Full-Time Policy", "Contract Staff Policy"',
     },
 
@@ -36,6 +36,12 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'leave_policies',
     comment:   'Named entitlement template — maps leave types to annual day allocations',
+    indexes: [
+      {
+        unique: true,
+        fields: ['name'],
+      },
+    ],
   });
   return LeavePolicy;
 };

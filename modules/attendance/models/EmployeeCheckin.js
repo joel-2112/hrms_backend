@@ -1,3 +1,4 @@
+const { validate } = require("uuid");
 
 module.exports = (sequelize, DataTypes) => {
   const EmployeeCheckin = sequelize.define('EmployeeCheckin', {
@@ -23,8 +24,14 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── The checkin event ──────────────────────────────────────
     logType: {
-      type:      DataTypes.ENUM('IN', 'OUT'),
+      type:      DataTypes.STRING,
       allowNull: false,
+      validate: {
+        isIn: {
+          args: [['IN', 'OUT']],
+          msg: 'Log type must be either IN or OUT',
+        },
+      },
       comment:   'IN = arrival tap, OUT = departure tap',
     },
     time: {

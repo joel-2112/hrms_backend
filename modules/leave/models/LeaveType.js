@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "Annual Leave", "Sick Leave", "Maternity Leave", "LWP"',
     },
     description: {
@@ -90,6 +90,12 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'leave_types',
     comment:   'Defines a category of leave and its accrual/encashment rules',
+    indexes: [
+      {
+        unique: true,
+        fields: ['name'],
+      },
+    ],
   });
   return LeaveType;
 };

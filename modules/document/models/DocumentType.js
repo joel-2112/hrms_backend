@@ -1,3 +1,4 @@
+const { validate } = require("uuid");
 
 module.exports = (sequelize, DataTypes) => {
   const DocumentType = sequelize.define('DocumentType', {
@@ -11,7 +12,7 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      unique:    true,
+      // unique:    true,
       comment:   'e.g. "National ID", "Passport", "Academic Certificate", "Contract"',
     },
     description: {
@@ -21,15 +22,19 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Classification ─────────────────────────────────────────
     category: {
-      type:      DataTypes.ENUM(
-        'Identity',
+      type:DataTypes.STRING,
+      allowNull:    false,
+      validate: {
+        isIn: {
+          args: [[ 'Identity',
         'Academic',
         'Employment',
         'Medical',
         'Legal',
-        'Other'
-      ),
-      allowNull:    false,
+        'Other']],
+          msg: 'Category must be one of: ID, Passport, Certificate, Contract, Other',
+        },
+      },
       defaultValue: 'Other',
       comment:      'Broad grouping for filtering and reporting',
     },
@@ -67,6 +72,14 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'document_types',
     comment:   'Classifies uploaded documents — the lookup master for the document module',
+    indexes: [
+      {
+        unique: true,
+        fields: ['name'],
+      },
+    ],
+
+
   });
 
   DocumentType.associate = () => {};
