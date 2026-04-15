@@ -30,8 +30,14 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Reviewer relationship ──────────────────────────────────
     reviewerType: {
-      type:      DataTypes.ENUM('Manager', 'Peer', 'Subordinate', 'Self', 'External'),
+      type:      DataTypes.STRING,
       allowNull: false,
+      validate: {
+        isIn: {
+          args: [['Manager', 'Peer', 'Subordinate', 'Self', 'External']],
+          msg: 'Reviewer type must be one of Manager, Peer, Subordinate, Self, External',
+        },
+      },
       comment:   'Relationship of reviewer to reviewee — drives 360° weighting logic',
     },
 
