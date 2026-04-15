@@ -74,20 +74,29 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     salutation: {
-      type:      DataTypes.ENUM('Mr', 'Mrs', 'Ms', 'Dr', 'Prof'),
+      type:      DataTypes.STRING,
       allowNull: true,
+      validate: {
+        isIn: [['Mr', 'Mrs', 'Ms', 'Dr', 'Prof']],
+      },
     },
     gender: {
-      type:      DataTypes.ENUM('Male', 'Female', 'Non-binary', 'Prefer not to say'),
+      type:      DataTypes.STRING,
       allowNull: true,
+      validate: {
+        isIn: [['Male', 'Female', 'Non-binary']],
+      },
     },
     dateOfBirth: {
       type:      DataTypes.DATEONLY,
       allowNull: true,
     },
     maritalStatus: {
-      type:      DataTypes.ENUM('Single', 'Married', 'Divorced', 'Widowed', 'Separated'),
+      type:      DataTypes.STRING,
       allowNull: true,
+      validate: {
+        isIn: [['Single', 'Married', 'Divorced', 'Widowed', 'Separated']],
+      },
     },
     nationality: {
       type:      DataTypes.STRING(100),
@@ -98,8 +107,9 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
     },
     bloodGroup: {
-      type:      DataTypes.ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'),
+      type:      DataTypes.STRING,
       allowNull: true,
+      validate: { isIn: [['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']] },
     },
 
     // ─────────────────────────────────────────────
