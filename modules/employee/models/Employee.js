@@ -1,3 +1,4 @@
+const { validate } = require("uuid");
 
 module.exports = (sequelize, DataTypes) => {
   const Employee = sequelize.define('Employee', {
@@ -9,7 +10,6 @@ module.exports = (sequelize, DataTypes) => {
 
     // ─────────────────────────────────────────────
     //  SECTION 1 — ORGANIZATION FKs
-    //  All wired in models/index.js
     // ─────────────────────────────────────────────
     userId: {
       type:      DataTypes.UUID,
@@ -93,10 +93,6 @@ module.exports = (sequelize, DataTypes) => {
       type:      DataTypes.STRING(100),
       allowNull: true,
     },
-    nationalId: {
-      type:      DataTypes.INTEGER(16),
-      allowNull: true,
-    },
     religion: {
       type:      DataTypes.STRING(100),
       allowNull: true,
@@ -119,9 +115,12 @@ module.exports = (sequelize, DataTypes) => {
     //  SECTION 4 — EMPLOYMENT DETAILS
     // ─────────────────────────────────────────────
     status: {
-      type:         DataTypes.ENUM('Active', 'Inactive', 'On Leave', 'Suspended', 'Left'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Active',
+      validate: {
+        isIn: [['Active', 'Inactive', 'Leave', 'Suspended', 'Left']],
+      },
     },
     dateOfJoining: {
       type:      DataTypes.DATEONLY,
@@ -296,9 +295,12 @@ module.exports = (sequelize, DataTypes) => {
       comment:   'M-Pesa or equivalent mobile money number for payroll disbursement',
     },
     paymentMethod: {
-      type:         DataTypes.ENUM('Bank Transfer', 'Cash', 'Cheque', 'Mobile Money'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Bank Transfer',
+      validate: {
+        isIn: [['Bank Transfer', 'Mobile Money', 'Cheque', 'Cash']],
+      },
     },
 
     // ─────────────────────────────────────────────
