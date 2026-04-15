@@ -40,8 +40,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
     },
     employmentType: {
-      type:      DataTypes.ENUM('Full-time', 'Part-time', 'Contract', 'Freelance', 'Internship'),
+      type:      DataTypes.STRING,
       allowNull: true,
+      validate: {
+        isIn: [['Full-time', 'Part-time', 'Contract', 'Internship', 'Freelance', 'Other']],
+      },
     },
 
     // ── Timeline ───────────────────────────────────────────────

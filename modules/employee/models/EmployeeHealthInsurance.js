@@ -97,9 +97,12 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Status ─────────────────────────────────────────────────
     status: {
-      type:         DataTypes.ENUM('Active', 'Expired', 'Cancelled', 'Pending Enrolment'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Pending Enrolment',
+      validate: {
+        isIn: [['Active', 'Expired', 'Cancelled', 'Pending Enrolment']],
+      },
     },
 
     // ── Misc ───────────────────────────────────────────────────

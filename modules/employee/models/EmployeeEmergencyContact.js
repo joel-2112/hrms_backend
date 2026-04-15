@@ -1,3 +1,4 @@
+const { validate } = require("uuid");
 
 module.exports = (sequelize, DataTypes) => {
   const EmployeeEmergencyContact = sequelize.define('EmployeeEmergencyContact', {
@@ -20,16 +21,17 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     relationship: {
-      type:      DataTypes.ENUM(
-        'Spouse',
+      type:      DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        isIn: [['Spouse',
         'Parent',
         'Sibling',
         'Child',
         'Friend',
         'Guardian',
-        'Other'
-      ),
-      allowNull: false,
+        ]],
+      },
     },
     relationshipOther: {
       type:      DataTypes.STRING(100),

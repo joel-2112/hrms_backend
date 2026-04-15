@@ -21,9 +21,12 @@ module.exports = (sequelize, DataTypes) => {
       comment:   'The date the promotion takes effect — used to time salary revision',
     },
     status: {
-      type:         DataTypes.ENUM('Draft', 'Pending Approval', 'Approved', 'Rejected', 'Cancelled'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Draft',
+      validate: {
+        isIn: [['Draft', 'Pending Approval', 'Approved', 'Rejected', 'Cancelled']],
+      },
     },
     approvedById: {
       type:      DataTypes.UUID,
@@ -79,9 +82,12 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Context ────────────────────────────────────────────────
     promotionType: {
-      type:      DataTypes.ENUM('Promotion', 'Demotion', 'Lateral Transfer', 'Grade Change'),
+      type:      DataTypes.STRING,
       allowNull: false,
       defaultValue: 'Promotion',
+      validate: {
+        isIn: [['Promotion', 'Demotion', 'Lateral Transfer', 'Grade Change']],
+      },
     },
     reason: {
       type:      DataTypes.TEXT,

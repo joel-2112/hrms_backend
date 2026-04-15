@@ -1,3 +1,4 @@
+const { valid } = require("joi");
 
 module.exports = (sequelize, DataTypes) => {
   const EmployeeSeparation = sequelize.define('EmployeeSeparation', {
@@ -17,9 +18,12 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Workflow ───────────────────────────────────────────────
     status: {
-      type:         DataTypes.ENUM('Draft', 'Pending Approval', 'Approved', 'Rejected', 'Completed'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Draft',
+      validate: {
+        isIn: [['Draft', 'Pending Approval', 'Approved', 'Rejected', 'Completed']],
+      },
     },
     approvedById: {
       type:      DataTypes.UUID,
@@ -33,22 +37,26 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Exit classification ────────────────────────────────────
     separationType: {
-      type:      DataTypes.ENUM(
-        'Resignation',
+      type:      DataTypes.STRING,
+      allowNull: false,
+      validate: {
+        isIn: [['Resignation',
         'Termination',
         'Retirement',
         'End of Contract',
         'Redundancy',
         'Death',
         'Abandonment',
-        'Mutual Agreement'
-      ),
-      allowNull: false,
+        'Mutual Agreement']],
+      },
     },
     initiatedBy: {
-      type:         DataTypes.ENUM('Employee', 'Employer'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Employee',
+      validate: {
+        isIn: [['Employee', 'Employer']],
+      },
     },
 
     // ── Key dates ──────────────────────────────────────────────

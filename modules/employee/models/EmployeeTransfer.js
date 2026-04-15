@@ -20,9 +20,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     status: {
-      type:         DataTypes.ENUM('Draft', 'Pending Approval', 'Approved', 'Rejected', 'Cancelled'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Draft',
+      validate: {
+        isIn: [['Draft', 'Pending Approval', 'Approved', 'Rejected', 'Cancelled']],
+      },
     },
     approvedById: {
       type:      DataTypes.UUID,
@@ -90,15 +93,16 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Transfer context ───────────────────────────────────────
     transferType: {
-      type:      DataTypes.ENUM(
-        'Inter-Company',
+      type:      DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'Inter-Department',
+      validate: {
+        isIn: [['Inter-Company',
         'Inter-Branch',
         'Inter-Department',
         'Project-Based',
-        'Secondment'
-      ),
-      allowNull: false,
-      defaultValue: 'Inter-Department',
+        'Secondment']],
+      },
     },
     isInterCompany: {
       type:         DataTypes.BOOLEAN,

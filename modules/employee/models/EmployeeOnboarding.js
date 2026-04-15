@@ -16,9 +16,12 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Lifecycle status ───────────────────────────────────────
     status: {
-      type:         DataTypes.ENUM('Pending', 'In Progress', 'Completed', 'Cancelled'),
+      type:         DataTypes.STRING,
       allowNull:    false,
       defaultValue: 'Pending',
+      validate: {
+        isIn: [['Pending', 'In Progress', 'Completed', 'Cancelled']],
+      },
     },
 
     // ── Dates ──────────────────────────────────────────────────
