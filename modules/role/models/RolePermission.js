@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
     // ── Field-level permission depth (0 = all fields) ─────────
     permLevel: {
       type:         DataTypes.INTEGER,
-      allowNull:    false,
+      allowNull:    true,
       defaultValue: 0,
       validate:     { min: 0, max: 9 },
       comment:      'Field group level 0–9; 0 means all fields are in scope',
@@ -115,9 +115,9 @@ module.exports = (sequelize, DataTypes) => {
     comment:   'One rule: Role X can perform action set Y on ResourceName Z at permLevel N',
     indexes: [
       {
-        // One rule per role+resource+permLevel combination
+        // One rule per role+resource combination
         unique: true,
-        fields: ['role_id','module_name', 'resource_name', 'perm_level'],
+        fields: ['role_id','module_name', 'resource_name'],
       },
       {
         fields: ['module_name'],

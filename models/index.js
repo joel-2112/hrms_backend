@@ -196,6 +196,7 @@ DocumentType.hasMany(Document,   { foreignKey: 'documentTypeId' });
 
 // Document → Employee (uploader)
 Document.belongsTo(Employee, { as: 'uploadedBy', foreignKey: 'uploadedById' });
+Employee.hasMany(Document,   { as: 'uploadedDocuments', foreignKey: 'uploadedById' });
 
 // DocumentVersion → Document
 DocumentVersion.belongsTo(Document, { foreignKey: 'documentId', allowNull: false });
@@ -220,6 +221,7 @@ Employee.belongsTo(Department,     { foreignKey: 'departmentId' });
 Employee.belongsTo(Designation,    { foreignKey: 'designationId' });
 Employee.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId' });
 Employee.belongsTo(EmployeeGrade,  { foreignKey: 'employeeGradeId' });
+Employee.belongsTo(RoleProfile,    { foreignKey: 'roleProfileId' });
 
 // Employee self-ref (reports to)
 Employee.belongsTo(Employee, { as: 'reportsTo',     foreignKey: 'reportsToId' });
@@ -247,8 +249,8 @@ EmployeeHealthInsurance.belongsTo(Employee,  { foreignKey: 'employeeId', allowNu
 Employee.hasMany(EmployeeOnboarding,       { foreignKey: 'employeeId' });
 Employee.hasMany(EmployeePromotion,        { foreignKey: 'employeeId' });
 Employee.hasMany(EmployeeTransfer,         { foreignKey: 'employeeId' });
-Employee.hasOne(EmployeeSeparation,        { foreignKey: 'employeeId' });
-Employee.hasOne(EmployeeSkillMap,          { foreignKey: 'employeeId' });
+Employee.hasMany(EmployeeSeparation,        { foreignKey: 'employeeId' });
+Employee.hasMany(EmployeeSkillMap,          { foreignKey: 'employeeId' });
 Employee.hasMany(EmployeeEducation,        { foreignKey: 'employeeId' });
 Employee.hasMany(EmployeeExternalWork,     { foreignKey: 'employeeId' });
 Employee.hasMany(EmployeeEmergencyContact, { foreignKey: 'employeeId' });
@@ -403,6 +405,8 @@ Employee.hasMany(EmployeeTaxExemptionProofSubmission,        { foreignKey: 'empl
 // StaffingPlan → Department + Designation
 StaffingPlan.belongsTo(Department,  { foreignKey: 'departmentId' });
 StaffingPlan.belongsTo(Designation, { foreignKey: 'designationId' });
+Department.hasMany(StaffingPlan,    { foreignKey: 'departmentId' });
+Designation.hasMany(StaffingPlan,   { foreignKey: 'designationId' });
 
 // JobOpening → StaffingPlan + Department + Designation
 JobOpening.belongsTo(StaffingPlan,  { foreignKey: 'staffingPlanId' });
@@ -442,6 +446,7 @@ JobApplicant.hasOne(JobOffer,    { foreignKey: 'jobApplicantId' });
 
 // AppointmentLetter → JobApplicant + JobOffer
 AppointmentLetter.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false });
+JobApplicant.hasOne(AppointmentLetter,   { foreignKey: 'jobApplicantId' });
 AppointmentLetter.belongsTo(JobOffer,     { foreignKey: 'jobOfferId',     allowNull: false });
 JobOffer.hasOne(AppointmentLetter,        { foreignKey: 'jobOfferId' });
 // JobRequisition → Department + Designation + Company + EmploymentType
