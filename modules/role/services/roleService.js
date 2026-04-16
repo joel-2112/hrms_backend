@@ -221,7 +221,9 @@ const deleteRole = async (id) => {
   }
 
   await role.destroy();
-  invalidateAllCache();
+  if (disabled !== undefined) {
+  invalidateAllCache();  
+}
 };
 
 // ═════════════════════════════════════════════
@@ -794,7 +796,7 @@ const getUserEffectivePermissions = async (userId) => {
         required: false,
         include: [{
           model:    RolePermission,
-          as:       'rolePermissions',   // must match association alias
+          as:       'RolePermissions',   // must match association alias
           required: false,
         }],
       },

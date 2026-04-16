@@ -1,6 +1,7 @@
 // 'use strict';
 
 const roleProfileService = require('../services/roleService');
+
 const { ok, created, noContent } = require('../../../utils/response');
 
 const createRoleProfile = async (req, res, next) => {
