@@ -21,30 +21,10 @@
  *   }
  */
 
-const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 const { unauthorized } = require('../utils/response');
+const { verifyToken } = require('../utils/jwt');
 const authService = require('../modules/role/services/authService');
-
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_ISSUER = process.env.JWT_ISSUER || 'hrms-api';
-const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'hrms-client';
-
-// ─────────────────────────────────────────────
-//  SIGN (used by authService.js on login)
-//
-//  generateToken(payload, expiresIn?)
-//  Returns a signed JWT string.
-// ─────────────────────────────────────────────
-const generateToken = (payload, expiresIn = process.env.JWT_EXPIRES_IN || '7d') => {
-  if (!JWT_SECRET) throw new Error('JWT_SECRET is not set in environment');
-
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn,
-    issuer: JWT_ISSUER,
-    audience: JWT_AUDIENCE,
-  });
-};
 
 // ─────────────────────────────────────────────
 //  HELPER: Extract token from request
@@ -66,16 +46,6 @@ const extractToken = (req) => {
 };
 
 // ─────────────────────────────────────────────
-//  HELPER: Verify and decode JWT
-// ─────────────────────────────────────────────
-const verifyAndDecode = (token) => {
-  return jwt.verify(token, JWT_SECRET, {
-    issuer: JWT_ISSUER,
-    audience: JWT_AUDIENCE,
-  });
-};
-
-// ─────────────────────────────────────────────
 //  AUTHENTICATE (Express middleware)
 //
 //  Rejects the request with 401 if:
@@ -94,7 +64,7 @@ const authenticate = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = verifyAndDecode(token);
+      decoded = verifyToken(token);
     } catch (err) {
       if (err.name === 'TokenExpiredError') {
         return unauthorized(res, 'Session expired. Please log in again.');
@@ -156,7 +126,7 @@ const optionalAuthenticate = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = verifyAndDecode(token);
+      decoded = verifyToken(token);
     } catch {
       // Token invalid or expired — still continue, just without user
       req.user = null;
@@ -239,7 +209,6 @@ const requireSystemManager = (req, res, next) => {
 };
 
 module.exports = {
-  generateToken,
   authenticate,
   optionalAuthenticate,
   refreshUserSession,

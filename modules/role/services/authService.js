@@ -16,7 +16,7 @@ const { Op } = require('sequelize');
 const crypto = require('crypto');
 const { User, Role, UserRole, RoleProfile, UserSession, LoginAttempt } = require('../../../models');
 const { AppError } = require('../../../middlewares/errorMiddleware');
-const { generateToken, verifyToken } = require('../../../middlewares/authMiddleware');
+const { generateToken, verifyToken } = require('../../../utils/jwt');
 
 // ─────────────────────────────────────────────
 //  CONFIGURATION
