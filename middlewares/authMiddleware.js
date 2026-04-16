@@ -3,93 +3,137 @@
 /**
  * middlewares/auth.middleware.js
  *
- * Verifies the Bearer JWT on every protected route and attaches
- * the decoded user payload to req.user so downstream middleware
- * and controllers never touch the token again.
+ * Verifies the JWT from either:
+ *   - Authorization: Bearer header (existing clients)
+ *   - HTTP-only cookie (web browsers)
  *
- * Usage in routes:
- *   const { authenticate } = require('../../middlewares/auth.middleware');
- *   router.get('/employees', authenticate, employeeController.list);
+ * Attaches decoded user payload to req.user and validates session.
  *
  * req.user shape after authenticate():
  *   {
  *     id            : 'uuid',
  *     email         : 'user@example.com',
+ *     sessionId     : 'uuid',
+ *     sessionToken  : 'string',
  *     isSystemManager: false,
  *     isSuperUser   : false,
  *     roleProfileId : 'uuid | null',
  *   }
- *
- * Install:  npm install jsonwebtoken
  */
 
-const jwt    = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 const { unauthorized } = require('../utils/response');
+const authService = require('../modules/role/services/authService');
 
-const JWT_SECRET      = process.env.JWT_SECRET;
-const JWT_ISSUER      = process.env.JWT_ISSUER  || 'hrms-api';
-const JWT_AUDIENCE    = process.env.JWT_AUDIENCE || 'hrms-client';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_ISSUER = process.env.JWT_ISSUER || 'hrms-api';
+const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'hrms-client';
 
 // ─────────────────────────────────────────────
-//  SIGN  (used by user.service.js on login)
+//  SIGN (used by authService.js on login)
 //
 //  generateToken(payload, expiresIn?)
 //  Returns a signed JWT string.
-//
-//  Usage:
-//    const token = generateToken({ id: user.id, email: user.email, ... });
 // ─────────────────────────────────────────────
-const generateToken = (payload, expiresIn = process.env.JWT_EXPIRES_IN || '8h') => {
+const generateToken = (payload, expiresIn = process.env.JWT_EXPIRES_IN || '7d') => {
   if (!JWT_SECRET) throw new Error('JWT_SECRET is not set in environment');
 
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn,
-    issuer:   JWT_ISSUER,
+    issuer: JWT_ISSUER,
     audience: JWT_AUDIENCE,
   });
 };
 
 // ─────────────────────────────────────────────
-//  AUTHENTICATE  (Express middleware)
-//
-//  Rejects the request with 401 if:
-//    — Authorization header is missing
-//    — Token is malformed, expired, or signed with wrong secret
-//  On success, sets req.user = decoded payload.
+//  HELPER: Extract token from request
+//    Priority: 1. Cookie | 2. Authorization Header
 // ─────────────────────────────────────────────
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return unauthorized(res, 'Authorization header missing or malformed');
+const extractToken = (req) => {
+  // First try cookie (web browsers)
+  if (req.cookies && req.cookies.authToken) {
+    return req.cookies.authToken;
   }
 
-  const token = authHeader.split(' ')[1];
+  // Fallback to Authorization header (mobile apps, API clients)
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
 
+  return null;
+};
+
+// ─────────────────────────────────────────────
+//  HELPER: Verify and decode JWT
+// ─────────────────────────────────────────────
+const verifyAndDecode = (token) => {
+  return jwt.verify(token, JWT_SECRET, {
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+  });
+};
+
+// ─────────────────────────────────────────────
+//  AUTHENTICATE (Express middleware)
+//
+//  Rejects the request with 401 if:
+//    — No token found in cookie or header
+//    — Token is malformed, expired, or signed with wrong secret
+//    — Session is invalid, expired, or terminated
+//  On success, sets req.user with decoded payload.
+// ─────────────────────────────────────────────
+const authenticate = async (req, res, next) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
-      issuer:   JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    });
+    const token = extractToken(req);
 
-    // Attach only the fields controllers need — never the raw token
+    if (!token) {
+      return unauthorized(res, 'Authentication required. Please log in.');
+    }
+
+    let decoded;
+    try {
+      decoded = verifyAndDecode(token);
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        return unauthorized(res, 'Session expired. Please log in again.');
+      }
+      if (err.name === 'JsonWebTokenError') {
+        return unauthorized(res, 'Invalid token. Please log in again.');
+      }
+      throw err;
+    }
+
+    // Validate session exists and is active (if sessionId is present in token)
+    if (decoded.sessionId && decoded.sessionToken) {
+      const isValid = await authService.validateSession(
+        decoded.id,
+        decoded.sessionId,
+        decoded.sessionToken
+      );
+
+      if (!isValid) {
+        return unauthorized(res, 'Session invalid or expired. Please log in again.');
+      }
+    }
+
+    // Attach user info to request
     req.user = {
-      id:              decoded.id,
-      email:           decoded.email,
+      id: decoded.id,
+      email: decoded.email,
+      sessionId: decoded.sessionId || null,
+      sessionToken: decoded.sessionToken || null,
       isSystemManager: decoded.isSystemManager || false,
-      isSuperUser:     decoded.isSuperUser     || false,
-      roleProfileId:   decoded.roleProfileId   || null,
+      isSuperUser: decoded.isSuperUser || false,
+      roleProfileId: decoded.roleProfileId || null,
     };
 
     logger.debug('Authenticated', { userId: req.user.id, path: req.originalUrl });
     return next();
 
   } catch (err) {
-    // jsonwebtoken throws named errors — the global error handler in
-    // error.middleware.js maps JsonWebTokenError + TokenExpiredError to 401.
-    // We re-throw here so that handler stays as the single mapping point.
-    logger.warn('JWT verification failed', { error: err.message, path: req.originalUrl });
+    logger.error('Authentication error', { error: err.message, path: req.originalUrl });
     return next(err);
   }
 };
@@ -98,42 +142,107 @@ const authenticate = (req, res, next) => {
 //  OPTIONAL AUTHENTICATE
 //
 //  Same as authenticate but does NOT reject if
-//  no token is present — req.user will be null.
-//  Use on public endpoints that show richer data
-//  when the caller is logged in (e.g. job portal).
+//  no token is present or validation fails.
+//  req.user will be null if not authenticated.
 // ─────────────────────────────────────────────
-const optionalAuthenticate = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
+const optionalAuthenticate = async (req, res, next) => {
+  try {
+    const token = extractToken(req);
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+
+    let decoded;
+    try {
+      decoded = verifyAndDecode(token);
+    } catch {
+      // Token invalid or expired — still continue, just without user
+      req.user = null;
+      return next();
+    }
+
+    // Validate session if present (don't reject, just set user if valid)
+    let sessionValid = true;
+    if (decoded.sessionId && decoded.sessionToken) {
+      sessionValid = await authService.validateSession(
+        decoded.id,
+        decoded.sessionId,
+        decoded.sessionToken
+      );
+    }
+
+    if (sessionValid) {
+      req.user = {
+        id: decoded.id,
+        email: decoded.email,
+        sessionId: decoded.sessionId || null,
+        sessionToken: decoded.sessionToken || null,
+        isSystemManager: decoded.isSystemManager || false,
+        isSuperUser: decoded.isSuperUser || false,
+        roleProfileId: decoded.roleProfileId || null,
+      };
+    } else {
+      req.user = null;
+    }
+
+    return next();
+
+  } catch (err) {
+    // On any error, just set user to null and continue
     req.user = null;
     return next();
   }
+};
 
-  const token = authHeader.split(' ')[1];
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
-      issuer:   JWT_ISSUER,
-      audience: JWT_AUDIENCE,
+// ─────────────────────────────────────────────
+//  SESSION REFRESH MIDDLEWARE
+//
+//  Call this on routes that should extend session expiry
+//  on user activity (e.g., after each API call from frontend)
+// ─────────────────────────────────────────────
+const refreshUserSession = async (req, res, next) => {
+  if (req.user && req.user.sessionId) {
+    // Fire-and-forget — don't await, don't block response
+    authService.refreshSession(req.user.sessionId).catch((err) => {
+      logger.debug('Session refresh failed', { error: err.message, userId: req.user.id });
     });
-
-    req.user = {
-      id:              decoded.id,
-      email:           decoded.email,
-      isSystemManager: decoded.isSystemManager || false,
-      isSuperUser:     decoded.isSuperUser     || false,
-      roleProfileId:   decoded.roleProfileId   || null,
-    };
-  } catch {
-    req.user = null;
   }
+  next();
+};
 
-  return next();
+// ─────────────────────────────────────────────
+//  REQUIRE SUPERUSER (admin-only routes)
+// ─────────────────────────────────────────────
+const requireSuperUser = (req, res, next) => {
+  if (!req.user) {
+    return unauthorized(res, 'Authentication required');
+  }
+  if (!req.user.isSuperUser) {
+    return res.status(403).json({ message: 'Superuser access required' });
+  }
+  next();
+};
+
+// ─────────────────────────────────────────────
+//  REQUIRE SYSTEM MANAGER
+// ─────────────────────────────────────────────
+const requireSystemManager = (req, res, next) => {
+  if (!req.user) {
+    return unauthorized(res, 'Authentication required');
+  }
+  if (!req.user.isSystemManager && !req.user.isSuperUser) {
+    return res.status(403).json({ message: 'System Manager access required' });
+  }
+  next();
 };
 
 module.exports = {
   generateToken,
   authenticate,
   optionalAuthenticate,
+  refreshUserSession,
+  requireSuperUser,
+  requireSystemManager,
 };

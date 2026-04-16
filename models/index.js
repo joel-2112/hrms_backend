@@ -27,6 +27,8 @@ const RoleProfileRole = require('../modules/role/models/RoleProfileRole')(sequel
 const RolePermission  = require('../modules/role/models/RolePermission')(sequelize, DataTypes);
 const User            = require('../modules/role/models/User')(sequelize, DataTypes);
 const UserPermission  = require('../modules/role/models/UserPermission')(sequelize, DataTypes);
+const UserSession     = require('../modules/role/models/UserSession')(sequelize, DataTypes);
+const LoginAttempt    = require('../modules/role/models/LoginAttempt')(sequelize, DataTypes);
 
 // ── organization/ ──────────────────────────────
 const Company        = require('../modules/organization/models/Company')(sequelize, DataTypes);
@@ -165,6 +167,12 @@ Role.hasMany(RolePermission,   { foreignKey: 'roleId' });
 // UserPermission → User
 UserPermission.belongsTo(User, { foreignKey: 'userId', allowNull: false });
 User.hasMany(UserPermission,   { foreignKey: 'userId' });
+User.hasMany(UserSession, { foreignKey: 'userId' });
+UserSession.belongsTo(User, { foreignKey: 'userId' });
+LoginAttempt.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(LoginAttempt, { foreignKey: 'userId' });
+
+
 
 
 // ══════════════════════════════════════════════
@@ -513,6 +521,8 @@ module.exports = {
   RolePermission,
   User,
   UserPermission,
+  UserSession,
+  LoginAttempt,
 
   // organization
   Company,
