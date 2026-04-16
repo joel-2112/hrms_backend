@@ -24,14 +24,11 @@ const { authenticate } = require('../../../middlewares/authMiddleware');
  *         application/json:
  *           schema:
  *             type: object
- *             required: [firstName,middleName, lastName, email, password]
+ *             required: [firstName, lastName, email, password]
  *             properties:
  *               firstName:
  *                 type: string
  *                 example: Aisha
- *               middleName:
- *                 type: string
- *                 example: Kofi
  *               lastName:
  *                 type: string
  *                 example: Mensah
