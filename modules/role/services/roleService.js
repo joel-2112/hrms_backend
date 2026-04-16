@@ -830,7 +830,7 @@ const getUserEffectivePermissions = async (userId) => {
   ];
 
   (user.roles || []).forEach(role => {
-    (role.rolePermissions || []).forEach(perm => {
+    (role.RolePermissions || []).forEach(perm => {
       const key = `${perm.moduleName}:${perm.resourceName}:${perm.permLevel}`;
 
       if (!permMap.has(key)) {
