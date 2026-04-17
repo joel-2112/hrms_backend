@@ -1,36 +1,65 @@
+'use strict';
 
-const { Sequelize, DataTypes } = require('sequelize');
-const sequelize = require('../config/database').sequelize;
+// ─────────────────────────────────────────────────────────────────────────────
+//  models/index.js
+//
+//  Single entry-point for the entire Sequelize layer.
+//
+//  Layout
+//  ──────
+//  1. Bootstrap  – Sequelize instance + DataTypes
+//  2. Imports    – one require() per model, grouped by module
+//                  Import order follows the dependency chain:
+//                  role → organization → document → employee →
+//                  attendance → leave → payroll → recruitment → performance
+//  3. Associations – every belongsTo / hasMany / hasOne / belongsToMany pair
+//                  declared HERE, never inside individual model files,
+//                  to avoid circular-require issues.
+//                  Rules applied throughout:
+//                    • Every belongsTo has a matching hasMany / hasOne reverse.
+//                    • Every hasMany reverse on a belongsTo is present.
+//                    • as: 'camelCaseAlias' is set on EVERY call so that
+//                      Sequelize eager-loading is always explicit and
+//                      unambiguous, even where a model has only one FK to
+//                      a target.
+//                    • allowNull: false mirrors the NOT NULL constraint for
+//                      mandatory FK columns.
+//  4. Exports    – sequelize instance + every model by name.
+//
+//  Usage in controllers / services:
+//    const { Employee, Department, LeaveApplication } = require('../../models');
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  1. BOOTSTRAP
+// ─────────────────────────────────────────────────────────────────────────────
+
 require('dotenv').config();
 
+const { Sequelize, DataTypes } = require('sequelize');
+const sequelize               = require('../config/database').sequelize;
 
 
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 //  2. IMPORT ALL MODELS
-//     Priority order mirrors the full module stack:
-//     role → organization → document → employee →
-//     attendance → leave → payroll →
-//     recruitment → performance
-//
-//     RULE: Each model file exports a factory function
-//     (sequelize, DataTypes) => Model.
-//     Associations are NEVER declared inside model
-//     files — they are all wired in section 3 below.
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── role/  ─────────────────────────────────────
-//    Must be first: User is referenced by Employee
+// ── 2.1  role/  ──────────────────────────────────────────────────────────────
+//         Must be first – User is referenced by Employee (userId FK).
+
 const Role            = require('../modules/role/models/Role')(sequelize, DataTypes);
 const RoleProfile     = require('../modules/role/models/RoleProfile')(sequelize, DataTypes);
-const UserRole        = require('../modules/role/models/UserRole')(sequelize, DataTypes);
-const RoleProfileRole = require('../modules/role/models/RoleProfileRole')(sequelize, DataTypes);
+const RoleProfileRole = require('../modules/role/models/RoleProfileRole')(sequelize, DataTypes);  // junction
 const RolePermission  = require('../modules/role/models/RolePermission')(sequelize, DataTypes);
 const User            = require('../modules/role/models/User')(sequelize, DataTypes);
+const UserRole        = require('../modules/role/models/UserRole')(sequelize, DataTypes);          // junction
 const UserPermission  = require('../modules/role/models/UserPermission')(sequelize, DataTypes);
 const UserSession     = require('../modules/role/models/UserSession')(sequelize, DataTypes);
 const LoginAttempt    = require('../modules/role/models/LoginAttempt')(sequelize, DataTypes);
 
-// ── organization/ ──────────────────────────────
+// ── 2.2  organization/  ───────────────────────────────────────────────────────
+
 const Company        = require('../modules/organization/models/Company')(sequelize, DataTypes);
 const Branch         = require('../modules/organization/models/Branch')(sequelize, DataTypes);
 const Department     = require('../modules/organization/models/Department')(sequelize, DataTypes);
@@ -38,12 +67,14 @@ const Designation    = require('../modules/organization/models/Designation')(seq
 const EmploymentType = require('../modules/organization/models/EmploymentType')(sequelize, DataTypes);
 const EmployeeGrade  = require('../modules/organization/models/EmployeeGrade')(sequelize, DataTypes);
 
-// ── document/ ──────────────────────────────────
+// ── 2.3  document/  ───────────────────────────────────────────────────────────
+
 const DocumentType    = require('../modules/document/models/DocumentType')(sequelize, DataTypes);
 const Document        = require('../modules/document/models/Document')(sequelize, DataTypes);
 const DocumentVersion = require('../modules/document/models/DocumentVersion')(sequelize, DataTypes);
 
-// ── employee/ ──────────────────────────────────
+// ── 2.4  employee/  ───────────────────────────────────────────────────────────
+
 const Employee                 = require('../modules/employee/models/Employee')(sequelize, DataTypes);
 const EmployeeOnboarding       = require('../modules/employee/models/EmployeeOnboarding')(sequelize, DataTypes);
 const EmployeePromotion        = require('../modules/employee/models/EmployeePromotion')(sequelize, DataTypes);
@@ -55,7 +86,8 @@ const EmployeeExternalWork     = require('../modules/employee/models/EmployeeExt
 const EmployeeEmergencyContact = require('../modules/employee/models/EmployeeEmergencyContact')(sequelize, DataTypes);
 const EmployeeHealthInsurance  = require('../modules/employee/models/EmployeeHealthInsurance')(sequelize, DataTypes);
 
-// ── attendance/ ────────────────────────────────
+// ── 2.5  attendance/  ─────────────────────────────────────────────────────────
+
 const ShiftType         = require('../modules/attendance/models/ShiftType')(sequelize, DataTypes);
 const ShiftAssignment   = require('../modules/attendance/models/ShiftAssignment')(sequelize, DataTypes);
 const ShiftRequest      = require('../modules/attendance/models/ShiftRequest')(sequelize, DataTypes);
@@ -63,7 +95,8 @@ const Attendance        = require('../modules/attendance/models/Attendance')(seq
 const EmployeeCheckin   = require('../modules/attendance/models/EmployeeCheckin')(sequelize, DataTypes);
 const AttendanceRequest = require('../modules/attendance/models/AttendanceRequest')(sequelize, DataTypes);
 
-// ── leave/ ─────────────────────────────────────
+// ── 2.6  leave/  ──────────────────────────────────────────────────────────────
+
 const HolidayList              = require('../modules/leave/models/HolidayList')(sequelize, DataTypes);
 const LeaveType                = require('../modules/leave/models/LeaveType')(sequelize, DataTypes);
 const LeavePeriod              = require('../modules/leave/models/LeavePeriod')(sequelize, DataTypes);
@@ -76,7 +109,8 @@ const CompensatoryLeaveRequest = require('../modules/leave/models/CompensatoryLe
 const LeaveEncashment          = require('../modules/leave/models/LeaveEncashment')(sequelize, DataTypes);
 const LeaveLedgerEntry         = require('../modules/leave/models/LeaveLedgerEntry')(sequelize, DataTypes);
 
-// ── payroll/ ───────────────────────────────────
+// ── 2.7  payroll/  ────────────────────────────────────────────────────────────
+
 const SalaryComponent                     = require('../modules/payroll/models/SalaryComponent')(sequelize, DataTypes);
 const SalaryStructure                     = require('../modules/payroll/models/SalaryStructure')(sequelize, DataTypes);
 const PayrollPeriod                       = require('../modules/payroll/models/PayrollPeriod')(sequelize, DataTypes);
@@ -90,51 +124,53 @@ const EmployeeIncentive                   = require('../modules/payroll/models/E
 const EmployeeTaxExemptionDeclaration     = require('../modules/payroll/models/EmployeeTaxExemptionDeclaration')(sequelize, DataTypes);
 const EmployeeTaxExemptionProofSubmission = require('../modules/payroll/models/EmployeeTaxExemptionProofSubmission')(sequelize, DataTypes);
 
-// ── recruitment/ ───────────────────────────────
+// ── 2.8  recruitment/  ────────────────────────────────────────────────────────
+
+const JobRequisition    = require('../modules/recruitment/models/JobRequisition')(sequelize, DataTypes);
 const StaffingPlan      = require('../modules/recruitment/models/StaffingPlan')(sequelize, DataTypes);
 const JobOpening        = require('../modules/recruitment/models/JobOpening')(sequelize, DataTypes);
-const EmployeeReferral  = require('../modules/recruitment/models/EmployeeReferral')(sequelize, DataTypes);
 const JobApplicant      = require('../modules/recruitment/models/JobApplicant')(sequelize, DataTypes);
+const EmployeeReferral  = require('../modules/recruitment/models/EmployeeReferral')(sequelize, DataTypes);
 const Interview         = require('../modules/recruitment/models/Interview')(sequelize, DataTypes);
 const InterviewFeedback = require('../modules/recruitment/models/InterviewFeedback')(sequelize, DataTypes);
 const JobOffer          = require('../modules/recruitment/models/JobOffer')(sequelize, DataTypes);
 const AppointmentLetter = require('../modules/recruitment/models/AppointmentLetter')(sequelize, DataTypes);
-const JobRequisition      = require('../modules/recruitment/models/JobRequisition')(sequelize, DataTypes);
-// ── performance/ ───────────────────────────────
+
+// ── 2.9  performance/  ────────────────────────────────────────────────────────
+
 const AppraisalTemplate           = require('../modules/performance/models/AppraisalTemplate')(sequelize, DataTypes);
 const AppraisalCycle              = require('../modules/performance/models/AppraisalCycle')(sequelize, DataTypes);
 const Appraisal                   = require('../modules/performance/models/Appraisal')(sequelize, DataTypes);
 const Goal                        = require('../modules/performance/models/Goal')(sequelize, DataTypes);
 const EmployeePerformanceFeedback = require('../modules/performance/models/EmployeePerformanceFeedback')(sequelize, DataTypes);
 
-// ─────────────────────────────────────────────
-//  3. DECLARE ALL ASSOCIATIONS
-//     Every belongsTo / hasMany / hasOne pair
-//     is defined here, after all models are
-//     initialized, to avoid circular import
-//     issues.
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  3. ASSOCIATIONS
 //
-//     Convention:
-//       — belongsTo  declares the FK column
-//       — hasMany / hasOne is always the mirror
-//       — as: 'alias' is required wherever a model
-//         has more than one FK pointing at the
-//         same target (e.g. reviewer vs reviewee)
-// ─────────────────────────────────────────────
+//  Format for every block:
+//    // ChildModel.belongsTo(ParentModel) — FK lives on ChildModel
+//    // ParentModel.hasMany / hasOne(ChildModel) — mirror (no new column)
+//
+//  Alias convention:
+//    belongsTo  → singular camelCase  e.g. as: 'company', as: 'approver'
+//    hasMany    → plural  camelCase   e.g. as: 'branches', as: 'employees'
+//    hasOne     → singular camelCase  e.g. as: 'separation', as: 'jobOffer'
+//    belongsToMany → plural camelCase e.g. as: 'roles', as: 'users'
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ══════════════════════════════════════════════
-//  ROLE
-//  Declared first — User must exist before
-//  Employee can reference userId below.
-// ══════════════════════════════════════════════
 
-// RoleProfile ↔ Role  (many-to-many via RoleProfileRole junction)
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.1  ROLE MODULE
+//       Declared first — User must exist before Employee references userId.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── RoleProfile ↔ Role  (M:M via RoleProfileRole junction) ───────────────────
 RoleProfile.belongsToMany(Role, {
   through:    RoleProfileRole,
   foreignKey: 'roleProfileId',
-  as:         'roles',
   otherKey:   'roleId',
-  
+  as:         'roles',
 });
 Role.belongsToMany(RoleProfile, {
   through:    RoleProfileRole,
@@ -143,7 +179,7 @@ Role.belongsToMany(RoleProfile, {
   as:         'roleProfiles',
 });
 
-// User ↔ Role  (many-to-many via UserRole junction)
+// ── User ↔ Role  (M:M via UserRole junction) ─────────────────────────────────
 User.belongsToMany(Role, {
   through:    UserRole,
   foreignKey: 'userId',
@@ -157,378 +193,467 @@ Role.belongsToMany(User, {
   as:         'users',
 });
 
-// User → RoleProfile  (optional single template FK)
-User.belongsTo(RoleProfile, { foreignKey: 'roleProfileId' });
-RoleProfile.hasMany(User,   { foreignKey: 'roleProfileId' });
-
-// RolePermission → Role
-RolePermission.belongsTo(Role, { foreignKey: 'roleId', allowNull: false });
-Role.hasMany(RolePermission,   { foreignKey: 'roleId' });
-
-// UserPermission → User
-UserPermission.belongsTo(User, { foreignKey: 'userId', allowNull: false });
-User.hasMany(UserPermission,   { foreignKey: 'userId' });
-User.hasMany(UserSession, { foreignKey: 'userId' });
-UserSession.belongsTo(User, { foreignKey: 'userId' });
-LoginAttempt.belongsTo(User, { foreignKey: 'userId' });
-User.hasMany(LoginAttempt, { foreignKey: 'userId' });
-
-
-
-
-// ══════════════════════════════════════════════
-//  ORGANIZATION
-// ══════════════════════════════════════════════
-
-// Company self-ref (group companies)
-Company.belongsTo(Company, { as: 'parentCompany', foreignKey: 'parentCompanyId' });
-Company.hasMany(Company,   { as: 'subsidiaries',  foreignKey: 'parentCompanyId' });
-
-// Branch → Company
-Branch.belongsTo(Company, { foreignKey: 'companyId', allowNull: false });
-Company.hasMany(Branch,   { foreignKey: 'companyId' });
-
-// Department → Company  +  Department self-ref (tree)
-Department.belongsTo(Company,    { foreignKey: 'companyId', allowNull: false });
-Company.hasMany(Department,      { foreignKey: 'companyId' });
-Department.belongsTo(Department, { as: 'parentDepartment', foreignKey: 'parentDepartmentId' });
-Department.hasMany(Department,   { as: 'subDepartments',   foreignKey: 'parentDepartmentId' });
-
-
-// ══════════════════════════════════════════════
-//  DOCUMENT
-// ══════════════════════════════════════════════
-
-// Document → DocumentType
-Document.belongsTo(DocumentType, { foreignKey: 'documentTypeId', allowNull: false });
-DocumentType.hasMany(Document,   { foreignKey: 'documentTypeId' });
-
-// Document → Employee (uploader)
-Document.belongsTo(Employee, { as: 'uploadedBy', foreignKey: 'uploadedById' });
-Employee.hasMany(Document,   { as: 'uploadedDocuments', foreignKey: 'uploadedById' });
-
-// DocumentVersion → Document
-DocumentVersion.belongsTo(Document, { foreignKey: 'documentId', allowNull: false });
-Document.hasMany(DocumentVersion,   { foreignKey: 'documentId', as: 'versions' });
-
-// DocumentVersion → Employee (who replaced it)
-DocumentVersion.belongsTo(Employee, { as: 'replacedBy', foreignKey: 'replacedById' });
-
-
-// ══════════════════════════════════════════════
-//  EMPLOYEE  (core lifecycle models)
-// ══════════════════════════════════════════════
-
-// Employee → User  (the system login account for this employee)
-Employee.belongsTo(User, { foreignKey: 'userId' });
-User.hasOne(Employee,    { foreignKey: 'userId' });
-
-// Employee → organization masters
-Employee.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false });
-Employee.belongsTo(Branch,         { foreignKey: 'branchId' });
-Employee.belongsTo(Department,     { foreignKey: 'departmentId' });
-Employee.belongsTo(Designation,    { foreignKey: 'designationId' });
-Employee.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId' });
-Employee.belongsTo(EmployeeGrade,  { foreignKey: 'employeeGradeId' });
-Employee.belongsTo(RoleProfile,    { foreignKey: 'roleProfileId' });
-
-// Employee self-ref (reports to)
-Employee.belongsTo(Employee, { as: 'reportsTo',     foreignKey: 'reportsToId' });
-Employee.hasMany(Employee,   { as: 'directReports', foreignKey: 'reportsToId' });
-
-// Reverse: organization masters have many employees
-Company.hasMany(Employee,        { foreignKey: 'companyId' });
-Branch.hasMany(Employee,         { foreignKey: 'branchId' });
-Department.hasMany(Employee,     { foreignKey: 'departmentId' });
-Designation.hasMany(Employee,    { foreignKey: 'designationId' });
-EmploymentType.hasMany(Employee, { foreignKey: 'employmentTypeId' });
-EmployeeGrade.hasMany(Employee,  { foreignKey: 'employeeGradeId' });
-EmployeeGrade.belongsTo(LeavePolicy,  { foreignKey: 'defaultLeavePolicyId' });
-
-
-// Employee lifecycle child models → Employee
-EmployeeOnboarding.belongsTo(Employee,       { foreignKey: 'employeeId', allowNull: false });
-EmployeePromotion.belongsTo(Employee,        { foreignKey: 'employeeId', allowNull: false });
-EmployeeTransfer.belongsTo(Employee,         { foreignKey: 'employeeId', allowNull: false });
-EmployeeSeparation.belongsTo(Employee,       { foreignKey: 'employeeId', allowNull: false });
-EmployeeSkillMap.belongsTo(Employee,         { foreignKey: 'employeeId', allowNull: false });
-EmployeeEducation.belongsTo(Employee,        { foreignKey: 'employeeId', allowNull: false });
-EmployeeExternalWork.belongsTo(Employee,     { foreignKey: 'employeeId', allowNull: false });
-EmployeeEmergencyContact.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false });
-EmployeeHealthInsurance.belongsTo(Employee,  { foreignKey: 'employeeId', allowNull: false });
-
-Employee.hasMany(EmployeeOnboarding,       { foreignKey: 'employeeId' });
-Employee.hasMany(EmployeePromotion,        { foreignKey: 'employeeId' });
-Employee.hasMany(EmployeeTransfer,         { foreignKey: 'employeeId' });
-Employee.hasMany(EmployeeSeparation,        { foreignKey: 'employeeId' });
-Employee.hasMany(EmployeeSkillMap,          { foreignKey: 'employeeId' });
-Employee.hasMany(EmployeeEducation,        { foreignKey: 'employeeId' });
-Employee.hasMany(EmployeeExternalWork,     { foreignKey: 'employeeId' });
-Employee.hasMany(EmployeeEmergencyContact, { foreignKey: 'employeeId' });
-Employee.hasOne(EmployeeHealthInsurance,   { foreignKey: 'employeeId' });
-
-
-// ══════════════════════════════════════════════
-//  ATTENDANCE
-// ══════════════════════════════════════════════
-
-// ShiftType → HolidayList (leave module cross-ref)
-ShiftType.belongsTo(HolidayList, { foreignKey: 'holidayListId' });
-
-// ShiftAssignment → Employee + ShiftType
-ShiftAssignment.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false });
-ShiftAssignment.belongsTo(ShiftType, { foreignKey: 'shiftTypeId', allowNull: false });
-Employee.hasMany(ShiftAssignment,    { foreignKey: 'employeeId' });
-ShiftType.hasMany(ShiftAssignment,   { foreignKey: 'shiftTypeId' });
-
-// ShiftRequest → Employee (requester + approver) + ShiftType
-ShiftRequest.belongsTo(Employee,  { as: 'requester', foreignKey: 'requesterId', allowNull: false });
-ShiftRequest.belongsTo(Employee,  { as: 'approver',  foreignKey: 'approverId' });
-ShiftRequest.belongsTo(ShiftType, { foreignKey: 'shiftTypeId', allowNull: false });
-Employee.hasMany(ShiftRequest,    { as: 'shiftRequests', foreignKey: 'requesterId' });
-ShiftType.hasMany(ShiftRequest,   { foreignKey: 'shiftTypeId' });
-
-// Attendance → Employee + ShiftType + LeaveApplication (cross-ref)
-Attendance.belongsTo(Employee,         { foreignKey: 'employeeId',        allowNull: false });
-Attendance.belongsTo(ShiftType,        { foreignKey: 'shiftTypeId' });
-Attendance.belongsTo(LeaveApplication, { foreignKey: 'leaveApplicationId' });
-Employee.hasMany(Attendance,           { foreignKey: 'employeeId' });
-ShiftType.hasMany(Attendance,          { foreignKey: 'shiftTypeId' });
-
-// EmployeeCheckin → Employee + ShiftType
-EmployeeCheckin.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false });
-EmployeeCheckin.belongsTo(ShiftType, { foreignKey: 'shiftTypeId' });
-Employee.hasMany(EmployeeCheckin,    { foreignKey: 'employeeId' });
-
-// AttendanceRequest → Employee + Attendance (approved request updates a record)
-AttendanceRequest.belongsTo(Employee,   { foreignKey: 'employeeId',   allowNull: false });
-AttendanceRequest.belongsTo(Attendance, { foreignKey: 'attendanceId' });
-Employee.hasMany(AttendanceRequest,     { foreignKey: 'employeeId' });
-
-
-// ══════════════════════════════════════════════
-//  LEAVE
-// ══════════════════════════════════════════════
-
-// LeavePolicy → LeaveType (policy bundles many leave type rows)
-LeavePolicy.hasMany(LeaveType,   { foreignKey: 'leavePolicyId' });
-LeavePolicy.hasMany(EmployeeGrade, { foreignKey: 'defaultLeavePolicyId' });
-LeaveType.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId' });
-
-// LeavePolicyAssignment → Employee + LeavePolicy + LeavePeriod
-LeavePolicyAssignment.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false });
-LeavePolicyAssignment.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId', allowNull: false });
-LeavePolicyAssignment.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false });
-Employee.hasMany(LeavePolicyAssignment,      { foreignKey: 'employeeId' });
-LeavePolicy.hasMany(LeavePolicyAssignment,   { foreignKey: 'leavePolicyId' });
-LeavePeriod.hasMany(LeavePolicyAssignment,   { foreignKey: 'leavePeriodId' });
-
-// LeaveAllocation → Employee + LeaveType + LeavePeriod
-LeaveAllocation.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false });
-LeaveAllocation.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',   allowNull: false });
-LeaveAllocation.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false });
-Employee.hasMany(LeaveAllocation,      { foreignKey: 'employeeId' });
-LeaveType.hasMany(LeaveAllocation,     { foreignKey: 'leaveTypeId' });
-LeavePeriod.hasMany(LeaveAllocation,   { foreignKey: 'leavePeriodId' });
-
-// LeaveApplication → Employee (applicant + approver) + LeaveType + HolidayList
-LeaveApplication.belongsTo(Employee,    { as: 'applicant', foreignKey: 'employeeId',  allowNull: false });
-LeaveApplication.belongsTo(Employee,    { as: 'approver',  foreignKey: 'approverId' });
-LeaveApplication.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',  allowNull: false });
-LeaveApplication.belongsTo(HolidayList, { foreignKey: 'holidayListId' });
-Employee.hasMany(LeaveApplication,      { as: 'leaveApplications', foreignKey: 'employeeId' });
-LeaveType.hasMany(LeaveApplication,     { foreignKey: 'leaveTypeId' });
-
-// CompensatoryLeaveRequest → Employee + LeaveType
-CompensatoryLeaveRequest.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false });
-CompensatoryLeaveRequest.belongsTo(LeaveType, { foreignKey: 'leaveTypeId', allowNull: false });
-Employee.hasMany(CompensatoryLeaveRequest,    { foreignKey: 'employeeId' });
-
-// LeaveEncashment → Employee + LeaveType + LeavePeriod
-LeaveEncashment.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false });
-LeaveEncashment.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',   allowNull: false });
-LeaveEncashment.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false });
-Employee.hasMany(LeaveEncashment,      { foreignKey: 'employeeId' });
-
-// LeaveLedgerEntry → Employee + LeaveType
-// voucherType + voucherNo are plain string columns (polymorphic — not FK-constrained)
-LeaveLedgerEntry.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false });
-LeaveLedgerEntry.belongsTo(LeaveType, { foreignKey: 'leaveTypeId', allowNull: false });
-Employee.hasMany(LeaveLedgerEntry,    { foreignKey: 'employeeId' });
-
-
-// ══════════════════════════════════════════════
-//  PAYROLL
-// ══════════════════════════════════════════════
-
-// IncomeTaxSlab → PayrollPeriod
-IncomeTaxSlab.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false });
-PayrollPeriod.hasMany(IncomeTaxSlab,   { foreignKey: 'payrollPeriodId' });
-
-// SalaryStructureAssignment → Employee + SalaryStructure
-SalaryStructureAssignment.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false });
-SalaryStructureAssignment.belongsTo(SalaryStructure, { foreignKey: 'salaryStructureId', allowNull: false });
-Employee.hasMany(SalaryStructureAssignment,          { foreignKey: 'employeeId' });
-SalaryStructure.hasMany(SalaryStructureAssignment,   { foreignKey: 'salaryStructureId' });
-
-// PayrollEntry → PayrollPeriod  (produces SalarySlip records)
-PayrollEntry.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false });
-PayrollPeriod.hasMany(PayrollEntry,   { foreignKey: 'payrollPeriodId' });
-
-// SalarySlip → Employee + SalaryStructure + PayrollEntry + PayrollPeriod
-SalarySlip.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false });
-SalarySlip.belongsTo(SalaryStructure, { foreignKey: 'salaryStructureId', allowNull: false });
-SalarySlip.belongsTo(PayrollEntry,    { foreignKey: 'payrollEntryId' });
-SalarySlip.belongsTo(PayrollPeriod,   { foreignKey: 'payrollPeriodId',   allowNull: false });
-Employee.hasMany(SalarySlip,          { foreignKey: 'employeeId' });
-PayrollEntry.hasMany(SalarySlip,      { foreignKey: 'payrollEntryId' });
-PayrollPeriod.hasMany(SalarySlip,     { foreignKey: 'payrollPeriodId' });
-
-// AdditionalSalary → Employee + SalaryComponent
-AdditionalSalary.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false });
-AdditionalSalary.belongsTo(SalaryComponent, { foreignKey: 'salaryComponentId', allowNull: false });
-Employee.hasMany(AdditionalSalary,          { foreignKey: 'employeeId' });
-
-// RetentionBonus → Employee + SalaryComponent
-RetentionBonus.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false });
-RetentionBonus.belongsTo(SalaryComponent, { foreignKey: 'salaryComponentId', allowNull: false });
-Employee.hasMany(RetentionBonus,          { foreignKey: 'employeeId' });
-
-// EmployeeIncentive → Employee + SalaryComponent
-EmployeeIncentive.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false });
-EmployeeIncentive.belongsTo(SalaryComponent, { foreignKey: 'salaryComponentId', allowNull: false });
-Employee.hasMany(EmployeeIncentive,          { foreignKey: 'employeeId' });
-
-// EmployeeTaxExemptionDeclaration → Employee + PayrollPeriod
-EmployeeTaxExemptionDeclaration.belongsTo(Employee,      { foreignKey: 'employeeId',      allowNull: false });
-EmployeeTaxExemptionDeclaration.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false });
-Employee.hasMany(EmployeeTaxExemptionDeclaration,        { foreignKey: 'employeeId' });
-
-// EmployeeTaxExemptionProofSubmission → Employee + PayrollPeriod
-EmployeeTaxExemptionProofSubmission.belongsTo(Employee,      { foreignKey: 'employeeId',      allowNull: false });
-EmployeeTaxExemptionProofSubmission.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false });
-Employee.hasMany(EmployeeTaxExemptionProofSubmission,        { foreignKey: 'employeeId' });
-
-
-// ══════════════════════════════════════════════
-//  RECRUITMENT
-// ══════════════════════════════════════════════
-
-// StaffingPlan → Department + Designation
-StaffingPlan.belongsTo(Department,  { foreignKey: 'departmentId' });
-StaffingPlan.belongsTo(Designation, { foreignKey: 'designationId' });
-Department.hasMany(StaffingPlan,    { foreignKey: 'departmentId' });
-Designation.hasMany(StaffingPlan,   { foreignKey: 'designationId' });
-
-// JobOpening → StaffingPlan + Department + Designation
-JobOpening.belongsTo(StaffingPlan,  { foreignKey: 'staffingPlanId' });
-JobOpening.belongsTo(Department,    { foreignKey: 'departmentId' });
-JobOpening.belongsTo(Designation,   { foreignKey: 'designationId' });
-StaffingPlan.hasMany(JobOpening,    { foreignKey: 'staffingPlanId' });
-Department.hasMany(JobOpening,      { foreignKey: 'departmentId' });
-Designation.hasMany(JobOpening,     { foreignKey: 'designationId' });
-
-// EmployeeReferral → Employee (referrer) + JobOpening
-EmployeeReferral.belongsTo(Employee,   { as: 'referrer',  foreignKey: 'referrerId',    allowNull: false });
-EmployeeReferral.belongsTo(JobOpening, { foreignKey: 'jobOpeningId', allowNull: false });
-Employee.hasMany(EmployeeReferral,     { as: 'referrals', foreignKey: 'referrerId' });
-JobOpening.hasMany(EmployeeReferral,   { foreignKey: 'jobOpeningId' });
-
-// JobApplicant → JobOpening + EmployeeReferral (nullable)
-JobApplicant.belongsTo(JobOpening,       { foreignKey: 'jobOpeningId',       allowNull: false });
-JobApplicant.belongsTo(EmployeeReferral, { foreignKey: 'employeeReferralId' });
-JobOpening.hasMany(JobApplicant,         { foreignKey: 'jobOpeningId' });
-
-// Interview → JobApplicant + JobOpening + Employee (interviewer)
-Interview.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false });
-Interview.belongsTo(JobOpening,   { foreignKey: 'jobOpeningId',   allowNull: false });
-Interview.belongsTo(Employee,     { as: 'interviewer', foreignKey: 'interviewerId', allowNull: false });
-JobApplicant.hasMany(Interview,   { foreignKey: 'jobApplicantId' });
-
-// InterviewFeedback → Interview + Employee (feedback author)
-InterviewFeedback.belongsTo(Interview, { foreignKey: 'interviewId', allowNull: false });
-InterviewFeedback.belongsTo(Employee,  { as: 'reviewer', foreignKey: 'reviewerId', allowNull: false });
-Interview.hasMany(InterviewFeedback,   { foreignKey: 'interviewId' });
-
-// JobOffer → JobApplicant + JobOpening + Designation
-JobOffer.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false });
-JobOffer.belongsTo(JobOpening,   { foreignKey: 'jobOpeningId',   allowNull: false });
-JobOffer.belongsTo(Designation,  { foreignKey: 'designationId' });
-JobApplicant.hasOne(JobOffer,    { foreignKey: 'jobApplicantId' });
-
-// AppointmentLetter → JobApplicant + JobOffer
-AppointmentLetter.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false });
-JobApplicant.hasOne(AppointmentLetter,   { foreignKey: 'jobApplicantId' });
-AppointmentLetter.belongsTo(JobOffer,     { foreignKey: 'jobOfferId',     allowNull: false });
-JobOffer.hasOne(AppointmentLetter,        { foreignKey: 'jobOfferId' });
-// JobRequisition → Department + Designation + Company + EmploymentType
-JobRequisition.belongsTo(Department,     { foreignKey: 'departmentId',     allowNull: false });
-JobRequisition.belongsTo(Designation,    { foreignKey: 'designationId',    allowNull: false });
-JobRequisition.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false });
-JobRequisition.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId' });
-
-// JobRequisition → Employee (requester, HR manager, GM)
-JobRequisition.belongsTo(Employee, { as: 'requestedBy',    foreignKey: 'requestedById', allowNull: false });
-JobRequisition.belongsTo(Employee, { as: 'hrManager',      foreignKey: 'hrManagerId' });
-JobRequisition.belongsTo(Employee, { as: 'generalManager', foreignKey: 'gmId' });
-
-// JobRequisition → JobOpening
-JobRequisition.hasOne(JobOpening, { foreignKey: 'requisitionId' });
-JobOpening.belongsTo(JobRequisition, { foreignKey: 'requisitionId' });
-
-// ══════════════════════════════════════════════
-//  PERFORMANCE
-// ══════════════════════════════════════════════
-
-// AppraisalCycle → AppraisalTemplate
-AppraisalCycle.belongsTo(AppraisalTemplate, { foreignKey: 'appraisalTemplateId', allowNull: false });
-AppraisalTemplate.hasMany(AppraisalCycle,   { foreignKey: 'appraisalTemplateId' });
-
-// Appraisal → Employee + AppraisalCycle + AppraisalTemplate
-Appraisal.belongsTo(Employee,          { foreignKey: 'employeeId',          allowNull: false });
-Appraisal.belongsTo(AppraisalCycle,    { foreignKey: 'appraisalCycleId',    allowNull: false });
-Appraisal.belongsTo(AppraisalTemplate, { foreignKey: 'appraisalTemplateId', allowNull: false });
-Employee.hasMany(Appraisal,            { foreignKey: 'employeeId' });
-AppraisalCycle.hasMany(Appraisal,      { foreignKey: 'appraisalCycleId' });
-
-// Goal → Appraisal + Employee + Goal self-ref (sub-goals)
-Goal.belongsTo(Appraisal, { foreignKey: 'appraisalId', allowNull: false });
-Goal.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false });
-Goal.belongsTo(Goal,      { as: 'parentGoal', foreignKey: 'parentGoalId' });
-Goal.hasMany(Goal,        { as: 'subGoals',   foreignKey: 'parentGoalId' });
-Appraisal.hasMany(Goal,   { foreignKey: 'appraisalId' });
-Employee.hasMany(Goal,    { foreignKey: 'employeeId' });
-
-// EmployeePerformanceFeedback → Appraisal + Employee (reviewee) + Employee (reviewer)
-EmployeePerformanceFeedback.belongsTo(Appraisal, { foreignKey: 'appraisalId', allowNull: false });
-EmployeePerformanceFeedback.belongsTo(Employee,  { as: 'reviewee', foreignKey: 'revieweeId', allowNull: false });
-EmployeePerformanceFeedback.belongsTo(Employee,  { as: 'reviewer', foreignKey: 'reviewerId', allowNull: false });
-Appraisal.hasMany(EmployeePerformanceFeedback,   { foreignKey: 'appraisalId' });
-
-
-// ─────────────────────────────────────────────
-//  4. EXPORT
-//     Export the sequelize instance + every model
-//     by name. Controllers and services destructure
-//     only what they need:
-//       const { Employee, Department } = require('../../models');
-// ─────────────────────────────────────────────
+// ── User → RoleProfile  (optional default-template FK on User) ───────────────
+User.belongsTo(RoleProfile, { foreignKey: 'roleProfileId', as: 'roleProfile' });
+RoleProfile.hasMany(User,   { foreignKey: 'roleProfileId', as: 'users' });
+
+// ── RolePermission → Role ─────────────────────────────────────────────────────
+RolePermission.belongsTo(Role, { foreignKey: 'roleId', allowNull: false, as: 'role' });
+Role.hasMany(RolePermission,   { foreignKey: 'roleId',                   as: 'permissions' });
+
+// ── UserPermission → User ─────────────────────────────────────────────────────
+UserPermission.belongsTo(User, { foreignKey: 'userId', allowNull: false, as: 'user' });
+User.hasMany(UserPermission,   { foreignKey: 'userId',                   as: 'permissions' });
+
+// ── UserSession → User ────────────────────────────────────────────────────────
+UserSession.belongsTo(User, { foreignKey: 'userId', allowNull: false, as: 'user' });
+User.hasMany(UserSession,   { foreignKey: 'userId',                   as: 'sessions' });
+
+// ── LoginAttempt → User  (nullable — failed attempts may have no resolved user) ──
+LoginAttempt.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasMany(LoginAttempt,   { foreignKey: 'userId', as: 'loginAttempts' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.2  ORGANIZATION MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── Company self-reference (parent / subsidiary tree) ────────────────────────
+Company.belongsTo(Company, { foreignKey: 'parentCompanyId', as: 'parentCompany' });
+Company.hasMany(Company,   { foreignKey: 'parentCompanyId', as: 'subsidiaries' });
+
+// ── Branch → Company ──────────────────────────────────────────────────────────
+Branch.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
+Company.hasMany(Branch,   { foreignKey: 'companyId',                   as: 'branches' });
+
+// ── Department → Company  +  Department self-reference (tree) ────────────────
+Department.belongsTo(Company,    { foreignKey: 'companyId',        allowNull: false, as: 'company' });
+Company.hasMany(Department,      { foreignKey: 'companyId',                          as: 'departments' });
+Department.belongsTo(Department, { foreignKey: 'parentDepartmentId',                 as: 'parentDepartment' });
+Department.hasMany(Department,   { foreignKey: 'parentDepartmentId',                 as: 'subDepartments' });
+
+// ── Designation → Company ─────────────────────────────────────────────────────
+Designation.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
+Company.hasMany(Designation,   { foreignKey: 'companyId',                   as: 'designations' });
+
+// ── EmploymentType → Company ──────────────────────────────────────────────────
+EmploymentType.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
+Company.hasMany(EmploymentType,   { foreignKey: 'companyId',                   as: 'employmentTypes' });
+
+// ── EmployeeGrade → Company + LeavePolicy (default policy for this grade) ────
+EmployeeGrade.belongsTo(Company,     { foreignKey: 'companyId',         allowNull: false, as: 'company' });
+Company.hasMany(EmployeeGrade,       { foreignKey: 'companyId',                           as: 'employeeGrades' });
+EmployeeGrade.belongsTo(LeavePolicy, { foreignKey: 'defaultLeavePolicyId',                as: 'defaultLeavePolicy' });
+LeavePolicy.hasMany(EmployeeGrade,   { foreignKey: 'defaultLeavePolicyId',                as: 'employeeGrades' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.3  DOCUMENT MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── Document → DocumentType ───────────────────────────────────────────────────
+Document.belongsTo(DocumentType, { foreignKey: 'documentTypeId', allowNull: false, as: 'documentType' });
+DocumentType.hasMany(Document,   { foreignKey: 'documentTypeId',                   as: 'documents' });
+
+// ── Document → Employee (uploader) ───────────────────────────────────────────
+Document.belongsTo(Employee, { foreignKey: 'uploadedById', as: 'uploadedBy' });
+Employee.hasMany(Document,   { foreignKey: 'uploadedById', as: 'uploadedDocuments' });
+
+// ── Document → Company (owner entity — documents can belong to a company, not just an employee) ─
+Document.belongsTo(Company, { foreignKey: 'companyId', as: 'company' });
+Company.hasMany(Document,   { foreignKey: 'companyId', as: 'documents' });
+
+// ── DocumentVersion → Document ────────────────────────────────────────────────
+DocumentVersion.belongsTo(Document, { foreignKey: 'documentId', allowNull: false, as: 'document' });
+Document.hasMany(DocumentVersion,   { foreignKey: 'documentId',                   as: 'versions' });
+
+// ── DocumentVersion → Employee (who uploaded this specific version) ───────────
+DocumentVersion.belongsTo(Employee, { foreignKey: 'uploadedById', as: 'uploadedBy' });
+Employee.hasMany(DocumentVersion,   { foreignKey: 'uploadedById', as: 'documentVersions' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.4  EMPLOYEE MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── Employee → User  (ERP login account for this employee) ───────────────────
+Employee.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasOne(Employee,    { foreignKey: 'userId', as: 'employee' });
+
+// ── Employee → organization masters ──────────────────────────────────────────
+Employee.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false, as: 'company' });
+Employee.belongsTo(Branch,         { foreignKey: 'branchId',                           as: 'branch' });
+Employee.belongsTo(Department,     { foreignKey: 'departmentId',                       as: 'department' });
+Employee.belongsTo(Designation,    { foreignKey: 'designationId',                      as: 'designation' });
+Employee.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId',                   as: 'employmentType' });
+Employee.belongsTo(EmployeeGrade,  { foreignKey: 'employeeGradeId',                    as: 'employeeGrade' });
+Employee.belongsTo(RoleProfile,    { foreignKey: 'roleProfileId',                      as: 'roleProfile' });
+
+// ── Reverse: organization masters → Employee ──────────────────────────────────
+Company.hasMany(Employee,        { foreignKey: 'companyId',        as: 'employees' });
+Branch.hasMany(Employee,         { foreignKey: 'branchId',         as: 'employees' });
+Department.hasMany(Employee,     { foreignKey: 'departmentId',     as: 'employees' });
+Designation.hasMany(Employee,    { foreignKey: 'designationId',    as: 'employees' });
+EmploymentType.hasMany(Employee, { foreignKey: 'employmentTypeId', as: 'employees' });
+EmployeeGrade.hasMany(Employee,  { foreignKey: 'employeeGradeId',  as: 'employees' });
+RoleProfile.hasMany(Employee,    { foreignKey: 'roleProfileId',    as: 'employees' });
+
+// ── Employee self-reference (reporting line) ──────────────────────────────────
+Employee.belongsTo(Employee, { foreignKey: 'reportsToId', as: 'reportsTo' });
+Employee.hasMany(Employee,   { foreignKey: 'reportsToId', as: 'directReports' });
+
+// ── EmployeeOnboarding → Employee ────────────────────────────────────────────
+EmployeeOnboarding.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
+Employee.hasMany(EmployeeOnboarding,   { foreignKey: 'employeeId',                   as: 'onboardings' });
+
+// ── EmployeePromotion → Employee  +  optional FK to approver ─────────────────
+EmployeePromotion.belongsTo(Employee, { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+EmployeePromotion.belongsTo(Employee, { foreignKey: 'approvedById',                  as: 'approvedBy' });
+Employee.hasMany(EmployeePromotion,   { foreignKey: 'employeeId',                    as: 'promotions' });
+Employee.hasMany(EmployeePromotion,   { foreignKey: 'approvedById',                  as: 'approvedPromotions' });
+
+// ── EmployeeTransfer → Employee + optional FK to approver ────────────────────
+EmployeeTransfer.belongsTo(Employee, { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+EmployeeTransfer.belongsTo(Employee, { foreignKey: 'approvedById',                  as: 'approvedBy' });
+Employee.hasMany(EmployeeTransfer,   { foreignKey: 'employeeId',                    as: 'transfers' });
+Employee.hasMany(EmployeeTransfer,   { foreignKey: 'approvedById',                  as: 'approvedTransfers' });
+
+// ── EmployeeSeparation → Employee + optional FK to approver ──────────────────
+EmployeeSeparation.belongsTo(Employee, { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+EmployeeSeparation.belongsTo(Employee, { foreignKey: 'approvedById',                  as: 'approvedBy' });
+Employee.hasMany(EmployeeSeparation,   { foreignKey: 'employeeId',                    as: 'separations' });
+Employee.hasMany(EmployeeSeparation,   { foreignKey: 'approvedById',                  as: 'approvedSeparations' });
+
+// ── EmployeeSkillMap → Employee ───────────────────────────────────────────────
+//    hasMany — an employee may accumulate many skill records over time.
+EmployeeSkillMap.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
+Employee.hasMany(EmployeeSkillMap,   { foreignKey: 'employeeId',                   as: 'skillMaps' });
+
+// ── EmployeeEducation → Employee ──────────────────────────────────────────────
+EmployeeEducation.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
+Employee.hasMany(EmployeeEducation,   { foreignKey: 'employeeId',                   as: 'educationHistory' });
+
+// ── EmployeeExternalWork → Employee ──────────────────────────────────────────
+EmployeeExternalWork.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
+Employee.hasMany(EmployeeExternalWork,   { foreignKey: 'employeeId',                   as: 'externalWorkHistory' });
+
+// ── EmployeeEmergencyContact → Employee ──────────────────────────────────────
+EmployeeEmergencyContact.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
+Employee.hasMany(EmployeeEmergencyContact,   { foreignKey: 'employeeId',                   as: 'emergencyContacts' });
+
+// ── EmployeeHealthInsurance → Employee ────────────────────────────────────────
+EmployeeHealthInsurance.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
+Employee.hasOne(EmployeeHealthInsurance,    { foreignKey: 'employeeId',                    as: 'healthInsurance' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.5  ATTENDANCE MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── ShiftType → HolidayList  (cross-module: attendance reads leave holidays) ──
+ShiftType.belongsTo(HolidayList, { foreignKey: 'holidayListId', as: 'holidayList' });
+HolidayList.hasMany(ShiftType,   { foreignKey: 'holidayListId', as: 'shiftTypes' });
+
+// ── ShiftAssignment → Employee + ShiftType ────────────────────────────────────
+ShiftAssignment.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+ShiftAssignment.belongsTo(ShiftType, { foreignKey: 'shiftTypeId', allowNull: false, as: 'shiftType' });
+Employee.hasMany(ShiftAssignment,    { foreignKey: 'employeeId',                    as: 'shiftAssignments' });
+ShiftType.hasMany(ShiftAssignment,   { foreignKey: 'shiftTypeId',                   as: 'shiftAssignments' });
+
+// ── ShiftRequest → Employee (requester & approver) + ShiftType ───────────────
+ShiftRequest.belongsTo(Employee,  { foreignKey: 'requesterId', allowNull: false, as: 'requester' });
+ShiftRequest.belongsTo(Employee,  { foreignKey: 'approverId',                    as: 'approver' });
+ShiftRequest.belongsTo(ShiftType, { foreignKey: 'shiftTypeId', allowNull: false, as: 'shiftType' });
+Employee.hasMany(ShiftRequest,    { foreignKey: 'requesterId',                    as: 'shiftRequests' });
+Employee.hasMany(ShiftRequest,    { foreignKey: 'approverId',                     as: 'approvedShiftRequests' });
+ShiftType.hasMany(ShiftRequest,   { foreignKey: 'shiftTypeId',                    as: 'shiftRequests' });
+
+// ── Attendance → Employee + ShiftType + LeaveApplication (cross-module) ───────
+Attendance.belongsTo(Employee,         { foreignKey: 'employeeId',        allowNull: false, as: 'employee' });
+Attendance.belongsTo(ShiftType,        { foreignKey: 'shiftTypeId',                         as: 'shiftType' });
+Attendance.belongsTo(LeaveApplication, { foreignKey: 'leaveApplicationId',                   as: 'leaveApplication' });
+Employee.hasMany(Attendance,           { foreignKey: 'employeeId',                           as: 'attendanceRecords' });
+ShiftType.hasMany(Attendance,          { foreignKey: 'shiftTypeId',                          as: 'attendanceRecords' });
+LeaveApplication.hasMany(Attendance,   { foreignKey: 'leaveApplicationId',                   as: 'attendanceRecords' });
+
+// ── EmployeeCheckin → Employee + ShiftType ────────────────────────────────────
+EmployeeCheckin.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+EmployeeCheckin.belongsTo(ShiftType, { foreignKey: 'shiftTypeId',                   as: 'shiftType' });
+Employee.hasMany(EmployeeCheckin,    { foreignKey: 'employeeId',                    as: 'checkins' });
+ShiftType.hasMany(EmployeeCheckin,   { foreignKey: 'shiftTypeId',                   as: 'checkins' });
+
+// ── AttendanceRequest → Employee + Attendance ─────────────────────────────────
+AttendanceRequest.belongsTo(Employee,   { foreignKey: 'employeeId',   allowNull: false, as: 'employee' });
+AttendanceRequest.belongsTo(Attendance, { foreignKey: 'attendanceId',                   as: 'attendance' });
+Employee.hasMany(AttendanceRequest,     { foreignKey: 'employeeId',                     as: 'attendanceRequests' });
+Attendance.hasMany(AttendanceRequest,   { foreignKey: 'attendanceId',                   as: 'requests' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.6  LEAVE MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── LeaveType → LeavePolicy ───────────────────────────────────────────────────
+LeaveType.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId', as: 'leavePolicy' });
+LeavePolicy.hasMany(LeaveType,   { foreignKey: 'leavePolicyId', as: 'leaveTypes' });
+
+// ── LeaveBlockList → Company  (block list is scoped to a company) ─────────────
+LeaveBlockList.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
+Company.hasMany(LeaveBlockList,   { foreignKey: 'companyId',                   as: 'leaveBlockLists' });
+
+// ── LeavePolicyAssignment → Employee + LeavePolicy + LeavePeriod ─────────────
+LeavePolicyAssignment.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false, as: 'employee' });
+LeavePolicyAssignment.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId', allowNull: false, as: 'leavePolicy' });
+LeavePolicyAssignment.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false, as: 'leavePeriod' });
+Employee.hasMany(LeavePolicyAssignment,      { foreignKey: 'employeeId',                      as: 'leavePolicyAssignments' });
+LeavePolicy.hasMany(LeavePolicyAssignment,   { foreignKey: 'leavePolicyId',                   as: 'assignments' });
+LeavePeriod.hasMany(LeavePolicyAssignment,   { foreignKey: 'leavePeriodId',                   as: 'leavePolicyAssignments' });
+
+// ── LeaveAllocation → Employee + LeaveType + LeavePeriod ─────────────────────
+LeaveAllocation.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false, as: 'employee' });
+LeaveAllocation.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',   allowNull: false, as: 'leaveType' });
+LeaveAllocation.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false, as: 'leavePeriod' });
+Employee.hasMany(LeaveAllocation,      { foreignKey: 'employeeId',                      as: 'leaveAllocations' });
+LeaveType.hasMany(LeaveAllocation,     { foreignKey: 'leaveTypeId',                     as: 'allocations' });
+LeavePeriod.hasMany(LeaveAllocation,   { foreignKey: 'leavePeriodId',                   as: 'leaveAllocations' });
+
+// ── LeaveApplication → Employee (applicant & approver) + LeaveType + HolidayList ──
+LeaveApplication.belongsTo(Employee,    { foreignKey: 'employeeId',   allowNull: false, as: 'applicant' });
+LeaveApplication.belongsTo(Employee,    { foreignKey: 'approverId',                     as: 'approver' });
+LeaveApplication.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',  allowNull: false, as: 'leaveType' });
+LeaveApplication.belongsTo(HolidayList, { foreignKey: 'holidayListId',                  as: 'holidayList' });
+Employee.hasMany(LeaveApplication,      { foreignKey: 'employeeId',                     as: 'leaveApplications' });
+Employee.hasMany(LeaveApplication,      { foreignKey: 'approverId',                     as: 'approvedLeaveApplications' });
+LeaveType.hasMany(LeaveApplication,     { foreignKey: 'leaveTypeId',                    as: 'applications' });
+HolidayList.hasMany(LeaveApplication,   { foreignKey: 'holidayListId',                  as: 'leaveApplications' });
+
+// ── CompensatoryLeaveRequest → Employee + LeaveType ───────────────────────────
+CompensatoryLeaveRequest.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+CompensatoryLeaveRequest.belongsTo(LeaveType, { foreignKey: 'leaveTypeId', allowNull: false, as: 'leaveType' });
+Employee.hasMany(CompensatoryLeaveRequest,    { foreignKey: 'employeeId',                    as: 'compensatoryLeaveRequests' });
+LeaveType.hasMany(CompensatoryLeaveRequest,   { foreignKey: 'leaveTypeId',                   as: 'compensatoryRequests' });
+
+// ── LeaveEncashment → Employee + LeaveType + LeavePeriod ─────────────────────
+LeaveEncashment.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false, as: 'employee' });
+LeaveEncashment.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',   allowNull: false, as: 'leaveType' });
+LeaveEncashment.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false, as: 'leavePeriod' });
+Employee.hasMany(LeaveEncashment,      { foreignKey: 'employeeId',                      as: 'leaveEncashments' });
+LeaveType.hasMany(LeaveEncashment,     { foreignKey: 'leaveTypeId',                     as: 'encashments' });
+LeavePeriod.hasMany(LeaveEncashment,   { foreignKey: 'leavePeriodId',                   as: 'leaveEncashments' });
+
+// ── LeaveLedgerEntry → Employee + LeaveType ───────────────────────────────────
+//    voucherType + voucherNo are plain string columns (polymorphic reference —
+//    not FK-constrained) so no Sequelize association is declared for them.
+LeaveLedgerEntry.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+LeaveLedgerEntry.belongsTo(LeaveType, { foreignKey: 'leaveTypeId', allowNull: false, as: 'leaveType' });
+Employee.hasMany(LeaveLedgerEntry,    { foreignKey: 'employeeId',                    as: 'leaveLedgerEntries' });
+LeaveType.hasMany(LeaveLedgerEntry,   { foreignKey: 'leaveTypeId',                   as: 'ledgerEntries' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.7  PAYROLL MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── IncomeTaxSlab → PayrollPeriod ─────────────────────────────────────────────
+IncomeTaxSlab.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false, as: 'payrollPeriod' });
+PayrollPeriod.hasMany(IncomeTaxSlab,   { foreignKey: 'payrollPeriodId',                   as: 'incomeTaxSlabs' });
+
+// ── SalaryStructure → Company ─────────────────────────────────────────────────
+SalaryStructure.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
+Company.hasMany(SalaryStructure,   { foreignKey: 'companyId',                   as: 'salaryStructures' });
+
+// ── SalaryStructureAssignment → Employee + SalaryStructure ───────────────────
+SalaryStructureAssignment.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false, as: 'employee' });
+SalaryStructureAssignment.belongsTo(SalaryStructure, { foreignKey: 'salaryStructureId', allowNull: false, as: 'salaryStructure' });
+Employee.hasMany(SalaryStructureAssignment,          { foreignKey: 'employeeId',                          as: 'salaryStructureAssignments' });
+SalaryStructure.hasMany(SalaryStructureAssignment,   { foreignKey: 'salaryStructureId',                   as: 'assignments' });
+
+// ── PayrollEntry → PayrollPeriod + Company ────────────────────────────────────
+PayrollEntry.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false, as: 'payrollPeriod' });
+PayrollEntry.belongsTo(Company,       { foreignKey: 'companyId',        allowNull: false, as: 'company' });
+PayrollPeriod.hasMany(PayrollEntry,   { foreignKey: 'payrollPeriodId',                    as: 'payrollEntries' });
+Company.hasMany(PayrollEntry,         { foreignKey: 'companyId',                          as: 'payrollEntries' });
+
+// ── SalarySlip → Employee + SalaryStructure + PayrollEntry + PayrollPeriod ────
+SalarySlip.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false, as: 'employee' });
+SalarySlip.belongsTo(SalaryStructure, { foreignKey: 'salaryStructureId', allowNull: false, as: 'salaryStructure' });
+SalarySlip.belongsTo(PayrollEntry,    { foreignKey: 'payrollEntryId',                      as: 'payrollEntry' });
+SalarySlip.belongsTo(PayrollPeriod,   { foreignKey: 'payrollPeriodId',   allowNull: false, as: 'payrollPeriod' });
+Employee.hasMany(SalarySlip,          { foreignKey: 'employeeId',                          as: 'salarySlips' });
+SalaryStructure.hasMany(SalarySlip,   { foreignKey: 'salaryStructureId',                   as: 'salarySlips' });
+PayrollEntry.hasMany(SalarySlip,      { foreignKey: 'payrollEntryId',                      as: 'salarySlips' });
+PayrollPeriod.hasMany(SalarySlip,     { foreignKey: 'payrollPeriodId',                     as: 'salarySlips' });
+
+// ── AdditionalSalary → Employee + SalaryComponent ────────────────────────────
+AdditionalSalary.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false, as: 'employee' });
+AdditionalSalary.belongsTo(SalaryComponent, { foreignKey: 'salaryComponentId', allowNull: false, as: 'salaryComponent' });
+Employee.hasMany(AdditionalSalary,          { foreignKey: 'employeeId',                          as: 'additionalSalaries' });
+SalaryComponent.hasMany(AdditionalSalary,   { foreignKey: 'salaryComponentId',                   as: 'additionalSalaries' });
+
+// ── RetentionBonus → Employee + SalaryComponent ───────────────────────────────
+RetentionBonus.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false, as: 'employee' });
+RetentionBonus.belongsTo(SalaryComponent, { foreignKey: 'salaryComponentId', allowNull: false, as: 'salaryComponent' });
+Employee.hasMany(RetentionBonus,          { foreignKey: 'employeeId',                          as: 'retentionBonuses' });
+SalaryComponent.hasMany(RetentionBonus,   { foreignKey: 'salaryComponentId',                   as: 'retentionBonuses' });
+
+// ── EmployeeIncentive → Employee + SalaryComponent ───────────────────────────
+EmployeeIncentive.belongsTo(Employee,        { foreignKey: 'employeeId',        allowNull: false, as: 'employee' });
+EmployeeIncentive.belongsTo(SalaryComponent, { foreignKey: 'salaryComponentId', allowNull: false, as: 'salaryComponent' });
+Employee.hasMany(EmployeeIncentive,          { foreignKey: 'employeeId',                          as: 'incentives' });
+SalaryComponent.hasMany(EmployeeIncentive,   { foreignKey: 'salaryComponentId',                   as: 'incentives' });
+
+// ── EmployeeTaxExemptionDeclaration → Employee + PayrollPeriod ───────────────
+EmployeeTaxExemptionDeclaration.belongsTo(Employee,      { foreignKey: 'employeeId',      allowNull: false, as: 'employee' });
+EmployeeTaxExemptionDeclaration.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false, as: 'payrollPeriod' });
+Employee.hasMany(EmployeeTaxExemptionDeclaration,        { foreignKey: 'employeeId',                        as: 'taxExemptionDeclarations' });
+PayrollPeriod.hasMany(EmployeeTaxExemptionDeclaration,   { foreignKey: 'payrollPeriodId',                   as: 'taxExemptionDeclarations' });
+
+// ── EmployeeTaxExemptionProofSubmission → Employee + PayrollPeriod ────────────
+EmployeeTaxExemptionProofSubmission.belongsTo(Employee,      { foreignKey: 'employeeId',      allowNull: false, as: 'employee' });
+EmployeeTaxExemptionProofSubmission.belongsTo(PayrollPeriod, { foreignKey: 'payrollPeriodId', allowNull: false, as: 'payrollPeriod' });
+Employee.hasMany(EmployeeTaxExemptionProofSubmission,        { foreignKey: 'employeeId',                        as: 'taxExemptionProofSubmissions' });
+PayrollPeriod.hasMany(EmployeeTaxExemptionProofSubmission,   { foreignKey: 'payrollPeriodId',                   as: 'taxExemptionProofSubmissions' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.8  RECRUITMENT MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── JobRequisition → Department + Designation + Company + EmploymentType ──────
+JobRequisition.belongsTo(Department,     { foreignKey: 'departmentId',     allowNull: false, as: 'department' });
+JobRequisition.belongsTo(Designation,    { foreignKey: 'designationId',    allowNull: false, as: 'designation' });
+JobRequisition.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false, as: 'company' });
+JobRequisition.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId',                   as: 'employmentType' });
+Department.hasMany(JobRequisition,       { foreignKey: 'departmentId',                        as: 'jobRequisitions' });
+Designation.hasMany(JobRequisition,      { foreignKey: 'designationId',                       as: 'jobRequisitions' });
+Company.hasMany(JobRequisition,          { foreignKey: 'companyId',                           as: 'jobRequisitions' });
+EmploymentType.hasMany(JobRequisition,   { foreignKey: 'employmentTypeId',                    as: 'jobRequisitions' });
+
+// ── JobRequisition → Employee (requester, HR manager, GM approver) ────────────
+JobRequisition.belongsTo(Employee, { foreignKey: 'requestedById', allowNull: false, as: 'requestedBy' });
+JobRequisition.belongsTo(Employee, { foreignKey: 'hrManagerId',                     as: 'hrManager' });
+JobRequisition.belongsTo(Employee, { foreignKey: 'gmId',                            as: 'generalManager' });
+Employee.hasMany(JobRequisition,   { foreignKey: 'requestedById',                   as: 'jobRequisitions' });
+Employee.hasMany(JobRequisition,   { foreignKey: 'hrManagerId',                     as: 'managedJobRequisitions' });
+Employee.hasMany(JobRequisition,   { foreignKey: 'gmId',                            as: 'approvedJobRequisitions' });
+
+// ── StaffingPlan → Department + Designation + Company ────────────────────────
+StaffingPlan.belongsTo(Department,  { foreignKey: 'departmentId',  as: 'department' });
+StaffingPlan.belongsTo(Designation, { foreignKey: 'designationId', as: 'designation' });
+StaffingPlan.belongsTo(Company,     { foreignKey: 'companyId',     as: 'company' });
+Department.hasMany(StaffingPlan,    { foreignKey: 'departmentId',  as: 'staffingPlans' });
+Designation.hasMany(StaffingPlan,   { foreignKey: 'designationId', as: 'staffingPlans' });
+Company.hasMany(StaffingPlan,       { foreignKey: 'companyId',     as: 'staffingPlans' });
+
+// ── JobOpening → JobRequisition + StaffingPlan + Department + Designation ─────
+JobOpening.belongsTo(JobRequisition, { foreignKey: 'requisitionId',   as: 'requisition' });
+JobOpening.belongsTo(StaffingPlan,   { foreignKey: 'staffingPlanId',  as: 'staffingPlan' });
+JobOpening.belongsTo(Department,     { foreignKey: 'departmentId',    as: 'department' });
+JobOpening.belongsTo(Designation,    { foreignKey: 'designationId',   as: 'designation' });
+JobRequisition.hasOne(JobOpening,    { foreignKey: 'requisitionId',   as: 'jobOpening' });
+StaffingPlan.hasMany(JobOpening,     { foreignKey: 'staffingPlanId',  as: 'jobOpenings' });
+Department.hasMany(JobOpening,       { foreignKey: 'departmentId',    as: 'jobOpenings' });
+Designation.hasMany(JobOpening,      { foreignKey: 'designationId',   as: 'jobOpenings' });
+
+// ── EmployeeReferral → Employee (referrer) + JobOpening ───────────────────────
+EmployeeReferral.belongsTo(Employee,   { foreignKey: 'referrerId',    allowNull: false, as: 'referrer' });
+EmployeeReferral.belongsTo(JobOpening, { foreignKey: 'jobOpeningId',  allowNull: false, as: 'jobOpening' });
+Employee.hasMany(EmployeeReferral,     { foreignKey: 'referrerId',                      as: 'referrals' });
+JobOpening.hasMany(EmployeeReferral,   { foreignKey: 'jobOpeningId',                    as: 'referrals' });
+
+// ── JobApplicant → JobOpening + EmployeeReferral (nullable) ───────────────────
+JobApplicant.belongsTo(JobOpening,       { foreignKey: 'jobOpeningId',       allowNull: false, as: 'jobOpening' });
+JobApplicant.belongsTo(EmployeeReferral, { foreignKey: 'employeeReferralId',               as: 'referral' });
+JobOpening.hasMany(JobApplicant,         { foreignKey: 'jobOpeningId',                      as: 'applicants' });
+EmployeeReferral.hasMany(JobApplicant,   { foreignKey: 'employeeReferralId',                as: 'applicants' });
+
+// ── Interview → JobApplicant + JobOpening + Employee (interviewer) ─────────────
+Interview.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false, as: 'jobApplicant' });
+Interview.belongsTo(JobOpening,   { foreignKey: 'jobOpeningId',   allowNull: false, as: 'jobOpening' });
+Interview.belongsTo(Employee,     { foreignKey: 'interviewerId',  allowNull: false, as: 'interviewer' });
+JobApplicant.hasMany(Interview,   { foreignKey: 'jobApplicantId',                   as: 'interviews' });
+JobOpening.hasMany(Interview,     { foreignKey: 'jobOpeningId',                     as: 'interviews' });
+Employee.hasMany(Interview,       { foreignKey: 'interviewerId',                    as: 'conductedInterviews' });
+
+// ── InterviewFeedback → Interview + Employee (feedback author) ─────────────────
+InterviewFeedback.belongsTo(Interview, { foreignKey: 'interviewId', allowNull: false, as: 'interview' });
+InterviewFeedback.belongsTo(Employee,  { foreignKey: 'reviewerId',  allowNull: false, as: 'reviewer' });
+Interview.hasMany(InterviewFeedback,   { foreignKey: 'interviewId',                   as: 'feedbacks' });
+Employee.hasMany(InterviewFeedback,    { foreignKey: 'reviewerId',                    as: 'interviewFeedbacks' });
+
+// ── JobOffer → JobApplicant + JobOpening + Designation ────────────────────────
+JobOffer.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false, as: 'jobApplicant' });
+JobOffer.belongsTo(JobOpening,   { foreignKey: 'jobOpeningId',   allowNull: false, as: 'jobOpening' });
+JobOffer.belongsTo(Designation,  { foreignKey: 'designationId',                    as: 'designation' });
+JobApplicant.hasOne(JobOffer,    { foreignKey: 'jobApplicantId',                   as: 'jobOffer' });
+JobOpening.hasMany(JobOffer,     { foreignKey: 'jobOpeningId',                     as: 'jobOffers' });
+Designation.hasMany(JobOffer,    { foreignKey: 'designationId',                    as: 'jobOffers' });
+
+// ── AppointmentLetter → JobApplicant + JobOffer ───────────────────────────────
+AppointmentLetter.belongsTo(JobApplicant, { foreignKey: 'jobApplicantId', allowNull: false, as: 'jobApplicant' });
+AppointmentLetter.belongsTo(JobOffer,     { foreignKey: 'jobOfferId',     allowNull: false, as: 'jobOffer' });
+JobApplicant.hasOne(AppointmentLetter,    { foreignKey: 'jobApplicantId',                   as: 'appointmentLetter' });
+JobOffer.hasOne(AppointmentLetter,        { foreignKey: 'jobOfferId',                        as: 'appointmentLetter' });
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  3.9  PERFORMANCE MODULE
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── AppraisalCycle → AppraisalTemplate ───────────────────────────────────────
+AppraisalCycle.belongsTo(AppraisalTemplate, { foreignKey: 'appraisalTemplateId', allowNull: false, as: 'appraisalTemplate' });
+AppraisalTemplate.hasMany(AppraisalCycle,   { foreignKey: 'appraisalTemplateId',                   as: 'appraisalCycles' });
+
+// ── Appraisal → Employee + AppraisalCycle + AppraisalTemplate ────────────────
+Appraisal.belongsTo(Employee,          { foreignKey: 'employeeId',          allowNull: false, as: 'employee' });
+Appraisal.belongsTo(AppraisalCycle,    { foreignKey: 'appraisalCycleId',    allowNull: false, as: 'appraisalCycle' });
+Appraisal.belongsTo(AppraisalTemplate, { foreignKey: 'appraisalTemplateId', allowNull: false, as: 'appraisalTemplate' });
+Employee.hasMany(Appraisal,            { foreignKey: 'employeeId',                            as: 'appraisals' });
+AppraisalCycle.hasMany(Appraisal,      { foreignKey: 'appraisalCycleId',                      as: 'appraisals' });
+AppraisalTemplate.hasMany(Appraisal,   { foreignKey: 'appraisalTemplateId',                   as: 'appraisals' });
+
+// ── Goal → Appraisal + Employee + Goal self-reference (sub-goals) ─────────────
+Goal.belongsTo(Appraisal, { foreignKey: 'appraisalId', allowNull: false, as: 'appraisal' });
+Goal.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
+Goal.belongsTo(Goal,      { foreignKey: 'parentGoalId',                  as: 'parentGoal' });
+Goal.hasMany(Goal,        { foreignKey: 'parentGoalId',                  as: 'subGoals' });
+Appraisal.hasMany(Goal,   { foreignKey: 'appraisalId',                   as: 'goals' });
+Employee.hasMany(Goal,    { foreignKey: 'employeeId',                    as: 'goals' });
+
+// ── EmployeePerformanceFeedback → Appraisal + Employee (reviewee & reviewer) ──
+EmployeePerformanceFeedback.belongsTo(Appraisal, { foreignKey: 'appraisalId', allowNull: false, as: 'appraisal' });
+EmployeePerformanceFeedback.belongsTo(Employee,  { foreignKey: 'revieweeId',  allowNull: false, as: 'reviewee' });
+EmployeePerformanceFeedback.belongsTo(Employee,  { foreignKey: 'reviewerId',  allowNull: false, as: 'reviewer' });
+Appraisal.hasMany(EmployeePerformanceFeedback,   { foreignKey: 'appraisalId',                   as: 'feedbacks' });
+Employee.hasMany(EmployeePerformanceFeedback,    { foreignKey: 'revieweeId',                    as: 'receivedFeedbacks' });
+Employee.hasMany(EmployeePerformanceFeedback,    { foreignKey: 'reviewerId',                    as: 'givenFeedbacks' });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  4. EXPORTS
+//
+//  Export the sequelize instance + Sequelize class + every model by name,
+//  grouped by module in the same order as the imports above.
+//  Controllers and services destructure only what they need:
+//    const { Employee, Department, LeaveApplication } = require('../../models');
+// ─────────────────────────────────────────────────────────────────────────────
+
 module.exports = {
   sequelize,
   Sequelize,
 
-  // role
+  // ── role ──────────────────────────────────────────────────────────────────
   Role,
   RoleProfile,
-  UserRole,
   RoleProfileRole,
   RolePermission,
   User,
+  UserRole,
   UserPermission,
   UserSession,
   LoginAttempt,
 
-  // organization
+  // ── organization ──────────────────────────────────────────────────────────
   Company,
   Branch,
   Department,
@@ -536,12 +661,12 @@ module.exports = {
   EmploymentType,
   EmployeeGrade,
 
-  // document
+  // ── document ──────────────────────────────────────────────────────────────
   DocumentType,
   Document,
   DocumentVersion,
 
-  // employee
+  // ── employee ──────────────────────────────────────────────────────────────
   Employee,
   EmployeeOnboarding,
   EmployeePromotion,
@@ -553,7 +678,7 @@ module.exports = {
   EmployeeEmergencyContact,
   EmployeeHealthInsurance,
 
-  // attendance
+  // ── attendance ────────────────────────────────────────────────────────────
   ShiftType,
   ShiftAssignment,
   ShiftRequest,
@@ -561,7 +686,7 @@ module.exports = {
   EmployeeCheckin,
   AttendanceRequest,
 
-  // leave
+  // ── leave ─────────────────────────────────────────────────────────────────
   HolidayList,
   LeaveType,
   LeavePeriod,
@@ -574,7 +699,7 @@ module.exports = {
   LeaveEncashment,
   LeaveLedgerEntry,
 
-  // payroll
+  // ── payroll ───────────────────────────────────────────────────────────────
   SalaryComponent,
   SalaryStructure,
   PayrollPeriod,
@@ -588,18 +713,18 @@ module.exports = {
   EmployeeTaxExemptionDeclaration,
   EmployeeTaxExemptionProofSubmission,
 
-  // recruitment
+  // ── recruitment ───────────────────────────────────────────────────────────
+  JobRequisition,
   StaffingPlan,
   JobOpening,
-  EmployeeReferral,
   JobApplicant,
+  EmployeeReferral,
   Interview,
   InterviewFeedback,
   JobOffer,
   AppointmentLetter,
-  JobRequisition,
 
-  // performance
+  // ── performance ───────────────────────────────────────────────────────────
   AppraisalTemplate,
   AppraisalCycle,
   Appraisal,
