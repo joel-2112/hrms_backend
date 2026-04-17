@@ -395,7 +395,7 @@ Attendance.hasMany(AttendanceRequest,   { foreignKey: 'attendanceId',           
 
 // ── LeaveType → LeavePolicy ───────────────────────────────────────────────────
 LeaveType.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId', as: 'leavePolicy' });
-LeavePolicy.hasMany(LeaveType,   { foreignKey: 'leavePolicyId', as: 'leaveTypes' });
+LeavePolicy.hasMany(LeaveType,   { foreignKey: 'leavePolicyId', as: 'leaveType' });
 
 // ── LeaveBlockList → Company  (block list is scoped to a company) ─────────────
 LeaveBlockList.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
