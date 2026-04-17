@@ -132,8 +132,9 @@ const EmployeePerformanceFeedback = require('../modules/performance/models/Emplo
 RoleProfile.belongsToMany(Role, {
   through:    RoleProfileRole,
   foreignKey: 'roleProfileId',
-  otherKey:   'roleId',
   as:         'roles',
+  otherKey:   'roleId',
+  
 });
 Role.belongsToMany(RoleProfile, {
   through:    RoleProfileRole,

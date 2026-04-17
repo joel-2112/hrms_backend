@@ -221,9 +221,8 @@ const deleteRole = async (id) => {
   }
 
   await role.destroy();
-  if (disabled !== undefined) {
   invalidateAllCache();  
-}
+
 };
 
 // ═════════════════════════════════════════════

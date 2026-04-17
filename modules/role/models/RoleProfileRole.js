@@ -20,6 +20,7 @@ module.exports = (sequelize, DataTypes) => {
     },
   }, {
     tableName: 'role_profile_roles',
+    timestamps: true,
     comment:   'Junction: RoleProfile ↔ Role many-to-many',
     indexes: [
       {
