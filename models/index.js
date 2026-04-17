@@ -243,6 +243,8 @@ Department.hasMany(Employee,     { foreignKey: 'departmentId' });
 Designation.hasMany(Employee,    { foreignKey: 'designationId' });
 EmploymentType.hasMany(Employee, { foreignKey: 'employmentTypeId' });
 EmployeeGrade.hasMany(Employee,  { foreignKey: 'employeeGradeId' });
+EmployeeGrade.belongsTo(LeavePolicy,  { foreignKey: 'defaultLeavePolicyId' });
+
 
 // Employee lifecycle child models → Employee
 EmployeeOnboarding.belongsTo(Employee,       { foreignKey: 'employeeId', allowNull: false });
@@ -310,6 +312,7 @@ Employee.hasMany(AttendanceRequest,     { foreignKey: 'employeeId' });
 
 // LeavePolicy → LeaveType (policy bundles many leave type rows)
 LeavePolicy.hasMany(LeaveType,   { foreignKey: 'leavePolicyId' });
+LeavePolicy.hasMany(EmployeeGrade, { foreignKey: 'defaultLeavePolicyId' });
 LeaveType.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId' });
 
 // LeavePolicyAssignment → Employee + LeavePolicy + LeavePeriod

@@ -12,18 +12,33 @@ const { AppError }  = require('../../../middlewares/errorMiddleware');
 // ══════════════════════════════════════════════
 
 const createCompany = async ({
-  name, abbreviation, defaultCurrency, country,
-  parentCompanyId, taxId, phone, email,
-  address, website, dateOfEstablishment,
+  name,
+  abbreviation,
+  defaultCurrency,
+  country,
+  parentCompanyId,
+  taxId,
+  phone,
+  email,
+  address,
+  website,
+  dateOfEstablishment,
 }) => {
   const exists = await Company.findOne({ where: { name } });
   if (exists) throw new AppError(`Company "${name}" already exists`, 409);
 
   return Company.create({
-    name, abbreviation, defaultCurrency, country,
+    name,
+    abbr: abbreviation,                          
+    currency: defaultCurrency,                   
+    country,
     parentCompanyId: parentCompanyId || null,
-    taxId, phone, email, address, website,
-    dateOfEstablishment,
+    taxId,
+    phone,
+    email,
+    address,
+    website,
+    dateOfIncorporation: dateOfEstablishment,    
   });
 };
 
@@ -223,6 +238,8 @@ const updateDepartment = async (id, updates) => {
 
     const parent = await Department.findByPk(updates.parentDepartmentId);
     if (!parent) throw new AppError('Parent department not found', 404);
+    if (parent.companyId !== dept.companyId)
+      throw new AppError('Parent department must belong to the same company', 422);
   }
 
   return dept.update(updates);
@@ -262,10 +279,10 @@ const getDepartmentTree = async (companyId, parentDepartmentId = null) => {
 //  DESIGNATION
 // ══════════════════════════════════════════════
 
-const createDesignation = async ({ name, description }) => {
+const createDesignation = async ({ name, jobFunction }) => {
   const exists = await Designation.findOne({ where: { name } });
   if (exists) throw new AppError(`Designation "${name}" already exists`, 409);
-  return Designation.create({ name, description });
+  return Designation.create({ name, jobFunction });
 };
 
 const getAllDesignations = async ({ includeDisabled = false, search } = {}) => {

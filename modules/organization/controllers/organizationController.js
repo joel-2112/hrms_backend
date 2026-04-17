@@ -49,7 +49,6 @@ const getCompanyTree = catchAsync(async (req, res) => {
 // ══════════════════════════════════════════════
 //  BRANCH
 // ══════════════════════════════════════════════
-
 const createBranch = catchAsync(async (req, res) => {
   const branch = await organizationService.createBranch(req.body);
   return created(res, { branch }, 'Branch created successfully');
