@@ -21,3 +21,4 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         port: 21
         # በ cPanel ላይ ፋይሉ እንዲቀመጥ የምትፈልግበት ፎልደር (ለምሳሌ public_html)
+        server-dir: ./erp-system/
