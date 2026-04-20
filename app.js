@@ -46,6 +46,10 @@ app.get('/api-docs.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
+app.get('/', (req, res) => {
+  res.send('Welcome to the HRMS API');
+});
+
 // ── Routes ────────────────────────────────────────────────────
 app.use('/auth', authRoutes);
 app.use('/roles', roleRoutes);
