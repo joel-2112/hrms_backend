@@ -3,7 +3,7 @@ name: Deploy hrms
 on:
   push:
     branches:
-      - main  # ወይም ኮድህ ያለበት የቅርንጫፍ ስም
+      - main  
 
 jobs:
   web-deploy:
