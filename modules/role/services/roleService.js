@@ -795,7 +795,7 @@ const getUserEffectivePermissions = async (userId) => {
         required: false,
         include: [{
           model:    RolePermission,
-          as:       'RolePermissions',   // must match association alias
+          as:       'rolePermissions',   // must match association alias
           required: false,
         }],
       },
