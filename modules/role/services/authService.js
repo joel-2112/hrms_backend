@@ -356,7 +356,7 @@ const getMe = async (userId, sessionId = null) => {
       },
       {
         model: RoleProfile,
-        as: 'RoleProfile',
+        as: 'roleProfile',
         attributes: ['id', 'name'],
       },
     ],

@@ -58,6 +58,8 @@ const getUserEffectivePermissions = async (req, res, next) => {
   }
 };
 
+
+
 module.exports = {
   addUserPermission,
   getUserPermissions,

@@ -86,6 +86,55 @@ const deletePermission = async (req, res, next) => {
   }
 };
 
+// Add after the existing functions (before module.exports)
+
+/**
+ * Get all roles assigned to a user
+ * GET /roles/users/:userId/roles
+ */
+const getUserRoles = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { page, limit } = req.query;
+    const result = await roleService.getUserRoles(userId, {
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20
+    });
+    ok(res, result.data, 'User roles fetched successfully', result.meta);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Assign roles to a user
+ * POST /roles/users/:userId/roles
+ */
+const assignRolesToUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { roleIds } = req.body;
+    const result = await roleService.assignRolesToUser(userId, roleIds);
+    ok(res, result.data, 'Roles assigned successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Remove a role from a user
+ * DELETE /roles/users/:userId/roles/:roleId
+ */
+const revokeRoleFromUser = async (req, res, next) => {
+  try {
+    const { userId, roleId } = req.params;
+    await roleService.revokeRolesFromUser(userId, [roleId]);
+    noContent(res);
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createRole,
   getAllRoles,
@@ -95,4 +144,8 @@ module.exports = {
   getRolePermissions,
   upsertPermission,
   deletePermission,
+  getUserRoles,
+  assignRolesToUser,
+  revokeRoleFromUser,
+
 };

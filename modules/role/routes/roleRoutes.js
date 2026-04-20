@@ -277,6 +277,206 @@ router.delete('/:id',
   authorize('Role', action.DELETE), 
   roleController.deleteRole
 );
+// ══════════════════════════════════════════════
+//  USER ROLE ASSIGNMENT ROUTES
+// ══════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /roles/users/{userId}/roles:
+ *   get:
+ *     summary: Get all roles assigned to a user
+ *     tags: [UserRoles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: List of user's roles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: User roles fetched successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       name:
+ *                         type: string
+ *                         example: HR Manager
+ *                       isSystemRole:
+ *                         type: boolean
+ *                         example: false
+ *                       disabled:
+ *                         type: boolean
+ *                         example: false
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: User not found
+ */
+router.get('/users/:userId/roles',
+  authorize('UserRole', action.READ),
+  roleController.getUserRoles
+);
+
+/**
+ * @swagger
+ * /roles/users/{userId}/roles:
+ *   post:
+ *     summary: Assign one or more roles to a user
+ *     tags: [UserRoles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleIds]
+ *             properties:
+ *               roleIds:
+ *                 type: array
+ *                 description: Array of role IDs to assign to the user
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example: ["550e8400-e29b-41d4-a716-446655440000", "550e8400-e29b-41d4-a716-446655440001"]
+ *     responses:
+ *       200:
+ *         description: Roles assigned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Roles assigned successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       name:
+ *                         type: string
+ *                       isSystemRole:
+ *                         type: boolean
+ *                       disabled:
+ *                         type: boolean
+ *       400:
+ *         description: Invalid request - roleIds must be a non-empty array
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: User or role not found
+ *       409:
+ *         description: Role already assigned to user
+ */
+router.post('/users/:userId/roles',
+  authorize('UserRole', action.SET_PERMISSIONS),
+  roleController.assignRolesToUser
+);
+
+/**
+ * @swagger
+ * /roles/users/{userId}/roles/{roleId}:
+ *   delete:
+ *     summary: Remove a specific role from a user
+ *     tags: [UserRoles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *       - in: path
+ *         name: roleId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Role ID to remove
+ *     responses:
+ *       204:
+ *         description: Role removed successfully
+ *       400:
+ *         description: Invalid request - cannot remove last role
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: User or role assignment not found
+ */
+router.delete('/users/:userId/roles/:roleId',
+  authorize('UserRole', action.SET_PERMISSIONS),
+  roleController.revokeRoleFromUser
+);
 
 // ══════════════════════════════════════════════
 //  ROLE PERMISSIONS
