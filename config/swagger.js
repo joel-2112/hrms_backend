@@ -23,7 +23,7 @@ const options = {
 
     servers: [
       {
-        url:         'http://localhost:3000/',
+        url:         'https://api.erp.teamworksc.com/',
         description: 'Local development',
       },
       {
