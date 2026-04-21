@@ -27,11 +27,11 @@ const options = {
         description: 'Local development',
       },
       {
-        url:         'https://staging.yourcompany.com/',
+        url:         'https://api.erp.teamworksc.com/',
         description: 'Staging',
       },
       {
-        url:         'https://app.yourcompany.com/',
+        url:         'https://api.erp.teamworksc.com/',
         description: 'Production',
       },
     ],
