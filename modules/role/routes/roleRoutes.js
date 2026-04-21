@@ -19,6 +19,12 @@ router.use(authenticate);
  *     description: Role profiles - Group multiple roles into profiles
  *   - name: UserPermissions
  *     description: User permissions - Record-level access control
+ *   - name: UserRoles
+ *     description: User role assignments - Assigning/removing roles to/from users
+ *   - name: RolePermissions
+ *     description: Role permissions - Managing permissions assigned to roles
+ *   - name: UserPermissions
+ *     description: User permissions - Record-level access control
  */
 
 // ══════════════════════════════════════════════
