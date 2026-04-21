@@ -23,16 +23,8 @@ const options = {
 
     servers: [
       {
-        url:         'https://api.erp.teamworksc.com/',
-        description: 'Local development',
-      },
-      {
-        url:         'https://api.erp.teamworksc.com/',
-        description: 'Staging',
-      },
-      {
-        url:         'https://api.erp.teamworksc.com/',
-        description: 'Production',
+        url:         'https://api.erp.teamworksc.com',
+        description: 'Production API',
       },
     ],
 
