@@ -47,7 +47,7 @@ app.get('/api-docs.json', (req, res) => {
   res.send(swaggerSpec);
 });
 app.get('/', (req, res) => {
-  res.send('Welcome to the HRMS API');
+  res.send('eWelcome to the HRMS API');
 });
 
 // ── Routes ────────────────────────────────────────────────────
