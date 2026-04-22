@@ -458,6 +458,7 @@ module.exports = {
   rejectHRRequisition,
   approveGMRequisition,
   rejectGMRequisition,
+  cancelJobRequisition,
 
   // Job Opening
   listJobOpenings,
