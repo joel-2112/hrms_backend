@@ -1,42 +1,4 @@
 'use strict';
-
-/**
- * recruitment.service.js
- *
- * Complete business logic layer for the Recruitment module.
- * Production-ready with performance optimizations, batch operations,
- * comprehensive error handling, and full audit logging.
- *
- * ─────────────────────────────────────────────────────────────────────────────
- *  PHASE 1 — HR Configuration
- *    Flow 1  : StaffingPlan CRUD + submit + approve
- *
- *  PHASE 2 — Job Requisition (Department Head → HR → GM)
- *    Flow 2  : Create + submit requisition
- *    Flow 3  : HR Manager L1 approval / rejection
- *    Flow 4  : GM L2 approval (auto-creates JobOpening) / rejection
- *
- *  PHASE 3 — Job Opening Management
- *    Flow 5  : HR publishes opening to job portal
- *
- *  PHASE 4 — Applicant Intake
- *    Flow 6  : Public apply + duplicate check + resume upload
- *    Flow 7  : Employee Referral → HR accept/reject → creates JobApplicant
- *
- *  PHASE 5 — Interview Management
- *    Flow 8  : HR schedules interview round
- *    Flow 9  : Interviewer submits feedback → recalculates average rating
- *
- *  PHASE 6 — Job Offer & Appointment
- *    Flow 10 : HR creates + submits offer
- *    Flow 11 : GM approves offer → HR sends to candidate
- *    Flow 12 : Candidate accepts (triggers AppointmentLetter) or declines
- *
- *  PHASE 7 — Onboarding Transition
- *    Flow 13 : Convert accepted applicant → Employee record
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
 const { Op } = require('sequelize');
 const { sequelize, ...models } = require('../../../models');
 const { AppError } = require('../../../middlewares/errorMiddleware');
