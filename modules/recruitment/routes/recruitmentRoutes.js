@@ -7,7 +7,7 @@ const { authorize } = require('../../../middlewares/rbacMiddleware');
 
 const router = express.Router();
 
-// All recruitment routes require authentication (except public endpoints)
+// All recruitment routes require authentication 
 router.use(authenticate);
 
 /**
