@@ -978,7 +978,7 @@ router
 router.put(
   '/employee-referrals/:id/accept',
   authorize('recruitment', 'EmployeeReferral', 'canWrite'),
-  c.acceptReferral,
+  c.acceptEmployeeReferral,
 );
 
 /**
@@ -1011,7 +1011,7 @@ router.put(
 router.put(
   '/employee-referrals/:id/reject',
   authorize('recruitment', 'EmployeeReferral', 'canWrite'),
-  c.rejectReferral,
+  c.rejectEmployeeReferral,
 );
 
 
@@ -1426,7 +1426,7 @@ router
 router.put(
   '/job-offers/:id/submit',
   authorize('recruitment', 'JobOffer', 'canSubmit'),
-  c.submitJobOffer,
+  c.submitJobOfferForApproval,
 );
 
 /**
@@ -1615,7 +1615,7 @@ router
 router.put(
   '/appointment-letters/:id/issue',
   authorize('recruitment', 'AppointmentLetter', 'canWrite'),
-  c.issueAppointmentLetter,
+  c.signAppointmentLetter,
 );
 
 /**
