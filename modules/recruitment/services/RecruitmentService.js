@@ -364,8 +364,8 @@ const getStaffingPlans = async ({ companyId, docStatus, page, limit } = {}) => {
     offset,
     order: [['createdAt', 'DESC']],
     include: [
-      { model: Company, attributes: ['id', 'name'] },
-      { model: Department, attributes: ['id', 'name'], required: false },
+      { model: Company, as: 'company', attributes: ['id', 'name'] },
+      { model: Department, as: 'department', attributes: ['id', 'name'], required: false },
     ],
   });
 

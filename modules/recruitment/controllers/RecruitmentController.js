@@ -113,7 +113,15 @@ const rejectGMRequisition = catchAsync(async (req, res) => {
   );
   ok(res, requisition, 'Requisition rejected by GM');
 });
-
+const cancelJobRequisition = catchAsync(async (req, res) => {
+  const { remarks } = req.body;
+  const requisition = await recruitmentService.cancelJobRequisition(
+    req.params.id,
+    req.user.id,
+    remarks || null
+  );
+  ok(res, requisition, 'Job requisition cancelled successfully');
+});
 
 // ══════════════════════════════════════════════
 //  JOB OPENING
