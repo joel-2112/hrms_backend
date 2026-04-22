@@ -23,7 +23,7 @@ const options = {
 
     servers: [
       {
-        url:         'https://api.erp.teamworksc.com',
+        url:         'http://localhost:3000',
         description: 'Production API',
       },
     ],
@@ -141,6 +141,7 @@ const options = {
     './modules/role/routes/*.js',
     './modules/organization/routes/*.js',
     './modules/document/routes/*.js',
+    './modules/recruitment/routes/*.js',
     './modules/employee/routes/*.js',
     './modules/payroll/routes/*.js',
     './modules/leave/routes/*.js',

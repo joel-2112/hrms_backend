@@ -6,6 +6,7 @@ const roleRoutes = require('./modules/role/routes/roleRoutes');
 const authRoutes = require('./modules/role/routes/authRoutes');
 const documentRoutes = require('./modules/document/routes/documentRoute');
 const organizationRoutes = require('./modules/organization/routes/organizationRoute');
+const recruitmentRoutes = require('./modules/recruitment/routes/recruitmentRoutes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 
@@ -51,6 +52,7 @@ app.use('/auth', authRoutes);
 app.use('/roles', roleRoutes);
 app.use('/organizations', organizationRoutes);
 app.use('/documents', documentRoutes);
+app.use('/recruitment', recruitmentRoutes);
 
 // ── Error handling middleware ─────────────────────────────────
 app.use(notFoundHandler);  
