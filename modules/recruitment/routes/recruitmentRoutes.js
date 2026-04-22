@@ -1,652 +1,2432 @@
 'use strict';
 
-/**
- * recruitmentRoutes.js
- *
- * Routes are wired 1-to-1 against every exported handler in recruitmentController.js.
- * Controller exports (in declaration order):
- *
- *  Staffing Plan      : listStaffingPlans, createStaffingPlan, getStaffingPlan,
- *                       updateStaffingPlan, submitStaffingPlan, approveStaffingPlan,
- *                       cancelStaffingPlan
- *
- *  Job Requisition    : listJobRequisitions, createJobRequisition, getJobRequisition,
- *                       submitJobRequisition, approveHRRequisition, rejectHRRequisition,
- *                       approveGMRequisition, rejectGMRequisition, cancelJobRequisition
- *
- *  Job Opening        : listJobOpenings, listPublicJobOpenings, getJobOpening,
- *                       createJobOpening, updateJobOpening, publishJobOpening,
- *                       unpublishJobOpening, closeJobOpening
- *
- *  Job Applicant      : listJobApplicants, createJobApplicant, getJobApplicant,
- *                       updateApplicantStatus, rateApplicant
- *
- *  Employee Referral  : listEmployeeReferrals, getEmployeeReferral,
- *                       createEmployeeReferral, acceptEmployeeReferral,
- *                       rejectEmployeeReferral, markReferralBonusPaid
- *
- *  Interview          : listInterviews, listMyInterviews, getInterview,
- *                       createInterview, updateInterview, cancelInterview,
- *                       markCandidateNotified, updateInterviewStatus
- *
- *  Interview Feedback : getInterviewFeedback, getInterviewFeedbackById,
- *                       submitInterviewFeedback
- *
- *  Job Offer          : listJobOffers, getJobOffer, createJobOffer, updateJobOffer,
- *                       submitJobOfferForApproval, approveJobOffer, rejectJobOffer,
- *                       sendJobOffer, acceptJobOffer, declineJobOffer, expireJobOffer
- *
- *  Appointment Letter : listAppointmentLetters, getAppointmentLetter,
- *                       generateAppointmentLetter, signAppointmentLetter,
- *                       markLetterDelivered, acknowledgeAppointmentLetter,
- *                       setPdfPath, cancelAppointmentLetter
- *
- *  Onboarding         : convertToEmployee
- *
- * ─────────────────────────────────────────────────────────────────────────
- *  Authentication strategy
- *  ────────────────────────
- *  Five endpoints are intentionally public (no authenticate):
- *
- *    GET  /job-openings/public            — public job portal listing
- *    POST /job-applicants                 — candidate submits application
- *         (?referralToken= links referral)
- *    PUT  /job-offers/:id/accept          — candidate accepts via portal link
- *    PUT  /job-offers/:id/decline         — candidate declines via portal link
- *    PUT  /appointment-letters/acknowledge— candidate acknowledges via token
- *         (?token= carries the one-time token)
- *
- *  Because router.use(authenticate) would block these five, authenticate is
- *  applied per-route on all protected endpoints instead.
- *
- * ─────────────────────────────────────────────────────────────────────────
- *  authorize() signature used throughout:
- *    authorize('hr', '<ModelName>', '<action>')
- *  Actions: canRead | canCreate | canWrite | canSubmit | canApprove | canDelete
- * ─────────────────────────────────────────────────────────────────────────
- *
- *  Route ordering note
- *  ───────────────────
- *  Static sub-paths (/public, /my, /acknowledge, /pending) are declared
- *  BEFORE their /:id counterparts so Express does not swallow them as
- *  param values.
- */
-
 const express = require('express');
-
-const ctrl = require('../controllers/recruitmentController');
+const recruitmentController = require('../controllers/recruitmentController');
 const { authenticate } = require('../../../middlewares/authMiddleware');
-const { authorize }    = require('../../../middlewares/rbacMiddleware');
+const { authorize } = require('../../../middlewares/rbacMiddleware');
 
 const router = express.Router();
 
+// All recruitment routes require authentication (except public endpoints)
+router.use(authenticate);
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Recruitment
+ *     description: Recruitment management - Staffing plans, requisitions, job openings, applicants, interviews, offers
+ */
+
 // ════════════════════════════════════════════════════════════════════════════
-//  STAFFING PLAN
-//  /recruitment/staffing-plans
+//  STAFFING PLAN — /recruitment/staffing-plans
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /recruitment/staffing-plans:
+ *   get:
+ *     summary: Get all staffing plans
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: "Filter by company"
+ *       - in: query
+ *         name: docStatus
+ *         schema:
+ *           type: integer
+ *           enum: [0, 1]
+ *         description: "0 = Draft, 1 = Submitted/Active"
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Staffing plans fetched successfully
+ */
 router.get(
   '/staffing-plans',
-  authenticate,
   authorize('hr', 'StaffingPlan', 'canRead'),
-  ctrl.listStaffingPlans
+  recruitmentController.listStaffingPlans
 );
 
+/**
+ * @swagger
+ * /recruitment/staffing-plans:
+ *   post:
+ *     summary: Create a new staffing plan (HR/GM only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, companyId, fromDate, toDate, planDetails]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Engineering Hiring Plan Q2 2026"
+ *               companyId:
+ *                 type: string
+ *                 format: uuid
+ *               departmentId:
+ *                 type: string
+ *                 format: uuid
+ *               fromDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-04-01"
+ *               toDate:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-06-30"
+ *               planDetails:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     designationId:
+ *                       type: string
+ *                       format: uuid
+ *                     numberOfPositions:
+ *                       type: integer
+ *                     estimatedCostPerPosition:
+ *                       type: number
+ *     responses:
+ *       201:
+ *         description: Staffing plan created successfully
+ *       403:
+ *         description: Access denied
+ *       409:
+ *         description: Staffing plan already exists
+ */
 router.post(
   '/staffing-plans',
-  authenticate,
   authorize('hr', 'StaffingPlan', 'canCreate'),
-  ctrl.createStaffingPlan
+  recruitmentController.createStaffingPlan
 );
 
+/**
+ * @swagger
+ * /recruitment/staffing-plans/{id}:
+ *   get:
+ *     summary: Get a specific staffing plan by ID
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Staffing plan fetched successfully
+ *       404:
+ *         description: Staffing plan not found
+ */
 router.get(
   '/staffing-plans/:id',
-  authenticate,
   authorize('hr', 'StaffingPlan', 'canRead'),
-  ctrl.getStaffingPlan
+  recruitmentController.getStaffingPlan
 );
 
+/**
+ * @swagger
+ * /recruitment/staffing-plans/{id}:
+ *   put:
+ *     summary: Update a staffing plan (Draft only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               planDetails:
+ *                 type: array
+ *     responses:
+ *       200:
+ *         description: Staffing plan updated successfully
+ *       404:
+ *         description: Staffing plan not found
+ */
 router.put(
   '/staffing-plans/:id',
-  authenticate,
   authorize('hr', 'StaffingPlan', 'canWrite'),
-  ctrl.updateStaffingPlan
+  recruitmentController.updateStaffingPlan
 );
 
+/**
+ * @swagger
+ * /recruitment/staffing-plans/{id}/submit:
+ *   put:
+ *     summary: Submit staffing plan for approval (Draft → Submitted)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Staffing plan submitted successfully
+ *       404:
+ *         description: Staffing plan not found
+ */
 router.put(
   '/staffing-plans/:id/submit',
-  authenticate,
   authorize('hr', 'StaffingPlan', 'canSubmit'),
-  ctrl.submitStaffingPlan
+  recruitmentController.submitStaffingPlan
 );
 
+/**
+ * @swagger
+ * /recruitment/staffing-plans/{id}/approve:
+ *   put:
+ *     summary: Approve staffing plan (GM only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Staffing plan approved successfully
+ *       403:
+ *         description: GM access required
+ *       404:
+ *         description: Staffing plan not found
+ */
 router.put(
   '/staffing-plans/:id/approve',
-  authenticate,
   authorize('hr', 'StaffingPlan', 'canApprove'),
-  ctrl.approveStaffingPlan
+  recruitmentController.approveStaffingPlan
 );
 
+/**
+ * @swagger
+ * /recruitment/staffing-plans/{id}/cancel:
+ *   put:
+ *     summary: Cancel a staffing plan
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Staffing plan cancelled successfully
+ *       404:
+ *         description: Staffing plan not found
+ */
 router.put(
   '/staffing-plans/:id/cancel',
-  authenticate,
   authorize('hr', 'StaffingPlan', 'canDelete'),
-  ctrl.cancelStaffingPlan
+  recruitmentController.cancelStaffingPlan
 );
 
 // ════════════════════════════════════════════════════════════════════════════
-//  JOB REQUISITION
-//  /recruitment/job-requisitions
+//  JOB REQUISITION — /recruitment/job-requisitions
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /recruitment/job-requisitions:
+ *   get:
+ *     summary: Get all job requisitions
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: departmentId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: overallStatus
+ *         schema:
+ *           type: string
+ *           enum: [Draft, Pending HR Review, HR Rejected, Pending GM Review, GM Rejected, Approved, Cancelled]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Job requisitions fetched successfully
+ */
 router.get(
   '/job-requisitions',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canRead'),
-  ctrl.listJobRequisitions
+  recruitmentController.listJobRequisitions
 );
 
+/**
+ * @swagger
+ * /recruitment/job-requisitions:
+ *   post:
+ *     summary: Create a new job requisition (Department Head)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [departmentId, designationId, companyId, reasonForHiring]
+ *             properties:
+ *               departmentId:
+ *                 type: string
+ *                 format: uuid
+ *               designationId:
+ *                 type: string
+ *                 format: uuid
+ *               companyId:
+ *                 type: string
+ *                 format: uuid
+ *               employmentTypeId:
+ *                 type: string
+ *                 format: uuid
+ *               numberOfPositions:
+ *                 type: integer
+ *                 default: 1
+ *               replacementFor:
+ *                 type: string
+ *               isNewPosition:
+ *                 type: boolean
+ *                 default: false
+ *               reasonForHiring:
+ *                 type: string
+ *               proposedSalaryMin:
+ *                 type: number
+ *               proposedSalaryMax:
+ *                 type: number
+ *               targetHireDate:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       201:
+ *         description: Job requisition created successfully
+ *       403:
+ *         description: Access denied
+ */
 router.post(
   '/job-requisitions',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canCreate'),
-  ctrl.createJobRequisition
+  recruitmentController.createJobRequisition
 );
 
+/**
+ * @swagger
+ * /recruitment/job-requisitions/{id}:
+ *   get:
+ *     summary: Get a specific job requisition
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job requisition fetched successfully
+ *       404:
+ *         description: Job requisition not found
+ */
 router.get(
   '/job-requisitions/:id',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canRead'),
-  ctrl.getJobRequisition
+  recruitmentController.getJobRequisition
 );
 
-// Dept Head submits their draft for HR review
+/**
+ * @swagger
+ * /recruitment/job-requisitions/{id}/submit:
+ *   put:
+ *     summary: Submit requisition for HR review
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Requisition submitted successfully
+ *       404:
+ *         description: Requisition not found
+ */
 router.put(
   '/job-requisitions/:id/submit',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canSubmit'),
-  ctrl.submitJobRequisition
+  recruitmentController.submitJobRequisition
 );
 
-// HR Manager — Level 1 approval
+/**
+ * @swagger
+ * /recruitment/job-requisitions/{id}/approve-hr:
+ *   put:
+ *     summary: HR approves requisition (Level 1)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               remarks:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Requisition approved by HR
+ *       404:
+ *         description: Requisition not found
+ */
 router.put(
   '/job-requisitions/:id/approve-hr',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canApprove'),
-  ctrl.approveHRRequisition
+  recruitmentController.approveHRRequisition
 );
 
+/**
+ * @swagger
+ * /recruitment/job-requisitions/{id}/reject-hr:
+ *   put:
+ *     summary: HR rejects requisition
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Requisition rejected by HR
+ *       404:
+ *         description: Requisition not found
+ */
 router.put(
   '/job-requisitions/:id/reject-hr',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canApprove'),
-  ctrl.rejectHRRequisition
+  recruitmentController.rejectHRRequisition
 );
 
-// GM — Level 2 approval (also auto-creates JobOpening)
+/**
+ * @swagger
+ * /recruitment/job-requisitions/{id}/approve-gm:
+ *   put:
+ *     summary: GM approves requisition (Level 2) - creates JobOpening
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               remarks:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Requisition approved by GM - JobOpening created
+ *       404:
+ *         description: Requisition not found
+ */
 router.put(
   '/job-requisitions/:id/approve-gm',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canApprove'),
-  ctrl.approveGMRequisition
+  recruitmentController.approveGMRequisition
 );
 
+/**
+ * @swagger
+ * /recruitment/job-requisitions/{id}/reject-gm:
+ *   put:
+ *     summary: GM rejects requisition
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Requisition rejected by GM
+ *       404:
+ *         description: Requisition not found
+ */
 router.put(
   '/job-requisitions/:id/reject-gm',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canApprove'),
-  ctrl.rejectGMRequisition
+  recruitmentController.rejectGMRequisition
 );
 
+/**
+ * @swagger
+ * /recruitment/job-requisitions/{id}/cancel:
+ *   put:
+ *     summary: Cancel a job requisition
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               remarks:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Job requisition cancelled successfully
+ *       404:
+ *         description: Requisition not found
+ */
 router.put(
   '/job-requisitions/:id/cancel',
-  authenticate,
   authorize('hr', 'JobRequisition', 'canDelete'),
-  ctrl.cancelJobRequisition
+  recruitmentController.cancelJobRequisition
 );
 
 // ════════════════════════════════════════════════════════════════════════════
-//  JOB OPENING
-//  /recruitment/job-openings
-//
-//  IMPORTANT: /public is declared first — must come before /:id
+//  JOB OPENING — /recruitment/job-openings
 // ════════════════════════════════════════════════════════════════════════════
 
-// ── Public (no authenticate) ──────────────────────────────────────────────
+/**
+ * @swagger
+ * /recruitment/job-openings:
+ *   get:
+ *     summary: Get all job openings (internal)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: departmentId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: designationId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Open, Closed]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Job openings fetched successfully
+ */
+router.get(
+  '/job-openings',
+  authorize('hr', 'JobOpening', 'canRead'),
+  recruitmentController.listJobOpenings
+);
+
+/**
+ * @swagger
+ * /recruitment/job-openings/public:
+ *   get:
+ *     summary: Get published job openings (public portal - no auth)
+ *     tags: [Recruitment]
+ *     security: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Public job openings fetched successfully
+ */
 router.get(
   '/job-openings/public',
-  ctrl.listPublicJobOpenings            // no authenticate, no authorize
+  recruitmentController.listPublicJobOpenings
 );
 
-// ── Authenticated ─────────────────────────────────────────────────────────
+/**
+ * @swagger
+ * /recruitment/job-openings/{id}:
+ *   get:
+ *     summary: Get a specific job opening
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job opening fetched successfully
+ *       404:
+ *         description: Job opening not found
+ */
 router.get(
-  '/job-openings',
-  authenticate,
+  '/job-openings/:id',
   authorize('hr', 'JobOpening', 'canRead'),
-  ctrl.listJobOpenings
+  recruitmentController.getJobOpening
 );
 
+/**
+ * @swagger
+ * /recruitment/job-openings:
+ *   post:
+ *     summary: Create a new job opening (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobTitle, companyId]
+ *             properties:
+ *               jobTitle:
+ *                 type: string
+ *               departmentId:
+ *                 type: string
+ *                 format: uuid
+ *               designationId:
+ *                 type: string
+ *                 format: uuid
+ *               companyId:
+ *                 type: string
+ *                 format: uuid
+ *               staffingPlanId:
+ *                 type: string
+ *                 format: uuid
+ *               plannedNumberOfPositions:
+ *                 type: integer
+ *                 default: 1
+ *               description:
+ *                 type: string
+ *               expectedSalaryFrom:
+ *                 type: number
+ *               expectedSalaryTo:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: Job opening created successfully
+ *       403:
+ *         description: Access denied
+ */
 router.post(
   '/job-openings',
-  authenticate,
   authorize('hr', 'JobOpening', 'canCreate'),
-  ctrl.createJobOpening
+  recruitmentController.createJobOpening
 );
 
-router.get(
-  '/job-openings/:id',
-  authenticate,
-  authorize('hr', 'JobOpening', 'canRead'),
-  ctrl.getJobOpening
-);
-
-// PATCH — partial update (title, description, salary range)
+/**
+ * @swagger
+ * /recruitment/job-openings/{id}:
+ *   patch:
+ *     summary: Update a job opening
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               jobTitle:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               expectedSalaryFrom:
+ *                 type: number
+ *               expectedSalaryTo:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Job opening updated successfully
+ *       404:
+ *         description: Job opening not found
+ */
 router.patch(
   '/job-openings/:id',
-  authenticate,
   authorize('hr', 'JobOpening', 'canWrite'),
-  ctrl.updateJobOpening
+  recruitmentController.updateJobOpening
 );
 
-// publishJobOpening — sets publishOnWebsite = true
+/**
+ * @swagger
+ * /recruitment/job-openings/{id}/publish:
+ *   put:
+ *     summary: Publish job opening to public portal
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job opening published successfully
+ *       404:
+ *         description: Job opening not found
+ */
 router.put(
   '/job-openings/:id/publish',
-  authenticate,
   authorize('hr', 'JobOpening', 'canSubmit'),
-  ctrl.publishJobOpening
+  recruitmentController.publishJobOpening
 );
 
-// unpublishJobOpening — sets publishOnWebsite = false
+/**
+ * @swagger
+ * /recruitment/job-openings/{id}/unpublish:
+ *   put:
+ *     summary: Unpublish job opening from public portal
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job opening unpublished successfully
+ *       404:
+ *         description: Job opening not found
+ */
 router.put(
   '/job-openings/:id/unpublish',
-  authenticate,
   authorize('hr', 'JobOpening', 'canSubmit'),
-  ctrl.unpublishJobOpening
+  recruitmentController.unpublishJobOpening
 );
 
-// closeJobOpening — sets status = 'Closed', also unpublishes
+/**
+ * @swagger
+ * /recruitment/job-openings/{id}/close:
+ *   put:
+ *     summary: Close a job opening (no more applications)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job opening closed successfully
+ *       404:
+ *         description: Job opening not found
+ */
 router.put(
   '/job-openings/:id/close',
-  authenticate,
   authorize('hr', 'JobOpening', 'canDelete'),
-  ctrl.closeJobOpening
+  recruitmentController.closeJobOpening
 );
 
 // ════════════════════════════════════════════════════════════════════════════
-//  JOB APPLICANT
-//  /recruitment/job-applicants
-//
-//  POST /job-applicants is public (candidate portal).
-//  The controller reads req.query.referralToken to link referrals.
+//  JOB APPLICANT — /recruitment/job-applicants
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /recruitment/job-applicants:
+ *   get:
+ *     summary: Get all job applicants (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: jobOpeningId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Open, Replied, Hold, Accepted, Rejected]
+ *       - in: query
+ *         name: source
+ *         schema:
+ *           type: string
+ *           enum: [Website Listing, Employee Referral, Campaign, Walk In]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Job applicants fetched successfully
+ */
 router.get(
   '/job-applicants',
-  authenticate,
   authorize('hr', 'JobApplicant', 'canRead'),
-  ctrl.listJobApplicants
+  recruitmentController.listJobApplicants
 );
 
-// ── Public (no authenticate) ──────────────────────────────────────────────
+/**
+ * @swagger
+ * /recruitment/job-applicants:
+ *   post:
+ *     summary: Submit job application (public - no auth)
+ *     tags: [Recruitment]
+ *     security: []
+ *     parameters:
+ *       - in: query
+ *         name: referralToken
+ *         schema:
+ *           type: string
+ *         description: Optional referral token for employee referral
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobOpeningId, applicantName, email]
+ *             properties:
+ *               jobOpeningId:
+ *                 type: string
+ *                 format: uuid
+ *               applicantName:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               phone:
+ *                 type: string
+ *               coverLetter:
+ *                 type: string
+ *               resumePath:
+ *                 type: string
+ *               expectedSalary:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: Application submitted successfully
+ *       409:
+ *         description: Duplicate application
+ */
 router.post(
   '/job-applicants',
-  ctrl.createJobApplicant               // public: candidate submits application
+  recruitmentController.createJobApplicant
 );
 
-// ── Authenticated ─────────────────────────────────────────────────────────
+/**
+ * @swagger
+ * /recruitment/job-applicants/{id}:
+ *   get:
+ *     summary: Get a specific job applicant
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job applicant fetched successfully
+ *       404:
+ *         description: Job applicant not found
+ */
 router.get(
   '/job-applicants/:id',
-  authenticate,
   authorize('hr', 'JobApplicant', 'canRead'),
-  ctrl.getJobApplicant
+  recruitmentController.getJobApplicant
 );
 
-// PATCH — move applicant through pipeline stages
+/**
+ * @swagger
+ * /recruitment/job-applicants/{id}/status:
+ *   patch:
+ *     summary: Update applicant status (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [Open, Replied, Hold, Accepted, Rejected]
+ *               rejectionReason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Applicant status updated successfully
+ *       404:
+ *         description: Job applicant not found
+ */
 router.patch(
   '/job-applicants/:id/status',
-  authenticate,
   authorize('hr', 'JobApplicant', 'canWrite'),
-  ctrl.updateApplicantStatus
+  recruitmentController.updateApplicantStatus
 );
 
-// PUT — recruiter sets overall rating after all interview rounds
+/**
+ * @swagger
+ * /recruitment/job-applicants/{id}/rate:
+ *   put:
+ *     summary: Rate an applicant (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [rating]
+ *             properties:
+ *               rating:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 5
+ *     responses:
+ *       200:
+ *         description: Applicant rated successfully
+ *       404:
+ *         description: Job applicant not found
+ */
 router.put(
   '/job-applicants/:id/rate',
-  authenticate,
   authorize('hr', 'JobApplicant', 'canWrite'),
-  ctrl.rateApplicant
-);
-
-// POST — convert accepted applicant to Employee record (onboarding transition)
-router.post(
-  '/job-applicants/:id/convert-to-employee',
-  authenticate,
-  authorize('hr', 'Employee', 'canCreate'),
-  ctrl.convertToEmployee
+  recruitmentController.rateApplicant
 );
 
 // ════════════════════════════════════════════════════════════════════════════
-//  EMPLOYEE REFERRAL
-//  /recruitment/employee-referrals
+//  EMPLOYEE REFERRAL — /recruitment/employee-referrals
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /recruitment/employee-referrals:
+ *   get:
+ *     summary: Get employee referrals (employees see own, HR sees all)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: jobOpeningId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Pending, Accepted, Rejected, In Process]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Employee referrals fetched successfully
+ */
 router.get(
   '/employee-referrals',
-  authenticate,
   authorize('hr', 'EmployeeReferral', 'canRead'),
-  ctrl.listEmployeeReferrals
+  recruitmentController.listEmployeeReferrals
 );
 
-router.post(
-  '/employee-referrals',
-  authenticate,
-  authorize('hr', 'EmployeeReferral', 'canCreate'),
-  ctrl.createEmployeeReferral
-);
-
+/**
+ * @swagger
+ * /recruitment/employee-referrals/{id}:
+ *   get:
+ *     summary: Get a specific employee referral
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Employee referral fetched successfully
+ *       404:
+ *         description: Employee referral not found
+ */
 router.get(
   '/employee-referrals/:id',
-  authenticate,
   authorize('hr', 'EmployeeReferral', 'canRead'),
-  ctrl.getEmployeeReferral
+  recruitmentController.getEmployeeReferral
 );
 
-// HR accepts referral → creates JobApplicant
+/**
+ * @swagger
+ * /recruitment/employee-referrals:
+ *   post:
+ *     summary: Create an employee referral (any employee)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobOpeningId, candidateName, candidateEmail]
+ *             properties:
+ *               jobOpeningId:
+ *                 type: string
+ *                 format: uuid
+ *               candidateName:
+ *                 type: string
+ *               candidateEmail:
+ *                 type: string
+ *                 format: email
+ *               candidatePhone:
+ *                 type: string
+ *               coverNote:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Referral submitted successfully
+ *       403:
+ *         description: Access denied
+ */
+router.post(
+  '/employee-referrals',
+  authorize('hr', 'EmployeeReferral', 'canCreate'),
+  recruitmentController.createEmployeeReferral
+);
+
+/**
+ * @swagger
+ * /recruitment/employee-referrals/{id}/accept:
+ *   put:
+ *     summary: HR accepts referral (creates JobApplicant)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Referral accepted - applicant created
+ *       404:
+ *         description: Referral not found
+ */
 router.put(
   '/employee-referrals/:id/accept',
-  authenticate,
   authorize('hr', 'EmployeeReferral', 'canApprove'),
-  ctrl.acceptEmployeeReferral
+  recruitmentController.acceptEmployeeReferral
 );
 
+/**
+ * @swagger
+ * /recruitment/employee-referrals/{id}/reject:
+ *   put:
+ *     summary: HR rejects referral
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Referral rejected
+ *       404:
+ *         description: Referral not found
+ */
 router.put(
   '/employee-referrals/:id/reject',
-  authenticate,
   authorize('hr', 'EmployeeReferral', 'canApprove'),
-  ctrl.rejectEmployeeReferral
+  recruitmentController.rejectEmployeeReferral
 );
 
-// HR / Finance marks referral bonus as paid
+/**
+ * @swagger
+ * /recruitment/employee-referrals/{id}/bonus-paid:
+ *   put:
+ *     summary: Mark referral bonus as paid (HR/Finance)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Referral bonus marked as paid
+ *       404:
+ *         description: Referral not found
+ */
 router.put(
   '/employee-referrals/:id/bonus-paid',
-  authenticate,
   authorize('hr', 'EmployeeReferral', 'canApprove'),
-  ctrl.markReferralBonusPaid
+  recruitmentController.markReferralBonusPaid
 );
 
 // ════════════════════════════════════════════════════════════════════════════
-//  INTERVIEW
-//  /recruitment/interviews
-//
-//  IMPORTANT: /my is declared before /:id so Express does not
-//  treat 'my' as a UUID param value.
+//  INTERVIEW — /recruitment/interviews
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /recruitment/interviews:
+ *   get:
+ *     summary: Get all interviews (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: jobApplicantId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: jobOpeningId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: interviewerId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Scheduled, Under Review, Pending, Cleared, Not Cleared, Cancelled, No Show]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Interviews fetched successfully
+ */
 router.get(
   '/interviews',
-  authenticate,
   authorize('hr', 'Interview', 'canRead'),
-  ctrl.listInterviews
+  recruitmentController.listInterviews
 );
 
-// Interviewer-scoped view — no extra authorize needed; controller resolves
-// the employee from req.user.id and filters by interviewerId internally
+/**
+ * @swagger
+ * /recruitment/interviews/my:
+ *   get:
+ *     summary: Get interviews assigned to me (interviewer)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: My interviews fetched successfully
+ */
 router.get(
   '/interviews/my',
-  authenticate,
-  ctrl.listMyInterviews
+  recruitmentController.listMyInterviews
 );
 
+/**
+ * @swagger
+ * /recruitment/interviews:
+ *   post:
+ *     summary: Schedule an interview (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobApplicantId, jobOpeningId, interviewerId, scheduledOn, name]
+ *             properties:
+ *               jobApplicantId:
+ *                 type: string
+ *                 format: uuid
+ *               jobOpeningId:
+ *                 type: string
+ *                 format: uuid
+ *               interviewerId:
+ *                 type: string
+ *                 format: uuid
+ *               name:
+ *                 type: string
+ *               interviewRound:
+ *                 type: integer
+ *                 default: 1
+ *               interviewType:
+ *                 type: string
+ *                 enum: [One-on-One, Panel, Technical, HR, Case Study, Group Discussion, Video Call, Phone Screening]
+ *                 default: One-on-One
+ *               scheduledOn:
+ *                 type: string
+ *                 format: date-time
+ *               duration:
+ *                 type: integer
+ *               location:
+ *                 type: string
+ *               panelMembers:
+ *                 type: array
+ *               skillCriteria:
+ *                 type: array
+ *     responses:
+ *       201:
+ *         description: Interview scheduled successfully
+ *       403:
+ *         description: Access denied
+ *       409:
+ *         description: Scheduling conflict
+ */
 router.post(
   '/interviews',
-  authenticate,
   authorize('hr', 'Interview', 'canCreate'),
-  ctrl.createInterview
+  recruitmentController.createInterview
 );
 
+/**
+ * @swagger
+ * /recruitment/interviews/{id}:
+ *   get:
+ *     summary: Get a specific interview
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Interview fetched successfully
+ *       404:
+ *         description: Interview not found
+ */
 router.get(
   '/interviews/:id',
-  authenticate,
   authorize('hr', 'Interview', 'canRead'),
-  ctrl.getInterview
+  recruitmentController.getInterview
 );
 
-// PATCH — reschedule, change panel, location
+/**
+ * @swagger
+ * /recruitment/interviews/{id}:
+ *   patch:
+ *     summary: Update an interview (reschedule, change panel, etc.)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               scheduledOn:
+ *                 type: string
+ *                 format: date-time
+ *               duration:
+ *                 type: integer
+ *               location:
+ *                 type: string
+ *               panelMembers:
+ *                 type: array
+ *               name:
+ *                 type: string
+ *               interviewType:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Interview updated successfully
+ *       404:
+ *         description: Interview not found
+ */
 router.patch(
   '/interviews/:id',
-  authenticate,
   authorize('hr', 'Interview', 'canWrite'),
-  ctrl.updateInterview
+  recruitmentController.updateInterview
 );
 
+/**
+ * @swagger
+ * /recruitment/interviews/{id}/cancel:
+ *   put:
+ *     summary: Cancel an interview
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               remarks:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Interview cancelled successfully
+ *       404:
+ *         description: Interview not found
+ */
 router.put(
   '/interviews/:id/cancel',
-  authenticate,
   authorize('hr', 'Interview', 'canDelete'),
-  ctrl.cancelInterview
+  recruitmentController.cancelInterview
 );
 
-// Mark that the candidate has been sent their invitation
+/**
+ * @swagger
+ * /recruitment/interviews/{id}/notify-candidate:
+ *   put:
+ *     summary: Mark candidate as notified
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Candidate marked as notified
+ *       404:
+ *         description: Interview not found
+ */
 router.put(
   '/interviews/:id/notify-candidate',
-  authenticate,
   authorize('hr', 'Interview', 'canWrite'),
-  ctrl.markCandidateNotified
+  recruitmentController.markCandidateNotified
 );
 
-// Advance/set interview status (Cleared, Not Cleared, No Show, etc.)
+/**
+ * @swagger
+ * /recruitment/interviews/{id}/status:
+ *   put:
+ *     summary: Update interview status
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [Scheduled, Under Review, Pending, Cleared, Not Cleared, Cancelled, No Show]
+ *               remarks:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Interview status updated successfully
+ *       404:
+ *         description: Interview not found
+ */
 router.put(
   '/interviews/:id/status',
-  authenticate,
   authorize('hr', 'Interview', 'canWrite'),
-  ctrl.updateInterviewStatus
+  recruitmentController.updateInterviewStatus
 );
 
-// ════════════════════════════════════════════════════════════════════════════
-//  INTERVIEW FEEDBACK
-//
-//  submitInterviewFeedback  → POST /interviews/:id/feedback
-//    controller reads:  req.params.id  (interviewId)  +  req.user.id
-//
-//  getInterviewFeedback     → GET  /interviews/:interviewId/feedback
-//    controller reads:  req.params.interviewId
-//
-//  getInterviewFeedbackById → GET  /interview-feedback/:id
-//    controller reads:  req.params.id  (feedbackId)
-// ════════════════════════════════════════════════════════════════════════════
-
-// Submit feedback for an interview round (panelist / interviewer)
+/**
+ * @swagger
+ * /recruitment/interviews/{id}/feedback:
+ *   post:
+ *     summary: Submit interview feedback (interviewer only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [result]
+ *             properties:
+ *               skillAssessments:
+ *                 type: array
+ *               competencyRatings:
+ *                 type: array
+ *               strengths:
+ *                 type: string
+ *               weaknesses:
+ *                 type: string
+ *               recommendation:
+ *                 type: string
+ *               result:
+ *                 type: string
+ *                 enum: [Cleared, Not Cleared, On Hold]
+ *     responses:
+ *       201:
+ *         description: Interview feedback submitted successfully
+ *       403:
+ *         description: Not assigned as interviewer
+ *       404:
+ *         description: Interview not found
+ */
 router.post(
   '/interviews/:id/feedback',
-  authenticate,
   authorize('hr', 'InterviewFeedback', 'canCreate'),
-  ctrl.submitInterviewFeedback
+  recruitmentController.submitInterviewFeedback
 );
 
-// Get all feedback records for one interview
-// Uses :interviewId param — controller: req.params.interviewId
+// ════════════════════════════════════════════════════════════════════════════
+//  INTERVIEW FEEDBACK — /recruitment/interviews/{interviewId}/feedback
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /recruitment/interviews/{interviewId}/feedback:
+ *   get:
+ *     summary: Get all feedback for an interview
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: interviewId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Interview feedback fetched successfully
+ *       404:
+ *         description: Interview not found
+ */
 router.get(
   '/interviews/:interviewId/feedback',
-  authenticate,
   authorize('hr', 'InterviewFeedback', 'canRead'),
-  ctrl.getInterviewFeedback
+  recruitmentController.getInterviewFeedback
 );
 
-// Get a single feedback record by its own UUID
-// Separate resource path avoids param collision with the routes above
+/**
+ * @swagger
+ * /recruitment/interview-feedback/{id}:
+ *   get:
+ *     summary: Get a specific interview feedback by ID
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Interview feedback fetched successfully
+ *       404:
+ *         description: Interview feedback not found
+ */
 router.get(
   '/interview-feedback/:id',
-  authenticate,
   authorize('hr', 'InterviewFeedback', 'canRead'),
-  ctrl.getInterviewFeedbackById
+  recruitmentController.getInterviewFeedbackById
 );
 
 // ════════════════════════════════════════════════════════════════════════════
-//  JOB OFFER
-//  /recruitment/job-offers
-//
-//  accept and decline are public (candidate portal — no auth session).
+//  JOB OFFER — /recruitment/job-offers
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /recruitment/job-offers:
+ *   get:
+ *     summary: Get all job offers (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: jobOpeningId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Job offers fetched successfully
+ */
 router.get(
   '/job-offers',
-  authenticate,
   authorize('hr', 'JobOffer', 'canRead'),
-  ctrl.listJobOffers
+  recruitmentController.listJobOffers
 );
 
+/**
+ * @swagger
+ * /recruitment/job-offers:
+ *   post:
+ *     summary: Create a job offer (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [jobApplicantId, jobOpeningId, offerDate, grossSalary]
+ *             properties:
+ *               jobApplicantId:
+ *                 type: string
+ *                 format: uuid
+ *               jobOpeningId:
+ *                 type: string
+ *                 format: uuid
+ *               designationId:
+ *                 type: string
+ *                 format: uuid
+ *               offerDate:
+ *                 type: string
+ *                 format: date
+ *               expiryDate:
+ *                 type: string
+ *                 format: date
+ *               proposedJoiningDate:
+ *                 type: string
+ *                 format: date
+ *               companyId:
+ *                 type: string
+ *                 format: uuid
+ *               departmentId:
+ *                 type: string
+ *                 format: uuid
+ *               branchId:
+ *                 type: string
+ *                 format: uuid
+ *               employmentTypeId:
+ *                 type: string
+ *                 format: uuid
+ *               gradeId:
+ *                 type: string
+ *                 format: uuid
+ *               grossSalary:
+ *                 type: number
+ *               offerTerms:
+ *                 type: array
+ *               probationPeriodMonths:
+ *                 type: integer
+ *                 default: 3
+ *     responses:
+ *       201:
+ *         description: Job offer created successfully
+ *       403:
+ *         description: Access denied
+ *       409:
+ *         description: Offer already exists for this applicant
+ */
 router.post(
   '/job-offers',
-  authenticate,
   authorize('hr', 'JobOffer', 'canCreate'),
-  ctrl.createJobOffer
+  recruitmentController.createJobOffer
 );
 
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}:
+ *   get:
+ *     summary: Get a specific job offer
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job offer fetched successfully
+ *       404:
+ *         description: Job offer not found
+ */
 router.get(
   '/job-offers/:id',
-  authenticate,
   authorize('hr', 'JobOffer', 'canRead'),
-  ctrl.getJobOffer
+  recruitmentController.getJobOffer
 );
 
-// PUT — edit Draft or Awaiting-Approval offer
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}:
+ *   put:
+ *     summary: Update a job offer
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               offerDate:
+ *                 type: string
+ *                 format: date
+ *               expiryDate:
+ *                 type: string
+ *                 format: date
+ *               proposedJoiningDate:
+ *                 type: string
+ *                 format: date
+ *               grossSalary:
+ *                 type: number
+ *               offerTerms:
+ *                 type: array
+ *     responses:
+ *       200:
+ *         description: Job offer updated successfully
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id',
-  authenticate,
   authorize('hr', 'JobOffer', 'canWrite'),
-  ctrl.updateJobOffer
+  recruitmentController.updateJobOffer
 );
 
-// HR submits Draft → Awaiting Approval
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}/submit:
+ *   put:
+ *     summary: Submit job offer for GM approval (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job offer submitted for approval
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id/submit',
-  authenticate,
   authorize('hr', 'JobOffer', 'canSubmit'),
-  ctrl.submitJobOfferForApproval
+  recruitmentController.submitJobOfferForApproval
 );
 
-// GM approves (Awaiting Approval → Approved)
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}/approve:
+ *   put:
+ *     summary: Approve job offer (GM only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job offer approved
+ *       403:
+ *         description: GM access required
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id/approve',
-  authenticate,
   authorize('hr', 'JobOffer', 'canApprove'),
-  ctrl.approveJobOffer
+  recruitmentController.approveJobOffer
 );
 
-// HR rejects before sending (Awaiting Approval → Rejected by HR)
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}/reject:
+ *   put:
+ *     summary: Reject a job offer (HR)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [remarks]
+ *             properties:
+ *               remarks:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Job offer rejected successfully
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id/reject',
-  authenticate,
   authorize('hr', 'JobOffer', 'canApprove'),
-  ctrl.rejectJobOffer
+  recruitmentController.rejectJobOffer
 );
 
-// HR sends approved offer to candidate (Approved → Offer Sent)
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}/send:
+ *   put:
+ *     summary: Send job offer to candidate (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job offer sent to candidate
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id/send',
-  authenticate,
   authorize('hr', 'JobOffer', 'canSubmit'),
-  ctrl.sendJobOffer
+  recruitmentController.sendJobOffer
 );
 
-// ── Public (no authenticate) ──────────────────────────────────────────────
-// Candidate accepts via portal link (Offer Sent → Accepted)
-// Also auto-creates AppointmentLetter in Draft status
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}/accept:
+ *   put:
+ *     summary: Candidate accepts job offer (public - no auth)
+ *     tags: [Recruitment]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job offer accepted - appointment letter drafted
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id/accept',
-  ctrl.acceptJobOffer
+  recruitmentController.acceptJobOffer
 );
 
-// Candidate declines via portal link (Offer Sent → Declined)
-// Also sets JobApplicant.status = 'Rejected'
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}/decline:
+ *   put:
+ *     summary: Candidate declines job offer (public - no auth)
+ *     tags: [Recruitment]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               declineReason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Job offer declined
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id/decline',
-  ctrl.declineJobOffer
+  recruitmentController.declineJobOffer
 );
 
-// ── Authenticated ─────────────────────────────────────────────────────────
-// Manual or scheduled expiry (Offer Sent / Approved → Expired)
+/**
+ * @swagger
+ * /recruitment/job-offers/{id}/expire:
+ *   put:
+ *     summary: Expire a job offer
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job offer expired successfully
+ *       404:
+ *         description: Job offer not found
+ */
 router.put(
   '/job-offers/:id/expire',
-  authenticate,
   authorize('hr', 'JobOffer', 'canWrite'),
-  ctrl.expireJobOffer
+  recruitmentController.expireJobOffer
 );
 
 // ════════════════════════════════════════════════════════════════════════════
-//  APPOINTMENT LETTER
-//  /recruitment/appointment-letters
-//
-//  IMPORTANT: /acknowledge is declared BEFORE /:id to prevent Express
-//  matching "acknowledge" as a UUID param.
-//
-//  acknowledgeAppointmentLetter:
-//    The controller reads: req.query.token || req.body.token
-//    Route: PUT /appointment-letters/acknowledge
-//    The token comes in as a query param: ?token=<one-time-token>
-//    No path param is needed — the service looks up the record by token.
+//  APPOINTMENT LETTER — /recruitment/appointment-letters
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /recruitment/appointment-letters:
+ *   get:
+ *     summary: Get all appointment letters (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Draft, Issued, Delivered, Acknowledged, Cancelled]
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Appointment letters fetched successfully
+ */
 router.get(
   '/appointment-letters',
-  authenticate,
   authorize('hr', 'AppointmentLetter', 'canRead'),
-  ctrl.listAppointmentLetters
+  recruitmentController.listAppointmentLetters
 );
 
-// ── Public (no authenticate) — must come before /:id ─────────────────────
-// Candidate acknowledges via one-time token in query string: ?token=<token>
-router.put(
-  '/appointment-letters/acknowledge',
-  ctrl.acknowledgeAppointmentLetter
-);
-
-// ── Authenticated ─────────────────────────────────────────────────────────
+/**
+ * @swagger
+ * /recruitment/appointment-letters/{id}:
+ *   get:
+ *     summary: Get a specific appointment letter
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Appointment letter fetched successfully
+ *       404:
+ *         description: Appointment letter not found
+ */
 router.get(
   '/appointment-letters/:id',
-  authenticate,
   authorize('hr', 'AppointmentLetter', 'canRead'),
-  ctrl.getAppointmentLetter
+  recruitmentController.getAppointmentLetter
 );
 
-// POST — render letter body from offer data and freeze as HTML snapshot
+/**
+ * @swagger
+ * /recruitment/appointment-letters/{id}/generate:
+ *   post:
+ *     summary: Generate appointment letter from offer
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               templateKey:
+ *                 type: string
+ *               signedById:
+ *                 type: string
+ *                 format: uuid
+ *               candidateEmail:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Appointment letter generated successfully
+ *       404:
+ *         description: Appointment letter not found
+ */
 router.post(
   '/appointment-letters/:id/generate',
-  authenticate,
   authorize('hr', 'AppointmentLetter', 'canWrite'),
-  ctrl.generateAppointmentLetter
+  recruitmentController.generateAppointmentLetter
 );
 
-// PUT — HR Director / GM signs (Draft → Issued); uses req.user.id as signedById
+/**
+ * @swagger
+ * /recruitment/appointment-letters/{id}/sign:
+ *   put:
+ *     summary: Sign appointment letter (HR/GM)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Appointment letter signed and issued
+ *       404:
+ *         description: Appointment letter not found
+ */
 router.put(
   '/appointment-letters/:id/sign',
-  authenticate,
   authorize('hr', 'AppointmentLetter', 'canApprove'),
-  ctrl.signAppointmentLetter
+  recruitmentController.signAppointmentLetter
 );
 
-// PUT — HR marks physical or digital delivery (Issued → Delivered)
+/**
+ * @swagger
+ * /recruitment/appointment-letters/{id}/deliver:
+ *   put:
+ *     summary: Mark appointment letter as delivered (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               deliveryMethod:
+ *                 type: string
+ *                 enum: [Email, Physical, Portal, WhatsApp]
+ *               deliveredOn:
+ *                 type: string
+ *                 format: date
+ *     responses:
+ *       200:
+ *         description: Appointment letter marked as delivered
+ *       404:
+ *         description: Appointment letter not found
+ */
 router.put(
   '/appointment-letters/:id/deliver',
-  authenticate,
   authorize('hr', 'AppointmentLetter', 'canWrite'),
-  ctrl.markLetterDelivered
+  recruitmentController.markLetterDelivered
 );
 
-// PUT — store the generated PDF file path after PDF service completes
+/**
+ * @swagger
+ * /recruitment/appointment-letters/acknowledge/{token}:
+ *   put:
+ *     summary: Candidate acknowledges appointment letter (public - no auth)
+ *     tags: [Recruitment]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Acknowledgement token from email
+ *     responses:
+ *       200:
+ *         description: Appointment letter acknowledged
+ *       404:
+ *         description: Invalid token
+ */
+router.put(
+  '/appointment-letters/acknowledge/:token',
+  recruitmentController.acknowledgeAppointmentLetter
+);
+
+/**
+ * @swagger
+ * /recruitment/appointment-letters/{id}/pdf-path:
+ *   put:
+ *     summary: Set PDF path for appointment letter
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [pdfPath]
+ *             properties:
+ *               pdfPath:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: PDF path set successfully
+ *       404:
+ *         description: Appointment letter not found
+ */
 router.put(
   '/appointment-letters/:id/pdf-path',
-  authenticate,
   authorize('hr', 'AppointmentLetter', 'canWrite'),
-  ctrl.setPdfPath
+  recruitmentController.setPdfPath
 );
 
-// PUT — HR cancels the letter (any status → Cancelled)
+/**
+ * @swagger
+ * /recruitment/appointment-letters/{id}/cancel:
+ *   put:
+ *     summary: Cancel appointment letter
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               remarks:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Appointment letter cancelled successfully
+ *       404:
+ *         description: Appointment letter not found
+ */
 router.put(
   '/appointment-letters/:id/cancel',
-  authenticate,
   authorize('hr', 'AppointmentLetter', 'canDelete'),
-  ctrl.cancelAppointmentLetter
+  recruitmentController.cancelAppointmentLetter
+);
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ONBOARDING TRANSITION — /recruitment/job-applicants/{id}/convert-to-employee
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /recruitment/job-applicants/{id}/convert-to-employee:
+ *   post:
+ *     summary: Convert accepted applicant to employee (HR only)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Job applicant ID
+ *     responses:
+ *       201:
+ *         description: Employee created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     employee:
+ *                       type: object
+ *                     user:
+ *                       type: object
+ *                     temporaryPassword:
+ *                       type: string
+ *                       description: Only returned in non-production environments
+ *       409:
+ *         description: Employee already exists
+ *       422:
+ *         description: Applicant not ready for conversion
+ */
+router.post(
+  '/job-applicants/:id/convert-to-employee',
+  authorize('hr', 'Employee', 'canCreate'),
+  recruitmentController.convertToEmployee
 );
 
 module.exports = router;
