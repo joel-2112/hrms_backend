@@ -447,6 +447,7 @@ const getAllActiveSessions = async ({ page = 1, limit = 50 } = {}) => {
     include: [
       {
         model: User,
+        as: 'user',
         attributes: ['id', 'email', 'firstName', 'lastName', 'status']
       }
     ],

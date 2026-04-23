@@ -487,13 +487,12 @@ router.delete('/users/:userId/roles/:roleId',
 // ══════════════════════════════════════════════
 //  ROLE PERMISSIONS
 // ══════════════════════════════════════════════
-
 /**
  * @swagger
  * /roles/{id}/permissions:
  *   get:
  *     summary: Get all permissions for a role
- *     tags: [Roles]
+ *     tags: [RolePermissions]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -515,26 +514,59 @@ router.delete('/users/:userId/roles/:roleId',
  *                 success:
  *                   type: boolean
  *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       roleId:
+ *                         type: string
+ *                         format: uuid
+ *                       moduleName:
+ *                         type: string
+ *                       resourceName:
+ *                         type: string
+ *                       permLevel:
+ *                         type: integer
+ *                       canRead:
+ *                         type: boolean
+ *                       canWrite:
+ *                         type: boolean
+ *                       canCreate:
+ *                         type: boolean
+ *                       canDelete:
+ *                         type: boolean
+ *                       canSubmit:
+ *                         type: boolean
+ *                       canCancel:
+ *                         type: boolean
+ *                       canAmend:
+ *                         type: boolean
+ *                       canPrint:
+ *                         type: boolean
+ *                       canEmail:
+ *                         type: boolean
+ *                       canImport:
+ *                         type: boolean
+ *                       canExport:
+ *                         type: boolean
+ *                       canReport:
+ *                         type: boolean
+ *                       canSetPermissions:
+ *                         type: boolean
+ *                 meta:
  *                   type: object
  *                   properties:
- *                     roleId:
- *                       type: string
- *                     roleName:
- *                       type: string
- *                     permissions:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: string
- *                           resource:
- *                             type: string
- *                           action:
- *                             type: string
- *                           effect:
- *                             type: string
- *                             enum: [allow, deny]
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
  */
 router.get('/:id/permissions', 
   authorize('Role', action.READ), 
@@ -545,8 +577,8 @@ router.get('/:id/permissions',
  * @swagger
  * /roles/{id}/permissions:
  *   put:
- *     summary: Set/update permissions for a role (full replace)
- *     tags: [Roles]
+ *     summary: Set/update permissions for a role
+ *     tags: [RolePermissions]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -563,35 +595,116 @@ router.get('/:id/permissions',
  *         application/json:
  *           schema:
  *             type: object
- *             required: [permissions]
+ *             required: [moduleName, resourceName]
  *             properties:
- *               permissions:
- *                 type: array
- *                 description: List of permissions to assign
- *                 items:
- *                   type: object
- *                   required: [resource, action]
- *                   properties:
- *                     resource:
- *                       type: string
- *                       example: Employee
- *                     action:
- *                       type: string
- *                       enum: [create, read, write, delete, manage]
- *                       example: manage
- *                     effect:
- *                       type: string
- *                       enum: [allow, deny]
- *                       default: allow
- *                       example: allow
- *                 example: [
- *                   { resource: "Employee", action: "create", effect: "allow" },
- *                   { resource: "Employee", action: "read", effect: "allow" },
- *                   { resource: "Employee", action: "write", effect: "allow" }
- *                 ]
+ *               moduleName:
+ *                 type: string
+ *                 description: Module the resource belongs to
+ *                 example: "hr"
+ *               resourceName:
+ *                 type: string
+ *                 description: Entity name
+ *                 example: "Employee"
+ *               permLevel:
+ *                 type: integer
+ *                 minimum: 0
+ *                 maximum: 9
+ *                 default: 0
+ *                 description: Field group level (0 = all fields)
+ *               canRead:
+ *                 type: boolean
+ *                 default: false
+ *               canWrite:
+ *                 type: boolean
+ *                 default: false
+ *               canCreate:
+ *                 type: boolean
+ *                 default: false
+ *               canDelete:
+ *                 type: boolean
+ *                 default: false
+ *               canSubmit:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Approve/submit documents
+ *               canCancel:
+ *                 type: boolean
+ *                 default: false
+ *               canAmend:
+ *                 type: boolean
+ *                 default: false
+ *               canPrint:
+ *                 type: boolean
+ *                 default: false
+ *               canEmail:
+ *                 type: boolean
+ *                 default: false
+ *               canImport:
+ *                 type: boolean
+ *                 default: false
+ *               canExport:
+ *                 type: boolean
+ *                 default: false
+ *               canReport:
+ *                 type: boolean
+ *                 default: false
+ *               canSetPermissions:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Can grant permissions to other users
  *     responses:
  *       200:
- *         description: Permissions updated successfully
+ *         description: Permission saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     roleId:
+ *                       type: string
+ *                       format: uuid
+ *                     moduleName:
+ *                       type: string
+ *                     resourceName:
+ *                       type: string
+ *                     permLevel:
+ *                       type: integer
+ *                     canRead:
+ *                       type: boolean
+ *                     canWrite:
+ *                       type: boolean
+ *                     canCreate:
+ *                       type: boolean
+ *                     canDelete:
+ *                       type: boolean
+ *                     canSubmit:
+ *                       type: boolean
+ *                     canCancel:
+ *                       type: boolean
+ *                     canAmend:
+ *                       type: boolean
+ *                     canPrint:
+ *                       type: boolean
+ *                     canEmail:
+ *                       type: boolean
+ *                     canImport:
+ *                       type: boolean
+ *                     canExport:
+ *                       type: boolean
+ *                     canReport:
+ *                       type: boolean
+ *                     canSetPermissions:
+ *                       type: boolean
  *       400:
  *         description: Invalid permission data
  *       404:
@@ -607,7 +720,7 @@ router.put('/:id/permissions',
  * /roles/{id}/permissions/{permissionId}:
  *   delete:
  *     summary: Remove a specific permission from a role
- *     tags: [Roles]
+ *     tags: [RolePermissions]
  *     security:
  *       - bearerAuth: []
  *     parameters:

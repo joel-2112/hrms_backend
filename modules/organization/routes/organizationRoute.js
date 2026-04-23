@@ -42,7 +42,7 @@ router.use(authenticate);
  */
 router.get(
   '/companies/tree',
-  authorize('organization', 'Company', 'canRead'),
+  authorize('Company', 'canRead'),
   organizationController.getCompanyTree,
 );
 
@@ -116,11 +116,11 @@ router.get(
 router
   .route('/companies')
   .get(
-    authorize('organization', 'Company', 'canRead'),
+    authorize('Company', 'canRead'),
     organizationController.getAllCompanies,
   )
   .post(
-    authorize('organization', 'Company', 'canCreate'),
+    authorize('Company', 'canCreate'),
     organizationController.createCompany,
   );
 
@@ -217,15 +217,15 @@ router
 router
   .route('/companies/:id')
   .get(
-    authorize('organization', 'Company', 'canRead'),
+    authorize('Company', 'canRead'),
     organizationController.getCompanyById,
   )
   .patch(
-    authorize('organization', 'Company', 'canWrite'),
+    authorize('Company', 'canWrite'),
     organizationController.updateCompany,
   )
   .delete(
-    authorize('organization', 'Company', 'canDelete'),
+    authorize('Company', 'canDelete'),
     organizationController.deleteCompany,
   );
 
@@ -285,11 +285,11 @@ router
 router
   .route('/branches')
   .get(
-    authorize('organization', 'Branch', 'canRead'),
+    authorize('Branch', 'canRead'),
     organizationController.getAllBranches,
   )
   .post(
-    authorize('organization', 'Branch', 'canCreate'),
+    authorize('Branch', 'canCreate'),
     organizationController.createBranch,
   );
 
@@ -370,15 +370,15 @@ router
 router
   .route('/branches/:id')
   .get(
-    authorize('organization', 'Branch', 'canRead'),
+    authorize('Branch', 'canRead'),
     organizationController.getBranchById,
   )
   .patch(
-    authorize('organization', 'Branch', 'canWrite'),
+    authorize('Branch', 'canWrite'),
     organizationController.updateBranch,
   )
   .delete(
-    authorize('organization', 'Branch', 'canDelete'),
+    authorize('Branch', 'canDelete'),
     organizationController.deleteBranch,
   );
 
@@ -410,7 +410,7 @@ router
  */
 router.get(
   '/departments/tree',
-  authorize('organization', 'Department', 'canRead'),
+  authorize('Department', 'canRead'),
   organizationController.getDepartmentTree,
 );
 
@@ -475,11 +475,11 @@ router.get(
 router
   .route('/departments')
   .get(
-    authorize('organization', 'Department', 'canRead'),
+    authorize('Department', 'canRead'),
     organizationController.getAllDepartments,
   )
   .post(
-    authorize('organization', 'Department', 'canCreate'),
+    authorize('Department', 'canCreate'),
     organizationController.createDepartment,
   );
 
@@ -560,15 +560,15 @@ router
 router
   .route('/departments/:id')
   .get(
-    authorize('organization', 'Department', 'canRead'),
+    authorize('Department', 'canRead'),
     organizationController.getDepartmentById,
   )
   .patch(
-    authorize('organization', 'Department', 'canWrite'),
+    authorize('Department', 'canWrite'),
     organizationController.updateDepartment,
   )
   .delete(
-    authorize('organization', 'Department', 'canDelete'),
+    authorize('Department', 'canDelete'),
     organizationController.deleteDepartment,
   );
 
@@ -624,11 +624,11 @@ router
 router
   .route('/designations')
   .get(
-    authorize('organization', 'Designation', 'canRead'),
+    authorize('Designation', 'canRead'),
     organizationController.getAllDesignations,
   )
   .post(
-    authorize('organization', 'Designation', 'canCreate'),
+    authorize('Designation', 'canCreate'),
     organizationController.createDesignation,
   );
 
@@ -708,15 +708,15 @@ router
 router
   .route('/designations/:id')
   .get(
-    authorize('organization', 'Designation', 'canRead'),
+    authorize('Designation', 'canRead'),
     organizationController.getDesignationById,
   )
   .patch(
-    authorize('organization', 'Designation', 'canWrite'),
+    authorize('Designation', 'canWrite'),
     organizationController.updateDesignation,
   )
   .delete(
-    authorize('organization', 'Designation', 'canDelete'),
+    authorize('Designation', 'canDelete'),
     organizationController.deleteDesignation,
   );
 
@@ -767,11 +767,11 @@ router
 router
   .route('/employment-types')
   .get(
-    authorize('organization', 'EmploymentType', 'canRead'),
+    authorize('EmploymentType', 'canRead'),
     organizationController.getAllEmploymentTypes,
   )
   .post(
-    authorize('organization', 'EmploymentType', 'canCreate'),
+    authorize('EmploymentType', 'canCreate'),
     organizationController.createEmploymentType,
   );
 
@@ -851,15 +851,15 @@ router
 router
   .route('/employment-types/:id')
   .get(
-    authorize('organization', 'EmploymentType', 'canRead'),
+    authorize('EmploymentType', 'canRead'),
     organizationController.getEmploymentTypeById,
   )
   .patch(
-    authorize('organization', 'EmploymentType', 'canWrite'),
+    authorize('EmploymentType', 'canWrite'),
     organizationController.updateEmploymentType,
   )
   .delete(
-    authorize('organization', 'EmploymentType', 'canDelete'),
+    authorize('EmploymentType', 'canDelete'),
     organizationController.deleteEmploymentType,
   );
 
@@ -913,11 +913,11 @@ router
 router
   .route('/employee-grades')
   .get(
-    authorize('organization', 'EmployeeGrade', 'canRead'),
+    authorize('EmployeeGrade', 'canRead'),
     organizationController.getAllEmployeeGrades,
   )
   .post(
-    authorize('organization', 'EmployeeGrade', 'canCreate'),
+    authorize('EmployeeGrade', 'canCreate'),
     organizationController.createEmployeeGrade,
   );
 
@@ -1000,15 +1000,15 @@ router
 router
   .route('/employee-grades/:id')
   .get(
-    authorize('organization', 'EmployeeGrade', 'canRead'),
+    authorize('EmployeeGrade', 'canRead'),
     organizationController.getEmployeeGradeById,
   )
   .patch(
-    authorize('organization', 'EmployeeGrade', 'canWrite'),
+    authorize('EmployeeGrade', 'canWrite'),
     organizationController.updateEmployeeGrade,
   )
   .delete(
-    authorize('organization', 'EmployeeGrade', 'canDelete'),
+    authorize('EmployeeGrade', 'canDelete'),
     organizationController.deleteEmployeeGrade,
   );
 
