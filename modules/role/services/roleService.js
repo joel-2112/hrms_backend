@@ -1000,25 +1000,20 @@ const checkPermission = async (
   userId,
   resourceName,
   action,
-  moduleName = "default",
-  permLevel = 0,
+  permLevel = 0,        
 ) => {
   const field = ACTION_FIELD_MAP[action];
   if (!field) throw new AppError(`Unknown action "${action}"`, 400);
 
   const effective = await getUserEffectivePermissions(userId);
 
-  // Superusers bypass all checks
   if (effective.isSuperUser) return true;
+  if (effective.isSystemManager && action === 'read') return true;
 
-  // System managers can read anything — restricted only on write/delete operations
-  if (effective.isSystemManager && action === "read") return true;
-
-  // Find the most permissive rule that covers this resource at or below the requested level
+  // ← moduleName removed from find — resourceName is the unique key per role
   const matchingRule = effective.permissions.find(
     (p) =>
       p.resourceName === resourceName &&
-      p.moduleName === moduleName &&
       p.permLevel <= permLevel,
   );
 

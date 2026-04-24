@@ -7,8 +7,8 @@ const roleService = require('../services/roleService');
  * Thin wrapper for middleware use.
  * Does NOT contain business logic — just delegates to service.
  */
-const hasPermission = async (userId, resourceName, action, moduleName = 'default') => {
-  return roleService.checkPermission(userId, resourceName, action, moduleName);
+const hasPermission = async (userId, resourceName, action) => {
+  return roleService.checkPermission(userId, resourceName, action);
 };
 
 const getUserEffectivePermissions = async (userId) => {
