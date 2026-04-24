@@ -152,7 +152,7 @@ router.post('/',
  *                       type: integer
  */
 router.get('/', 
-  // authorize('Role', action.READ), 
+  authorize('Role', action.READ), 
   roleController.getAllRoles
 );
 
@@ -789,7 +789,7 @@ router.delete('/:id/permissions/:permissionId',
  *         description: Profile name already exists
  */
 router.post('/profiles', 
-  authorize('RoleProfile', action.CREATE), 
+  authorize('RoleProfile', action.CREAwTE), 
   roleProfileController.createRoleProfile
 );
 
