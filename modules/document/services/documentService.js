@@ -23,7 +23,7 @@ const { AppError }     = require('../../../middlewares/errorMiddleware');
 const documentIncludes = [
   {
     model:      DocumentType,
-    as:         'DocumentType',
+    as:         'documentType',
     attributes: ['id', 'name', 'category', 'description'],
   },
   {
