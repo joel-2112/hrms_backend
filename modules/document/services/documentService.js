@@ -314,7 +314,7 @@ const searchDocuments = async ({
     where,
     include: documentIncludes,
     order:   [
-      [{ model: DocumentType, as: 'DocumentType' }, 'name', 'ASC'],
+      [{ model: DocumentType, as: 'documentType' }, 'name', 'ASC'],
       ['uploaded_at', 'DESC'],
     ],
     limit,
