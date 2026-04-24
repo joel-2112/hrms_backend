@@ -36,7 +36,7 @@ const documentIncludes = [
     as:      'versions',
     include: [{
       model:      Employee,
-      as:         'replacedBy',
+      as:         'uploadedBy',
       attributes: ['id', 'firstName', 'lastName'],
     }],
     order:      [['version_number', 'DESC']],
