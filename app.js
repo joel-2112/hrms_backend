@@ -9,10 +9,11 @@ const organizationRoutes = require('./modules/organization/routes/organizationRo
 const recruitmentRoutes = require('./modules/recruitment/routes/recruitmentRoutes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
+const cookieParser = require('cookie-parser');
 
 // ── CORS Configuration ──────────────────────────────────────────────
 app.use(cors({
-    origin: ['https://erp.teamworksc.com', 'http://localhost:3000', 'http://localhost:5173'],
+    origin: ['https://erp.teamworksc.com', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080',],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -21,6 +22,7 @@ app.use(cors({
 // ── Body parsing ──────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // ── SWAGGER UI ─────────────────────────────────────────────
 app.use(
