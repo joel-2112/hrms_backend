@@ -4,7 +4,7 @@ const express = require('express');
 const recruitmentController = require('../controllers/recruitmentController');
 const { authenticate } = require('../../../middlewares/authMiddleware');
 const { authorize } = require('../../../middlewares/rbacMiddleware');
-
+console.log('Controller functions:', Object.keys(recruitmentController));
 const router = express.Router();
 
 // Helper to validate that a handler is a function

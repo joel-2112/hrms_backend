@@ -1,4 +1,3 @@
-'use strict';
 const recruitmentService = require('../services/recruitmentService');
 const { catchAsync }     = require('../../../utils/catchAsync');
 const { ok, created, noContent } = require('../../../utils/response');
