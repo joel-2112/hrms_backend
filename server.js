@@ -11,8 +11,8 @@ async function start() {
   console.log('✅  Database connected');
 
   // 2. Sync models (alter: true is safe for dev — never use force: true in production)
-  await sequelize.sync({ alter: true });
-  console.log('✅  Models synced');
+  // await sequelize.sync({ alter: true });
+  // console.log('✅  Models synced');
 
   // 3. Start listening
   app.listen(PORT, () => {

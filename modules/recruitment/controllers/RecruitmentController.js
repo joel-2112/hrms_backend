@@ -1,9 +1,8 @@
 'use strict';
-
 const recruitmentService = require('../services/recruitmentService');
-const { catchAsync } = require('../../../utils/catchAsync');
-const { ok, created } = require('../../../utils/response');
-const { AppError } = require('../../../middlewares/errorMiddleware');
+const { catchAsync }     = require('../../../utils/catchAsync');
+const { ok, created, noContent } = require('../../../utils/response');
+
 
 // ══════════════════════════════════════════════
 //  STAFFING PLAN
@@ -14,8 +13,8 @@ const listStaffingPlans = catchAsync(async (req, res) => {
   const result = await recruitmentService.getStaffingPlans({
     companyId,
     docStatus: docStatus !== undefined ? Number(docStatus) : undefined,
-    page: Number(page) || 1,
-    limit: Number(limit) || 20,
+    page:      Number(page)  || 1,
+    limit:     Number(limit) || 20,
   });
   ok(res, result.data, 'Staffing plans fetched successfully', result.meta);
 });
@@ -30,33 +29,16 @@ const getStaffingPlan = catchAsync(async (req, res) => {
   ok(res, plan, 'Staffing plan fetched successfully');
 });
 
-const updateStaffingPlan = catchAsync(async (req, res) => {
-  const plan = await recruitmentService.updateStaffingPlan(req.params.id, req.body);
-  ok(res, plan, 'Staffing plan updated successfully');
-});
-
 const submitStaffingPlan = catchAsync(async (req, res) => {
   const plan = await recruitmentService.submitStaffingPlan(req.params.id);
   ok(res, plan, 'Staffing plan submitted successfully');
 });
 
-const cancelStaffingPlan = catchAsync(async (req, res) => {
-  const plan = await recruitmentService.cancelStaffingPlan(req.params.id);
-  ok(res, plan, 'Staffing plan cancelled successfully');
+const approveStaffingPlan = catchAsync(async (req, res) => {
+  const plan = await recruitmentService.approveStaffingPlan(req.params.id, req.user.id);
+  ok(res, plan, 'Staffing plan approved successfully');
 });
 
-const getStaffingSnapshot = catchAsync(async (req, res) => {
-  const { designationId, departmentId, companyId } = req.query;
-  if (!designationId || !companyId) {
-    throw new AppError('designationId and companyId are required', 422);
-  }
-  const snapshot = await recruitmentService.getStaffingSnapshot(
-    designationId,
-    departmentId,
-    companyId
-  );
-  ok(res, snapshot, 'Staffing snapshot fetched successfully');
-});
 
 // ══════════════════════════════════════════════
 //  JOB REQUISITION
@@ -69,7 +51,7 @@ const listJobRequisitions = catchAsync(async (req, res) => {
     departmentId,
     overallStatus,
     requestedById,
-    page: Number(page) || 1,
+    page:  Number(page)  || 1,
     limit: Number(limit) || 20,
   });
   ok(res, result.data, 'Job requisitions fetched successfully', result.meta);
@@ -95,7 +77,7 @@ const approveHRRequisition = catchAsync(async (req, res) => {
   const requisition = await recruitmentService.approveHRRequisition(
     req.params.id,
     req.user.id,
-    remarks || null
+    remarks || null,
   );
   ok(res, requisition, 'Requisition approved by HR — escalated to GM');
 });
@@ -105,7 +87,7 @@ const rejectHRRequisition = catchAsync(async (req, res) => {
   const requisition = await recruitmentService.rejectHRRequisition(
     req.params.id,
     req.user.id,
-    reason
+    reason,
   );
   ok(res, requisition, 'Requisition rejected by HR');
 });
@@ -115,9 +97,9 @@ const approveGMRequisition = catchAsync(async (req, res) => {
   const result = await recruitmentService.approveGMRequisition(
     req.params.id,
     req.user.id,
-    remarks || null
+    remarks || null,
   );
-  ok(res, result, 'Requisition approved by GM');
+  ok(res, result, 'Requisition approved by GM — job opening created');
 });
 
 const rejectGMRequisition = catchAsync(async (req, res) => {
@@ -125,20 +107,11 @@ const rejectGMRequisition = catchAsync(async (req, res) => {
   const requisition = await recruitmentService.rejectGMRequisition(
     req.params.id,
     req.user.id,
-    reason
+    reason,
   );
   ok(res, requisition, 'Requisition rejected by GM');
 });
 
-const cancelJobRequisition = catchAsync(async (req, res) => {
-  const { remarks } = req.body;
-  const requisition = await recruitmentService.cancelJobRequisition(
-    req.params.id,
-    req.user.id,
-    remarks || null
-  );
-  ok(res, requisition, 'Job requisition cancelled successfully');
-});
 
 // ══════════════════════════════════════════════
 //  EXPORTS
@@ -149,10 +122,8 @@ module.exports = {
   listStaffingPlans,
   createStaffingPlan,
   getStaffingPlan,
-  updateStaffingPlan,
   submitStaffingPlan,
-  cancelStaffingPlan,
-  getStaffingSnapshot,
+  approveStaffingPlan,
 
   // Job Requisition
   listJobRequisitions,
@@ -163,5 +134,4 @@ module.exports = {
   rejectHRRequisition,
   approveGMRequisition,
   rejectGMRequisition,
-  cancelJobRequisition,
 };
