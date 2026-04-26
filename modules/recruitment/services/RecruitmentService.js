@@ -283,11 +283,10 @@ const getStaffingPlans = async ({ companyId, docStatus, page, limit } = {}) => {
     offset,
     order: [['createdAt', 'DESC']],
     include: [
-      { model: Company, as: 'company', attributes: ['id', 'name'] },
-      { model: Department, as: 'department', attributes: ['id', 'name'], required: false },
+     { model: Company, as: 'company', attributes: ['id', 'name'] },
+     { model: Department, as: 'department', attributes: ['id', 'name'], required: false },
     ],
   });
-
   return { data: rows, meta: buildMeta(count, page || 1, lim) };
 };
 
