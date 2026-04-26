@@ -442,10 +442,10 @@ const cancelStaffingPlan = async (id) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 const REQUISITION_INCLUDES = [
-  { model: Department, attributes: ['id', 'name'] },
-  { model: Designation, attributes: ['id', 'name'] },
-  { model: Company, attributes: ['id', 'name'] },
-  { model: EmploymentType, attributes: ['id', 'name'], required: false },
+  { model: Department, as: 'department', attributes: ['id', 'name'] },
+  { model: Designation, as: 'designation', attributes: ['id', 'name'] },
+  { model: Company, as: 'company', attributes: ['id', 'name'] },
+  { model: EmploymentType, as: 'employmentType', attributes: ['id', 'name'], required: false },
   { model: Employee, as: 'requestedBy', attributes: ['id', 'firstName', 'lastName'] },
   { model: Employee, as: 'hrManager', attributes: ['id', 'firstName', 'lastName'], required: false },
   { model: Employee, as: 'generalManager', attributes: ['id', 'firstName', 'lastName'], required: false },
