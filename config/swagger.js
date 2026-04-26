@@ -20,7 +20,7 @@ const options = {
         email: 'engineering@yourcompany.com',
       },
     },
-//the servers
+//the servers local and remote server url
     servers: [
       {
         url:         'https://api.erp.teamworksc.com',
