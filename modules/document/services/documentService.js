@@ -1,5 +1,20 @@
 'use strict';
 
+/**
+ * modules/document/services/documentService.js
+ *
+ * Universal document filing cabinet — any module can attach files
+ * identified by voucherType + voucherNo (no FK constraint).
+ *
+ * Pattern:
+ *   • DocumentType = The Shelf (label on the cabinet)
+ *   • Document     = The File (sitting on a shelf)
+ *   • DocumentVersion = Archived copy (when file is replaced)
+ *
+ * Physical storage mirrors logical structure:
+ *   uploads/documents/{voucherType}/{documentTypeId}/{filename}
+ */
+
 const { Op }           = require('sequelize');
 const path             = require('path');
 const {
@@ -8,23 +23,22 @@ const {
   Document,
   DocumentVersion,
   Employee,
+  User,
 }                      = require('../../../models');
 const { AppError }     = require('../../../middlewares/errorMiddleware');
+const { getPaginationOptions, buildMeta } = require('../../../utils/pagination');
+const logger           = require('../../../utils/logger');
 
 // ─────────────────────────────────────────────────────────────
-//  PRIVATE HELPERS
+//  SHARED INCLUDES
 // ─────────────────────────────────────────────────────────────
 
-/**
- * The canonical "shelf view" include — always returns the full
- * document context: type (shelf label), uploader (whom), versions (tabs).
- * Used by every single-document fetch so the shape is consistent.
- */
-const documentIncludes = [
+/** Full context for a single document — what, whom, version tabs */
+const DOCUMENT_INCLUDES = [
   {
     model:      DocumentType,
     as:         'documentType',
-    attributes: ['id', 'name', 'category', 'description'],
+    attributes: ['id', 'name', 'category', 'description', 'isRequired', 'hasExpiry'],
   },
   {
     model:      Employee,
@@ -32,53 +46,124 @@ const documentIncludes = [
     attributes: ['id', 'firstName', 'lastName', 'employeeNumber'],
   },
   {
-    model:   DocumentVersion,
-    as:      'versions',
+    model:      DocumentVersion,
+    as:         'versions',
     include: [{
       model:      Employee,
-      as:         'uploadedBy',
+      as:         'replacedBy',
       attributes: ['id', 'firstName', 'lastName'],
     }],
-    order:      [['version_number', 'DESC']],
-    separate:   true,   // avoids cartesian product on multi-include
+    order:      [['versionNumber', 'DESC']],
+    separate:   true,
   },
 ];
 
-/**
- * Build a human-readable shelf path string for any document.
- * Format: "DocumentType / voucherType / voucherNo / fileName (vN)"
- * Makes logs and responses instantly scannable.
- */
-const buildShelfPath = (doc) =>
-  [
-    doc.documentType?.name   || 'Unknown Type',
-    doc.voucherType          || 'Unknown Owner',
-    doc.voucherNo            || '—',
-    `${doc.fileName} (v${(doc.versions?.length ?? 0) + 1})`,
-  ].join(' / ');
+/** Minimal context for list queries — avoids over-fetching */
+const DOCUMENT_LIST_INCLUDES = [
+  {
+    model:      DocumentType,
+    as:         'documentType',
+    attributes: ['id', 'name', 'category'],
+  },
+  {
+    model:      Employee,
+    as:         'uploadedBy',
+    attributes: ['id', 'firstName', 'lastName', 'employeeNumber'],
+  },
+];
 
 // ─────────────────────────────────────────────────────────────
+//  PRIVATE HELPERS
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Builds a human-readable path string for any document.
+ * Format: "DocumentType / voucherType / voucherNo / fileName"
+ */
+const buildShelfPath = (doc) => {
+  const typeName = doc.documentType?.name || 'Unknown Type';
+  const owner    = doc.voucherType || 'Unknown Owner';
+  const ownerId  = doc.voucherNo || '—';
+  return `${typeName} / ${owner} / ${ownerId} / ${doc.fileName}`;
+};
+
+/**
+ * Asserts that a DocumentType exists and is not disabled.
+ */
+const assertDocumentTypeValid = async (documentTypeId) => {
+  const docType = await DocumentType.findByPk(documentTypeId);
+  if (!docType) throw new AppError('Document type not found', 404);
+  if (docType.disabled) throw new AppError(`Document type "${docType.name}" is disabled`, 422);
+  return docType;
+};
+
+/**
+ * Asserts that an Employee exists (for uploadedById / replacedById).
+ * Returns the employee or null if the ID is null/undefined.
+ */
+const assertEmployeeExists = async (employeeId) => {
+  if (!employeeId) return null;
+  const emp = await Employee.findByPk(employeeId, { attributes: ['id'] });
+  if (!emp) throw new AppError('Employee (uploader) not found', 404);
+  return emp;
+};
+
+/**
+ * Generates a unique filename for storage.
+ */
+const generateStoredFileName = (originalName) => {
+  const ext = path.extname(originalName).toLowerCase();
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  return `doc-${timestamp}-${random}${ext}`;
+};
+
+
+// ═════════════════════════════════════════════════════════════
 //  DOCUMENT TYPE  (the shelves)
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 
 /**
- * Create a new shelf label — admin defines document categories
- * dynamically without any code change.
- * e.g. "Employment Contract", "Passport", "Medical Certificate"
+ * Create a new document type — admin defines what kinds of
+ * documents can be uploaded without any code change.
+ *
+ * e.g. "National ID", "Passport", "Employment Contract", "Medical Certificate"
  */
-const createDocumentType = async ({ name, category, description, isRequired, allowedMimeTypes }) => {
+const createDocumentType = async (data) => {
+  const {
+    name,
+    category = 'Other',
+    description,
+    isRequired = false,
+    hasExpiry = false,
+    allowedExtensions,
+    maxFileSizeKb,
+  } = data;
+
+  if (!name) throw new AppError('name is required', 422);
+
+  // Check uniqueness (model has unique index on name)
   const exists = await DocumentType.findOne({ where: { name } });
   if (exists) throw new AppError(`Document type "${name}" already exists`, 409);
 
-  return DocumentType.create({
+  const docType = await DocumentType.create({
     name,
-    category:          category          || null,
-    description:       description       || null,
-    isRequired:        isRequired        ?? false,
-    allowedMimeTypes:  allowedMimeTypes  || [],  // JSONB e.g. ["application/pdf","image/jpeg"]
+    category,
+    description: description || null,
+    isRequired,
+    hasExpiry,
+    allowedExtensions: allowedExtensions || null,
+    maxFileSizeKb: maxFileSizeKb || null,
+    disabled: false,
   });
+
+  logger.info('DocumentType created', { id: docType.id, name });
+  return docType;
 };
 
+/**
+ * List all document types — optionally filtered by category.
+ */
 const getAllDocumentTypes = async ({ category, includeDisabled = false } = {}) => {
   const where = {};
   if (!includeDisabled) where.disabled = false;
@@ -86,137 +171,205 @@ const getAllDocumentTypes = async ({ category, includeDisabled = false } = {}) =
 
   return DocumentType.findAll({
     where,
-    order: [['category', 'ASC'], ['name', 'ASC']],  // grouped by category = shelf section
+    order: [['category', 'ASC'], ['name', 'ASC']],
   });
 };
 
+/**
+ * Get a single document type by ID.
+ */
 const getDocumentTypeById = async (id) => {
-  const type = await DocumentType.findByPk(id);
-  if (!type) throw new AppError('Document type not found', 404);
-  return type;
+  const docType = await DocumentType.findByPk(id);
+  if (!docType) throw new AppError('Document type not found', 404);
+  return docType;
 };
-
-const updateDocumentType = async (id, updates) => {
-  const type = await DocumentType.findByPk(id);
-  if (!type) throw new AppError('Document type not found', 404);
-  return type.update(updates);
-};
-
-const deleteDocumentType = async (id) => {
-  const type = await DocumentType.findByPk(id);
-  if (!type) throw new AppError('Document type not found', 404);
-
-  const docCount = await Document.count({ where: { documentTypeId: id } });
-  if (docCount > 0)
-    throw new AppError(
-      `Cannot delete — ${docCount} document(s) filed under this type`,
-      409,
-    );
-
-  await type.destroy();
-};
-
-// ─────────────────────────────────────────────────────────────
-//  DOCUMENT  (the files on the shelves)
-// ─────────────────────────────────────────────────────────────
 
 /**
- * Attach a new document to any record in any module.
- * The caller passes voucherType + voucherNo to identify
- * the owner without any FK constraint.
- *
- * e.g. attach a passport scan to Employee EMP-0042:
- *   voucherType = "Employee"
- *   voucherNo   = "EMP-0042"
+ * Update a document type.
  */
-const attachDocument = async ({
-  documentTypeId,
-  voucherType,
-  voucherNo,
-  uploadedById,
-  fileName,
-  fileUrl,
-  fileSize,
-  mimeType,
-  description,
-  expiryDate,
-  isPrivate,
-}) => {
-  // Validate the document type (the shelf) exists
-  const docType = await DocumentType.findByPk(documentTypeId);
+const updateDocumentType = async (id, data) => {
+  const docType = await DocumentType.findByPk(id);
   if (!docType) throw new AppError('Document type not found', 404);
 
-  // Validate mime type if the shelf has a restriction
-  if (docType.allowedMimeTypes?.length && !docType.allowedMimeTypes.includes(mimeType)) {
+  // If name is being changed, check uniqueness
+  if (data.name && data.name !== docType.name) {
+    const exists = await DocumentType.findOne({ where: { name: data.name } });
+    if (exists) throw new AppError(`Document type "${data.name}" already exists`, 409);
+  }
+
+  await docType.update(data);
+  logger.info('DocumentType updated', { id, changes: Object.keys(data) });
+  return docType;
+};
+
+/**
+ * Delete a document type — only if no documents are filed under it.
+ */
+const deleteDocumentType = async (id) => {
+  const docType = await DocumentType.findByPk(id);
+  if (!docType) throw new AppError('Document type not found', 404);
+
+  const docCount = await Document.count({ where: { documentTypeId: id } });
+  if (docCount > 0) {
     throw new AppError(
-      `File type "${mimeType}" is not allowed for "${docType.name}". ` +
-      `Allowed: ${docType.allowedMimeTypes.join(', ')}`,
-      422,
+      `Cannot delete — ${docCount} document(s) are filed under this type`,
+      409,
     );
   }
 
+  await docType.destroy();
+  logger.info('DocumentType deleted', { id, name: docType.name });
+};
+
+
+// ═════════════════════════════════════════════════════════════
+//  DOCUMENT  (the files on the shelves)
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Upload and attach a new document to any record in any module.
+ *
+ * The caller identifies the owner via voucherType + voucherNo:
+ *   voucherType = "Employee"   → the module
+ *   voucherNo   = "EMP-0042"   → the specific record
+ *
+ * This is the ONLY way to create a Document — every document
+ * is always attached to something.
+ */
+const attachDocument = async (data) => {
+  const {
+    documentTypeId,
+    voucherType,
+    voucherNo,
+    uploadedById,
+    // File details (from multer middleware)
+    originalFileName,
+    filePath,        // relative path from uploads/ root
+    mimeType,
+    fileSize,
+    // Optional metadata
+    title,
+    documentNumber,
+    issueDate,
+    expiryDate,
+    isConfidential = false,
+    notes,
+  } = data;
+
+  // ── Validate required fields ───────────────────────────────
+  if (!documentTypeId) throw new AppError('documentTypeId is required', 422);
+  if (!voucherType)    throw new AppError('voucherType is required', 422);
+  if (!voucherNo)      throw new AppError('voucherNo is required', 422);
+  if (!filePath)       throw new AppError('filePath is required', 422);
+
+  // ── Validate references ────────────────────────────────────
+  const docType = await assertDocumentTypeValid(documentTypeId);
+
+  // Validate file extension if the shelf has restrictions
+  if (docType.allowedExtensions?.length && mimeType) {
+    const ext = path.extname(originalFileName || filePath).toLowerCase().replace('.', '');
+    if (!docType.allowedExtensions.includes(ext)) {
+      throw new AppError(
+        `File extension ".${ext}" is not allowed for "${docType.name}". ` +
+        `Allowed: ${docType.allowedExtensions.map(e => `.${e}`).join(', ')}`,
+        422,
+      );
+    }
+  }
+
+  // Validate file size if the shelf has a cap
+  if (docType.maxFileSizeKb && fileSize) {
+    const sizeKb = Math.ceil(fileSize / 1024);
+    if (sizeKb > docType.maxFileSizeKb) {
+      throw new AppError(
+        `File size (${sizeKb} KB) exceeds the maximum of ${docType.maxFileSizeKb} KB for "${docType.name}"`,
+        422,
+      );
+    }
+  }
+
+  // Validate uploader if provided
+  if (uploadedById) {
+    await assertEmployeeExists(uploadedById);
+  }
+
+  // ── Create document ────────────────────────────────────────
   const document = await Document.create({
     documentTypeId,
     voucherType,
     voucherNo,
-    uploadedById:  uploadedById || null,
-    fileName,
-    fileUrl,
-    fileSize:      fileSize  || null,
-    mimeType,
-    description:   description || null,
-    expiryDate:    expiryDate  || null,
-    isPrivate:     isPrivate   ?? true,   // private by default — must explicitly publish
-    status:        'Active',
-    uploadedAt:    new Date(),
+    uploadedById: uploadedById || null,
+    title: title || originalFileName || path.basename(filePath),
+    documentNumber: documentNumber || null,
+    fileName: originalFileName || path.basename(filePath),
+    filePath,
+    mimeType: mimeType || null,
+    fileSizeKb: fileSize ? Math.ceil(fileSize / 1024) : null,
+    issueDate: issueDate || null,
+    expiryDate: expiryDate || null,
+    status: 'Pending',           // Starts as Pending — must be verified
+    isConfidential,
+    notes: notes || null,
   });
 
-  // Return with full shelf context
-  return Document.findByPk(document.id, { include: documentIncludes });
+  logger.info('Document attached', {
+    documentId: document.id,
+    documentType: docType.name,
+    voucherType,
+    voucherNo,
+    shelfPath: buildShelfPath(document),
+  });
+
+  // Return with full context
+  return Document.findByPk(document.id, { include: DOCUMENT_INCLUDES });
 };
 
 /**
  * Get a single document by ID — full shelf view.
- * What + Whom + When + all version tabs.
+ * Returns the document with its type, uploader, and all version tabs.
  */
 const getDocumentById = async (id) => {
-  const doc = await Document.findByPk(id, { include: documentIncludes });
+  const doc = await Document.findByPk(id, { include: DOCUMENT_INCLUDES });
   if (!doc) throw new AppError('Document not found', 404);
+
   doc.dataValues.shelfPath = buildShelfPath(doc);
   return doc;
 };
 
 /**
- * Browse the shelf for a specific owner record.
- * Returns all documents filed under voucherType + voucherNo,
- * grouped by document type (shelf section).
+ * Get all documents attached to a specific owner record.
  *
- * e.g. "Show me everything filed for Employee EMP-0042"
+ * e.g. "Show me every document for Employee EMP-0042"
+ *
+ * Results are grouped by DocumentType — the "shelf view".
  */
 const getDocumentsByOwner = async (voucherType, voucherNo, { includeExpired = false } = {}) => {
   const where = { voucherType, voucherNo };
+
+  // By default, hide documents that are already expired
   if (!includeExpired) {
-    where[Op.or] = [
-      { expiryDate: null },
-      { expiryDate: { [Op.gte]: new Date() } },
-    ];
+    where.status = { [Op.ne]: 'Expired' };
   }
 
   const documents = await Document.findAll({
     where,
-    include: documentIncludes,
-    order:   [
+    include: DOCUMENT_INCLUDES,
+    order: [
       [{ model: DocumentType, as: 'documentType' }, 'category', 'ASC'],
       [{ model: DocumentType, as: 'documentType' }, 'name', 'ASC'],
-      ['uploaded_at', 'DESC'],
+      ['createdAt', 'DESC'],
     ],
+  });
+
+  // Annotate each with shelf path
+  documents.forEach(doc => {
+    doc.dataValues.shelfPath = buildShelfPath(doc);
   });
 
   // Group by document type — the shelf view
   return documents.reduce((shelf, doc) => {
     const typeName = doc.documentType?.name || 'Uncategorised';
     if (!shelf[typeName]) shelf[typeName] = [];
-    doc.dataValues.shelfPath = buildShelfPath(doc);
     shelf[typeName].push(doc);
     return shelf;
   }, {});
@@ -224,65 +377,61 @@ const getDocumentsByOwner = async (voucherType, voucherNo, { includeExpired = fa
 
 /**
  * Browse all documents of a given type across the entire system.
- * e.g. "Show me every Employment Contract on file"
+ *
+ * e.g. "Show me every Passport on file"
  */
-const getDocumentsByType = async (documentTypeId, {
-  voucherType,
-  status,
-  includeExpired = false,
-  page  = 1,
-  limit = 20,
-} = {}) => {
-  const type = await DocumentType.findByPk(documentTypeId);
-  if (!type) throw new AppError('Document type not found', 404);
+const getDocumentsByType = async (documentTypeId, query = {}) => {
+  const { voucherType, status, includeExpired = false } = query;
+  const { limit, offset, page } = getPaginationOptions(query);
+
+  const docType = await assertDocumentTypeValid(documentTypeId);
 
   const where = { documentTypeId };
   if (voucherType) where.voucherType = voucherType;
-  if (status) where.status = status;
+  if (status)      where.status      = status;
   if (!includeExpired) {
-    where[Op.or] = [
-      { expiryDate: null },
-      { expiryDate: { [Op.gte]: new Date() } },
-    ];
+    where.status = { [Op.ne]: 'Expired' };
   }
 
-  const offset = (page - 1) * limit;
   const { count, rows } = await Document.findAndCountAll({
     where,
-    include: documentIncludes,
-    order:   [['uploaded_at', 'DESC']],
+    include: DOCUMENT_LIST_INCLUDES,
+    order: [['createdAt', 'DESC']],
     limit,
     offset,
   });
 
-  rows.forEach(doc => { doc.dataValues.shelfPath = buildShelfPath(doc); });
+  rows.forEach(doc => {
+    doc.dataValues.shelfPath = buildShelfPath(doc);
+  });
 
   return {
-    documentType: type,
-    total:        count,
-    page,
-    totalPages:   Math.ceil(count / limit),
-    documents:    rows,
+    documentType: docType,
+    data: rows,
+    meta: buildMeta(count, page, limit),
   };
 };
 
 /**
- * Search across all documents by any combination of:
- * fileName, voucherType, voucherNo, documentTypeId,
- * uploadedById, status, expiring soon.
+ * Search across all documents with rich filters.
+ *
+ * Filters: search term, documentTypeId, voucherType, voucherNo,
+ *          uploadedById, status, isConfidential, expiringWithinDays
  */
-const searchDocuments = async ({
-  search,
-  documentTypeId,
-  voucherType,
-  voucherNo,
-  uploadedById,
-  status,
-  expiringWithinDays,
-  isPrivate,
-  page  = 1,
-  limit = 20,
-} = {}) => {
+const searchDocuments = async (query = {}) => {
+  const {
+    search,
+    documentTypeId,
+    voucherType,
+    voucherNo,
+    uploadedById,
+    status,
+    isConfidential,
+    expiringWithinDays,
+  } = query;
+
+  const { limit, offset, page } = getPaginationOptions(query);
+
   const where = {};
 
   if (documentTypeId) where.documentTypeId = documentTypeId;
@@ -290,163 +439,253 @@ const searchDocuments = async ({
   if (voucherNo)      where.voucherNo      = voucherNo;
   if (uploadedById)   where.uploadedById   = uploadedById;
   if (status)         where.status         = status;
-  if (isPrivate !== undefined) where.isPrivate = isPrivate;
+  if (isConfidential !== undefined) where.isConfidential = isConfidential;
 
+  // Full-text search across multiple fields
   if (search) {
+    const like = { [Op.iLike]: `%${search}%` };
     where[Op.or] = [
-      { fileName:    { [Op.iLike]: `%${search}%` } },
-      { voucherNo:   { [Op.iLike]: `%${search}%` } },
-      { description: { [Op.iLike]: `%${search}%` } },
+      { title:          like },
+      { fileName:       like },
+      { documentNumber: like },
+      { notes:          like },
     ];
   }
 
-  // "Expiring within N days" filter — very common compliance query
+  // "Expiring within N days" — compliance query
   if (expiringWithinDays) {
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() + parseInt(expiringWithinDays));
+    cutoff.setDate(cutoff.getDate() + parseInt(expiringWithinDays, 10));
     where.expiryDate = {
-      [Op.between]: [new Date(), cutoff],
+      [Op.and]: [
+        { [Op.ne]: null },
+        { [Op.lte]: cutoff },
+      ],
     };
+    // Only show non-expired, non-rejected documents
+    where.status = { [Op.in]: ['Pending', 'Verified'] };
   }
 
-  const offset = (page - 1) * limit;
   const { count, rows } = await Document.findAndCountAll({
     where,
-    include: documentIncludes,
-    order:   [
+    include: DOCUMENT_LIST_INCLUDES,
+    order: [
       [{ model: DocumentType, as: 'documentType' }, 'name', 'ASC'],
-      ['uploaded_at', 'DESC'],
+      ['createdAt', 'DESC'],
     ],
     limit,
     offset,
-    distinct: true,  // avoid count inflation from multi-include
+    distinct: true,
   });
 
-  rows.forEach(doc => { doc.dataValues.shelfPath = buildShelfPath(doc); });
+  rows.forEach(doc => {
+    doc.dataValues.shelfPath = buildShelfPath(doc);
+  });
 
   return {
-    total:     count,
-    page,
-    totalPages: Math.ceil(count / limit),
-    documents: rows,
+    data: rows,
+    meta: buildMeta(count, page, limit),
   };
 };
 
 /**
- * Update document metadata — never replaces the file itself.
- * File replacement always goes through replaceDocument().
+ * Update document metadata — title, notes, dates, confidential flag.
+ * Does NOT change the file itself. For file replacement, use replaceDocument().
  */
-const updateDocumentMetadata = async (id, {
-  description,
-  expiryDate,
-  isPrivate,
-  status,
-}) => {
+const updateDocument = async (id, data) => {
   const doc = await Document.findByPk(id);
   if (!doc) throw new AppError('Document not found', 404);
 
-  return doc.update({ description, expiryDate, isPrivate, status });
+  // Only allow updating metadata fields
+  const allowedFields = [
+    'title', 'documentNumber', 'issueDate', 'expiryDate',
+    'isConfidential', 'notes',
+  ];
+
+  const updates = {};
+  for (const field of allowedFields) {
+    if (data[field] !== undefined) {
+      updates[field] = data[field];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new AppError('No valid fields to update', 422);
+  }
+
+  await doc.update(updates);
+  logger.info('Document updated', { documentId: id, fields: Object.keys(updates) });
+
+  return Document.findByPk(id, { include: DOCUMENT_INCLUDES });
 };
 
 /**
  * Replace a document file — the old file is archived as a version.
- * This is the ONLY way to change the fileUrl of a document.
+ *
+ * This is the ONLY way to change the file on a Document record.
  *
  * Flow:
- *   1. Snapshot current file → DocumentVersion (the archived tab)
- *   2. Update Document with the new file details
- *   3. Status stays Active, version count increments
+ *   1. Archive current file → DocumentVersion (immutable audit trail)
+ *   2. Update Document with new file details
+ *   3. Reset status to 'Pending' for re-verification
  */
-const replaceDocument = async (id, {
-  replacedById,
-  replacedReason,
-  newFileName,
-  newFileUrl,
-  newFileSize,
-  newMimeType,
-}) => {
-  const doc = await Document.findByPk(id, { include: documentIncludes });
+const replaceDocument = async (id, data) => {
+  const {
+    replacedById,
+    originalFileName,
+    filePath,
+    mimeType,
+    fileSize,
+    changeReason,
+  } = data;
+
+  if (!filePath) throw new AppError('filePath is required for replacement', 422);
+
+  const doc = await Document.findByPk(id, {
+    include: [{ model: DocumentVersion, as: 'versions' }],
+  });
   if (!doc) throw new AppError('Document not found', 404);
 
-  // Validate mime type against the shelf restriction
-  if (doc.documentType?.allowedMimeTypes?.length &&
-      !doc.documentType.allowedMimeTypes.includes(newMimeType)) {
-    throw new AppError(
-      `File type "${newMimeType}" is not allowed for "${doc.documentType.name}"`,
-      422,
-    );
+  // Validate document type is still active
+  if (doc.documentTypeId) {
+    await assertDocumentTypeValid(doc.documentTypeId);
   }
 
+  // Validate replacement uploader
+  if (replacedById) {
+    await assertEmployeeExists(replacedById);
+  }
+
+  // Determine next version number
   const versionNumber = (doc.versions?.length ?? 0) + 1;
 
   await sequelize.transaction(async (t) => {
-    // Archive the current file as a version
+    // 1. Archive the current file as an immutable version
     await DocumentVersion.create({
-      documentId:     id,
+      documentId:       id,
+      replacedById:     replacedById || doc.uploadedById || null,
       versionNumber,
-      fileName:       doc.fileName,
-      fileUrl:        doc.fileUrl,
-      fileSize:       doc.fileSize,
-      mimeType:       doc.mimeType,
-      replacedById:   replacedById   || null,
-      replacedReason: replacedReason || null,
-      replacedAt:     new Date(),
+      fileName:         doc.fileName,
+      filePath:         doc.filePath,
+      mimeType:         doc.mimeType,
+      fileSizeKb:       doc.fileSizeKb,
+      statusAtArchival: doc.status,
+      changeReason:     changeReason || 'File replaced',
     }, { transaction: t });
 
-    // Promote the new file onto the document record
+    // 2. Update document with new file details
     await doc.update({
-      fileName:   newFileName,
-      fileUrl:    newFileUrl,
-      fileSize:   newFileSize  || null,
-      mimeType:   newMimeType,
-      uploadedAt: new Date(),
-      status:     'Active',
+      title:     originalFileName || path.basename(filePath),
+      fileName:  originalFileName || path.basename(filePath),
+      filePath,
+      mimeType:  mimeType || null,
+      fileSizeKb: fileSize ? Math.ceil(fileSize / 1024) : null,
+      status:    'Pending',          // Reset — needs re-verification
     }, { transaction: t });
   });
 
-  return Document.findByPk(id, { include: documentIncludes });
+  logger.info('Document replaced', {
+    documentId: id,
+    versionNumber,
+    shelfPath: buildShelfPath(doc),
+  });
+
+  return Document.findByPk(id, { include: DOCUMENT_INCLUDES });
 };
 
 /**
- * Soft-delete a document (paranoid: true handles the deletedAt stamp).
- * The versions are preserved for audit.
+ * Soft-delete a document.
+ * Versions are preserved for audit trail.
  */
 const deleteDocument = async (id) => {
   const doc = await Document.findByPk(id);
   if (!doc) throw new AppError('Document not found', 404);
+
   await doc.destroy();
+  logger.info('Document deleted', { documentId: id });
 };
 
-// ─────────────────────────────────────────────────────────────
-//  DOCUMENT VERSIONS  (the archived tabs)
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════
+//  DOCUMENT VERIFICATION (status workflow)
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Verify a document — HR confirms the document is authentic.
+ * Status: Pending → Verified
+ */
+const verifyDocument = async (id, verifiedById) => {
+  const doc = await Document.findByPk(id);
+  if (!doc) throw new AppError('Document not found', 404);
+  if (doc.status !== 'Pending') {
+    throw new AppError(`Cannot verify — document status is "${doc.status}"`, 422);
+  }
+
+  await doc.update({
+    status: 'Verified',
+    verifiedAt: new Date(),
+  });
+
+  logger.info('Document verified', { documentId: id, verifiedById });
+  return Document.findByPk(id, { include: DOCUMENT_INCLUDES });
+};
+
+/**
+ * Reject a document — HR flags it as invalid/incorrect.
+ * Status: Pending → Rejected
+ */
+const rejectDocument = async (id, rejectionReason) => {
+  if (!rejectionReason) throw new AppError('rejectionReason is required', 422);
+
+  const doc = await Document.findByPk(id);
+  if (!doc) throw new AppError('Document not found', 404);
+  if (doc.status !== 'Pending') {
+    throw new AppError(`Cannot reject — document status is "${doc.status}"`, 422);
+  }
+
+  await doc.update({
+    status: 'Rejected',
+    rejectionReason,
+  });
+
+  logger.info('Document rejected', { documentId: id, reason: rejectionReason });
+  return Document.findByPk(id, { include: DOCUMENT_INCLUDES });
+};
+
+
+// ═════════════════════════════════════════════════════════════
+//  DOCUMENT VERSIONS  (archived tabs — read-only)
+// ═════════════════════════════════════════════════════════════
 
 /**
  * Get the full version history for a document — all archived tabs.
- * Ordered newest first so reviewers immediately see the latest change.
+ * Ordered newest first for review convenience.
  */
 const getDocumentVersions = async (documentId) => {
-  const doc = await Document.findByPk(documentId);
+  const doc = await Document.findByPk(documentId, { attributes: ['id'] });
   if (!doc) throw new AppError('Document not found', 404);
 
   return DocumentVersion.findAll({
-    where:   { documentId },
+    where: { documentId },
     include: [{
       model:      Employee,
       as:         'replacedBy',
       attributes: ['id', 'firstName', 'lastName', 'employeeNumber'],
     }],
-    order: [['version_number', 'DESC']],
+    order: [['versionNumber', 'DESC']],
   });
 };
 
 /**
- * Get one specific version by its ID.
+ * Get a specific version by its ID.
  */
 const getDocumentVersionById = async (versionId) => {
   const version = await DocumentVersion.findByPk(versionId, {
     include: [
-      { model: Document,  attributes: ['id', 'fileName', 'voucherType', 'voucherNo'] },
+      {
+        model:      Document,
+        attributes: ['id', 'title', 'fileName', 'voucherType', 'voucherNo'],
+      },
       {
         model:      Employee,
         as:         'replacedBy',
@@ -458,33 +697,42 @@ const getDocumentVersionById = async (versionId) => {
   return version;
 };
 
-// ─────────────────────────────────────────────────────────────
-//  COMPLIANCE QUERIES  (expiry and status monitoring)
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════
+//  COMPLIANCE QUERIES
+// ═════════════════════════════════════════════════════════════
 
 /**
- * "Expiry shelf" — documents expiring within N days or already expired.
- * Grouped by voucherType so HR sees: Employee documents, Contract documents, etc.
- * This is the compliance officer's primary daily view.
+ * "Expiry Dashboard" — documents expiring within N days, or already expired.
+ *
+ * Grouped by voucherType so compliance officers see:
+ *   Employee documents, Contract documents, etc.
+ *
+ * Each document is annotated with daysUntilExpiry (negative = expired).
  */
 const getExpiringDocuments = async ({ withinDays = 30, voucherType, documentTypeId } = {}) => {
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() + parseInt(withinDays));
+  cutoff.setDate(cutoff.getDate() + parseInt(withinDays, 10));
 
   const where = {
-    expiryDate: { [Op.lte]: cutoff },   // includes already expired
-    status:     { [Op.ne]: 'Superseded' },
+    expiryDate: {
+      [Op.and]: [
+        { [Op.ne]: null },
+        { [Op.lte]: cutoff },
+      ],
+    },
+    status: { [Op.in]: ['Pending', 'Verified'] },   // only active documents
   };
   if (voucherType)    where.voucherType    = voucherType;
   if (documentTypeId) where.documentTypeId = documentTypeId;
 
   const documents = await Document.findAll({
     where,
-    include: documentIncludes,
-    order:   [['expiry_date', 'ASC']],  // most urgent first
+    include: DOCUMENT_INCLUDES,
+    order: [['expiryDate', 'ASC']],   // most urgent first
   });
 
-  // Annotate each with days remaining (negative = already expired)
+  // Annotate each with days remaining
   const today = new Date();
   documents.forEach(doc => {
     const msLeft = new Date(doc.expiryDate) - today;
@@ -493,32 +741,36 @@ const getExpiringDocuments = async ({ withinDays = 30, voucherType, documentType
     doc.dataValues.shelfPath       = buildShelfPath(doc);
   });
 
-  // Group by voucherType — the compliance shelf view
-  return documents.reduce((shelf, doc) => {
+  // Group by voucherType — the compliance dashboard view
+  return documents.reduce((dashboard, doc) => {
     const section = doc.voucherType || 'Other';
-    if (!shelf[section]) shelf[section] = [];
-    shelf[section].push(doc);
-    return shelf;
+    if (!dashboard[section]) dashboard[section] = [];
+    dashboard[section].push(doc);
+    return dashboard;
   }, {});
 };
 
 /**
- * Mark a document as Expired manually (or set to Active to reinstate).
+ * Mark a document as Expired manually.
+ *
+ * Also used by the scheduled job to auto-expire overdue documents.
  */
-const setDocumentStatus = async (id, status) => {
-  const validStatuses = ['Active', 'Expired', 'Superseded'];
-  if (!validStatuses.includes(status))
-    throw new AppError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`, 422);
-
+const expireDocument = async (id) => {
   const doc = await Document.findByPk(id);
   if (!doc) throw new AppError('Document not found', 404);
-  return doc.update({ status });
+  if (doc.status === 'Expired') {
+    throw new AppError('Document is already expired', 422);
+  }
+
+  await doc.update({ status: 'Expired' });
+  logger.info('Document expired', { documentId: id });
+  return doc;
 };
 
 /**
- * Bulk-expire documents past their expiry date.
- * Designed to be called by a scheduled job (cron / worker).
- * Returns the count of records updated.
+ * Bulk-expire all documents past their expiry date.
+ * Designed for cron / scheduled job.
+ * Returns count of records updated.
  */
 const expireOverdueDocuments = async () => {
   const [affectedCount] = await Document.update(
@@ -526,41 +778,86 @@ const expireOverdueDocuments = async () => {
     {
       where: {
         expiryDate: { [Op.lt]: new Date() },
-        status:     'Active',
+        status:     { [Op.in]: ['Pending', 'Verified'] },
       },
     },
   );
+  logger.info('Bulk expiry job completed', { expired: affectedCount });
   return { expired: affectedCount };
 };
 
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════
+//  MISSING DOCUMENTS (compliance — which required docs are absent)
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Find which required document types an owner is missing.
+ *
+ * e.g. "Employee EMP-0042 hasn't uploaded a Passport yet"
+ *
+ * Returns the list of required DocumentTypes that have no
+ * Verified/Pending document for this owner.
+ */
+const getMissingRequiredDocuments = async (voucherType, voucherNo) => {
+  // Get all required document types
+  const requiredTypes = await DocumentType.findAll({
+    where: { isRequired: true, disabled: false },
+    attributes: ['id', 'name', 'category'],
+  });
+
+  if (requiredTypes.length === 0) return [];
+
+  // Get all documents this owner has (active only)
+  const existingDocs = await Document.findAll({
+    where: {
+      voucherType,
+      voucherNo,
+      status: { [Op.in]: ['Pending', 'Verified'] },
+    },
+    attributes: ['documentTypeId'],
+  });
+
+  const existingTypeIds = new Set(existingDocs.map(d => d.documentTypeId));
+
+  // Filter to types the owner doesn't have
+  return requiredTypes.filter(type => !existingTypeIds.has(type.id));
+};
+
+
+// ═════════════════════════════════════════════════════════════
 //  EXPORTS
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 
 module.exports = {
-  // DocumentType  (shelves)
+  // DocumentType (shelves)
   createDocumentType,
   getAllDocumentTypes,
   getDocumentTypeById,
   updateDocumentType,
   deleteDocumentType,
 
-  // Document  (files)
+  // Document (files)
   attachDocument,
   getDocumentById,
   getDocumentsByOwner,
   getDocumentsByType,
   searchDocuments,
-  updateDocumentMetadata,
+  updateDocument,
   replaceDocument,
   deleteDocument,
 
-  // DocumentVersion  (archived tabs)
+  // Verification workflow
+  verifyDocument,
+  rejectDocument,
+
+  // DocumentVersion (archived tabs)
   getDocumentVersions,
   getDocumentVersionById,
 
   // Compliance
   getExpiringDocuments,
-  setDocumentStatus,
+  expireDocument,
   expireOverdueDocuments,
+  getMissingRequiredDocuments,
 };

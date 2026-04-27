@@ -1,51 +1,43 @@
-// routes/documentRoutes.js
-// Frappe HRMS — Document Routes
 'use strict';
 
-const router = require('express').Router();
-const {
-  createDocumentType,
-  getAllDocumentTypes,
-  getDocumentTypeById,
-  updateDocumentType,
-  deleteDocumentType,
-  attachDocument,
-  getDocumentById,
-  getDocumentsByOwner,
-  getDocumentsByType,
-  searchDocuments,
-  updateDocumentMetadata,
-  replaceDocument,
-  deleteDocument,
-  getDocumentVersions,
-  getDocumentVersionById,
-  getExpiringDocuments,
-  setDocumentStatus,
-  expireOverdueDocuments,
-} = require('../controllers/documentController');
+/**
+ * modules/document/routes/documentRoutes.js
+ *
+ * Document module routes — Document Types (shelves), Documents (files),
+ * Verification workflow, Version history, and Compliance monitoring.
+ *
+ * All routes require authentication (add via index file or here).
+ */
 
+const router = require('express').Router();
+const documentController = require('../controllers/documentController');
 const { uploadDocument } = require('../../../middlewares/uploadMiddleware');
+const { authenticate } = require('../../../middlewares/authMiddleware');
+const { authorize, action } = require('../../../middlewares/rbacMiddleware');
+
+// All routes require authentication
+router.use(authenticate);
 
 /**
  * @swagger
  * tags:
- *   - name: Documents
- *     description: Document management - Upload, replace, and manage files
  *   - name: DocumentTypes
- *     description: Document type management - Create and manage document categories (shelves)
+ *     description: Document type management — create and manage document categories (shelves)
+ *   - name: Documents
+ *     description: Document management — upload, replace, verify, and manage files
  *   - name: DocumentVersions
- *     description: Document version history - Track file changes and archives
- *   - name: Compliance
- *     description: Compliance monitoring - Track expiring documents and status
+ *     description: Document version history — track file changes and archived copies
+ *   - name: DocumentCompliance
+ *     description: Compliance monitoring — track expiring and missing documents
  */
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT TYPES  (the shelves)
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
- * /documents/document-types:
+ * /documents/types:
  *   get:
  *     summary: List all document types
  *     tags: [DocumentTypes]
@@ -56,12 +48,12 @@ const { uploadDocument } = require('../../../middlewares/uploadMiddleware');
  *         name: category
  *         schema:
  *           type: string
- *         description: "Filter by category (e.g., Compliance, HR, Finance)"
+ *         description: Filter by category (Identity, Academic, Employment, Medical, Legal, Other)
  *       - in: query
  *         name: includeDisabled
  *         schema:
  *           type: boolean
- *         description: "Include disabled document types"
+ *         description: Include disabled document types
  *     responses:
  *       200:
  *         description: Document types fetched successfully
@@ -80,16 +72,26 @@ const { uploadDocument } = require('../../../middlewares/uploadMiddleware');
  *             properties:
  *               name:
  *                 type: string
+ *                 example: Passport
  *               category:
  *                 type: string
+ *                 enum: [Identity, Academic, Employment, Medical, Legal, Other]
+ *                 default: Other
  *               description:
  *                 type: string
  *               isRequired:
  *                 type: boolean
- *               allowedMimeTypes:
+ *                 default: false
+ *               hasExpiry:
+ *                 type: boolean
+ *                 default: false
+ *               allowedExtensions:
  *                 type: array
  *                 items:
  *                   type: string
+ *                 example: ["pdf", "jpg", "png"]
+ *               maxFileSizeKb:
+ *                 type: integer
  *     responses:
  *       201:
  *         description: Document type created successfully
@@ -97,13 +99,13 @@ const { uploadDocument } = require('../../../middlewares/uploadMiddleware');
  *         description: Document type already exists
  */
 router
-  .route('/document-types')
-  .get(getAllDocumentTypes)
-  .post(createDocumentType);
+  .route('/types')
+  .get(authorize('DocumentType', action.READ), documentController.getAllDocumentTypes)
+  .post(authorize('DocumentType', action.CREATE), documentController.createDocumentType);
 
 /**
  * @swagger
- * /documents/document-types/{id}:
+ * /documents/types/{id}:
  *   get:
  *     summary: Get a specific document type by ID
  *     tags: [DocumentTypes]
@@ -116,7 +118,6 @@ router
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document type ID"
  *     responses:
  *       200:
  *         description: Document type fetched successfully
@@ -134,7 +135,6 @@ router
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document type ID"
  *     requestBody:
  *       required: true
  *       content:
@@ -150,10 +150,14 @@ router
  *                 type: string
  *               isRequired:
  *                 type: boolean
- *               allowedMimeTypes:
+ *               hasExpiry:
+ *                 type: boolean
+ *               allowedExtensions:
  *                 type: array
  *                 items:
  *                   type: string
+ *               maxFileSizeKb:
+ *                 type: integer
  *               disabled:
  *                 type: boolean
  *     responses:
@@ -173,31 +177,32 @@ router
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document type ID"
  *     responses:
  *       204:
  *         description: Document type deleted successfully
  *       404:
  *         description: Document type not found
  *       409:
- *         description: "Cannot delete - documents exist under this type"
+ *         description: Cannot delete — documents exist under this type
  */
 router
-  .route('/document-types/:id')
-  .get(getDocumentTypeById)
-  .patch(updateDocumentType)
-  .delete(deleteDocumentType);
+  .route('/types/:id')
+  .get(authorize('DocumentType', action.READ), documentController.getDocumentTypeById)
+  .patch(authorize('DocumentType', action.WRITE), documentController.updateDocumentType)
+  .delete(authorize('DocumentType', action.DELETE), documentController.deleteDocumentType);
 
-// ─────────────────────────────────────────────────────────────
-//  COMPLIANCE  (static routes)
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  COMPLIANCE  (static routes — must be before /:id)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
  * /documents/compliance/expiring:
  *   get:
  *     summary: Get expiring documents
- *     tags: [Compliance]
+ *     description: Compliance officer's daily view — documents expiring within N days, grouped by voucherType
+ *     tags: [DocumentCompliance]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -206,41 +211,80 @@ router
  *         schema:
  *           type: integer
  *           default: 30
- *         description: "Number of days to look ahead for expiring documents"
+ *         description: Number of days to look ahead for expiring documents
  *       - in: query
  *         name: voucherType
  *         schema:
  *           type: string
- *         description: "Filter by voucher type (Employee, SalarySlip, etc.)"
+ *         description: Filter by voucher type (Employee, etc.)
  *       - in: query
  *         name: documentTypeId
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Filter by document type"
+ *         description: Filter by document type
  *     responses:
  *       200:
  *         description: Expiring documents fetched successfully
  */
-router.get('/compliance/expiring', getExpiringDocuments);
+router.get('/compliance/expiring',
+  authorize('Document', action.READ),
+  documentController.getExpiringDocuments
+);
 
 /**
  * @swagger
  * /documents/compliance/expire-overdue:
  *   post:
  *     summary: Bulk expire overdue documents
- *     tags: [Compliance]
+ *     description: Marks all documents past their expiry date as Expired. Intended for cron/scheduled jobs.
+ *     tags: [DocumentCompliance]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: "Overdue documents marked as expired"
+ *         description: Overdue documents marked as Expired
  */
-router.post('/compliance/expire-overdue', expireOverdueDocuments);
+router.post('/compliance/expire-overdue',
+  authorize('Document', action.SUBMIT),
+  documentController.expireOverdueDocuments
+);
 
-// ─────────────────────────────────────────────────────────────
-//  DOCUMENT SEARCH
-// ─────────────────────────────────────────────────────────────
+/**
+ * @swagger
+ * /documents/compliance/missing/{voucherType}/{voucherNo}:
+ *   get:
+ *     summary: Get missing required documents for an owner
+ *     description: Returns which required document types are missing for a given record
+ *     tags: [DocumentCompliance]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: voucherType
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Owner module (e.g. Employee)
+ *       - in: path
+ *         name: voucherNo
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Owner identifier (e.g. EMP-2026-0042)
+ *     responses:
+ *       200:
+ *         description: Missing required documents list
+ */
+router.get('/compliance/missing/:voucherType/:voucherNo',
+  authorize('Document', action.READ),
+  documentController.getMissingRequiredDocuments
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENT SEARCH (static route — must be before /:id)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
@@ -255,39 +299,39 @@ router.post('/compliance/expire-overdue', expireOverdueDocuments);
  *         name: search
  *         schema:
  *           type: string
- *         description: "Search term for filename, voucher number, or description"
+ *         description: Search term for title, filename, document number, or notes
  *       - in: query
  *         name: documentTypeId
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Filter by document type"
  *       - in: query
  *         name: voucherType
  *         schema:
  *           type: string
- *         description: "Filter by voucher type"
  *       - in: query
  *         name: voucherNo
  *         schema:
  *           type: string
- *         description: "Filter by voucher number"
+ *       - in: query
+ *         name: uploadedById
+ *         schema:
+ *           type: string
+ *           format: uuid
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *           enum: [Active, Expired, Superseded]
- *         description: "Filter by document status"
+ *           enum: [Pending, Verified, Rejected, Expired]
+ *       - in: query
+ *         name: isConfidential
+ *         schema:
+ *           type: boolean
  *       - in: query
  *         name: expiringWithinDays
  *         schema:
  *           type: integer
- *         description: "Filter documents expiring within N days"
- *       - in: query
- *         name: isPrivate
- *         schema:
- *           type: boolean
- *         description: "Filter by privacy setting"
+ *         description: Filter documents expiring within N days
  *       - in: query
  *         name: page
  *         schema:
@@ -302,17 +346,22 @@ router.post('/compliance/expire-overdue', expireOverdueDocuments);
  *       200:
  *         description: Search completed successfully
  */
-router.get('/search', searchDocuments);
+router.get('/search',
+  authorize('Document', action.READ),
+  documentController.searchDocuments
+);
 
-// ─────────────────────────────────────────────────────────────
-//  DOCUMENTS BY OWNER
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENTS BY OWNER (static route — must be before /:id)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
  * /documents/owner/{voucherType}/{voucherNo}:
  *   get:
  *     summary: Get all documents for a specific owner record
+ *     description: Returns documents grouped by document type (shelf view)
  *     tags: [Documents]
  *     security:
  *       - bearerAuth: []
@@ -322,27 +371,31 @@ router.get('/search', searchDocuments);
  *         required: true
  *         schema:
  *           type: string
- *         description: "Type of record (Employee, SalarySlip, etc.)"
+ *         description: Type of record (Employee, etc.)
  *       - in: path
  *         name: voucherNo
  *         required: true
  *         schema:
  *           type: string
- *         description: "Record identifier"
+ *         description: Record identifier (e.g. EMP-2026-0042)
  *       - in: query
  *         name: includeExpired
  *         schema:
  *           type: boolean
- *         description: "Include expired documents"
+ *         description: Include expired documents
  *     responses:
  *       200:
  *         description: Documents fetched successfully
  */
-router.get('/owner/:voucherType/:voucherNo', getDocumentsByOwner);
+router.get('/owner/:voucherType/:voucherNo',
+  authorize('Document', action.READ),
+  documentController.getDocumentsByOwner
+);
 
-// ─────────────────────────────────────────────────────────────
-//  DOCUMENTS BY TYPE
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENTS BY TYPE (static route — must be before /:id)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
@@ -359,21 +412,15 @@ router.get('/owner/:voucherType/:voucherNo', getDocumentsByOwner);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document type ID"
+ *         description: Document type ID
  *       - in: query
  *         name: voucherType
  *         schema:
  *           type: string
- *         description: "Filter by voucher type"
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *         description: "Filter by status"
- *       - in: query
- *         name: includeExpired
- *         schema:
- *           type: boolean
  *       - in: query
  *         name: page
  *         schema:
@@ -388,11 +435,15 @@ router.get('/owner/:voucherType/:voucherNo', getDocumentsByOwner);
  *       200:
  *         description: Documents fetched successfully
  */
-router.get('/type/:documentTypeId', getDocumentsByType);
+router.get('/type/:documentTypeId',
+  authorize('Document', action.READ),
+  documentController.getDocumentsByType
+);
 
-// ─────────────────────────────────────────────────────────────
-//  DOCUMENT VERSIONS
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENT VERSIONS (static route — must be before /:id)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
@@ -409,24 +460,29 @@ router.get('/type/:documentTypeId', getDocumentsByType);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document version ID"
+ *         description: Document version ID
  *     responses:
  *       200:
  *         description: Document version fetched successfully
  *       404:
  *         description: Document version not found
  */
-router.get('/versions/:versionId', getDocumentVersionById);
+router.get('/versions/:versionId',
+  authorize('Document', action.READ),
+  documentController.getDocumentVersionById
+);
 
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  CORE DOCUMENT CRUD
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
  * /documents:
  *   post:
- *     summary: Attach a new document to any HRMS record
+ *     summary: Upload and attach a new document
+ *     description: Attaches a file to any module record identified by voucherType + voucherNo
  *     tags: [Documents]
  *     security:
  *       - bearerAuth: []
@@ -445,39 +501,49 @@ router.get('/versions/:versionId', getDocumentVersionById);
  *               file:
  *                 type: string
  *                 format: binary
- *                 description: "The file to upload"
+ *                 description: The file to upload
  *               documentTypeId:
  *                 type: string
  *                 format: uuid
- *                 description: "Document type ID (shelf)"
+ *                 description: Document type (which shelf)
  *               voucherType:
  *                 type: string
- *                 description: "Type of record (Employee, SalarySlip, etc.)"
+ *                 description: Owner module (e.g. Employee)
  *               voucherNo:
  *                 type: string
- *                 description: "Record identifier"
- *               description:
+ *                 description: Owner identifier (e.g. EMP-2026-0042)
+ *               title:
  *                 type: string
- *                 description: "Document description"
+ *                 description: Display name (defaults to filename)
+ *               documentNumber:
+ *                 type: string
+ *                 description: Official document reference number
+ *               issueDate:
+ *                 type: string
+ *                 format: date
  *               expiryDate:
  *                 type: string
  *                 format: date
- *                 description: "Expiry date (ISO format)"
- *               isPrivate:
+ *               isConfidential:
  *                 type: boolean
- *                 default: true
- *                 description: "Restrict access to owner and admins"
+ *                 default: false
+ *               notes:
+ *                 type: string
  *     responses:
  *       201:
  *         description: Document attached successfully
  *       400:
- *         description: "Missing required fields or invalid file type"
+ *         description: Missing required fields or invalid file type
  *       404:
  *         description: Document type not found
  *       413:
- *         description: "File too large (max 10MB)"
+ *         description: File too large
  */
-router.post('/', uploadDocument.single('file'), attachDocument);
+router.post('/',
+  authorize('Document', action.CREATE),
+  uploadDocument.single('file'),
+  documentController.attachDocument
+);
 
 /**
  * @swagger
@@ -494,14 +560,14 @@ router.post('/', uploadDocument.single('file'), attachDocument);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document ID"
  *     responses:
  *       200:
  *         description: Document fetched successfully
  *       404:
  *         description: Document not found
- *   delete:
- *     summary: Soft delete a document
+ *   patch:
+ *     summary: Update document metadata
+ *     description: Updates title, notes, dates, confidential flag. Does NOT change the file.
  *     tags: [Documents]
  *     security:
  *       - bearerAuth: []
@@ -512,7 +578,45 @@ router.post('/', uploadDocument.single('file'), attachDocument);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document ID"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               documentNumber:
+ *                 type: string
+ *               issueDate:
+ *                 type: string
+ *                 format: date
+ *               expiryDate:
+ *                 type: string
+ *                 format: date
+ *               isConfidential:
+ *                 type: boolean
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Document updated successfully
+ *       404:
+ *         description: Document not found
+ *   delete:
+ *     summary: Soft delete a document
+ *     description: Versions are preserved for audit trail
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     responses:
  *       204:
  *         description: Document deleted successfully
@@ -521,14 +625,21 @@ router.post('/', uploadDocument.single('file'), attachDocument);
  */
 router
   .route('/:id')
-  .get(getDocumentById)
-  .delete(deleteDocument);
+  .get(authorize('Document', action.READ), documentController.getDocumentById)
+  .patch(authorize('Document', action.WRITE), documentController.updateDocument)
+  .delete(authorize('Document', action.DELETE), documentController.deleteDocument);
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENT VERIFICATION WORKFLOW
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
- * /documents/{id}/metadata:
- *   patch:
- *     summary: Update document metadata (not the file)
+ * /documents/{id}/verify:
+ *   post:
+ *     summary: Verify a document
+ *     description: HR confirms the document is authentic. Status changes Pending → Verified.
  *     tags: [Documents]
  *     security:
  *       - bearerAuth: []
@@ -539,37 +650,64 @@ router
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document ID"
+ *     responses:
+ *       200:
+ *         description: Document verified successfully
+ *       404:
+ *         description: Document not found
+ *       422:
+ *         description: Document status is not Pending
+ */
+router.post('/:id/verify',
+  authorize('Document', action.SUBMIT),
+  documentController.verifyDocument
+);
+
+/**
+ * @swagger
+ * /documents/{id}/reject:
+ *   post:
+ *     summary: Reject a document
+ *     description: HR flags the document as invalid. Status changes Pending → Rejected.
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [rejectionReason]
  *             properties:
- *               description:
+ *               rejectionReason:
  *                 type: string
- *               expiryDate:
- *                 type: string
- *                 format: date
- *               isPrivate:
- *                 type: boolean
- *               status:
- *                 type: string
- *                 enum: [Active, Expired, Superseded]
+ *                 example: "Document is blurry — please re-upload a clear copy"
  *     responses:
  *       200:
- *         description: Document metadata updated successfully
+ *         description: Document rejected
  *       404:
  *         description: Document not found
+ *       422:
+ *         description: Document status is not Pending
  */
-router.patch('/:id/metadata', updateDocumentMetadata);
+router.post('/:id/reject',
+  authorize('Document', action.SUBMIT),
+  documentController.rejectDocument
+);
 
 /**
  * @swagger
- * /documents/{id}/replace:
+ * /documents/{id}/expire:
  *   post:
- *     summary: Replace the physical file of a document (creates a version)
+ *     summary: Manually expire a document
  *     tags: [Documents]
  *     security:
  *       - bearerAuth: []
@@ -580,7 +718,38 @@ router.patch('/:id/metadata', updateDocumentMetadata);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document ID"
+ *     responses:
+ *       200:
+ *         description: Document marked as Expired
+ *       404:
+ *         description: Document not found
+ */
+router.post('/:id/expire',
+  authorize('Document', action.SUBMIT),
+  documentController.expireDocument
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENT REPLACEMENT (creates version)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /documents/{id}/replace:
+ *   post:
+ *     summary: Replace the physical file
+ *     description: Archives current file as a DocumentVersion and promotes new file. Status resets to Pending.
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -593,54 +762,26 @@ router.patch('/:id/metadata', updateDocumentMetadata);
  *               file:
  *                 type: string
  *                 format: binary
- *                 description: "The new file to replace with"
- *               replacedReason:
+ *                 description: The new file
+ *               changeReason:
  *                 type: string
- *                 description: "Reason for replacement"
+ *                 description: Reason for replacement (e.g. "Document renewed")
  *     responses:
  *       200:
- *         description: "Document replaced successfully - previous version archived"
+ *         description: Document replaced — previous version archived
  *       404:
  *         description: Document not found
- *       413:
- *         description: "File too large (max 10MB)"
  */
-router.post('/:id/replace', uploadDocument.single('file'), replaceDocument);
+router.post('/:id/replace',
+  authorize('Document', action.WRITE),
+  uploadDocument.single('file'),
+  documentController.replaceDocument
+);
 
-/**
- * @swagger
- * /documents/{id}/status:
- *   patch:
- *     summary: Manually set document status
- *     tags: [Documents]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: "Document ID"
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [status]
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [Active, Expired, Superseded]
- *     responses:
- *       200:
- *         description: Document status updated successfully
- *       404:
- *         description: Document not found
- */
-router.patch('/:id/status', setDocumentStatus);
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENT VERSIONS (per document)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
@@ -657,13 +798,20 @@ router.patch('/:id/status', setDocumentStatus);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: "Document ID"
  *     responses:
  *       200:
  *         description: Document versions fetched successfully
  *       404:
  *         description: Document not found
  */
-router.get('/:id/versions', getDocumentVersions);
+router.get('/:id/versions',
+  authorize('Document', action.READ),
+  documentController.getDocumentVersions
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  EXPORTS
+// ═════════════════════════════════════════════════════════════════════════════
 
 module.exports = router;

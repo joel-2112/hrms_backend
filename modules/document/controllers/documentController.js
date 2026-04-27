@@ -1,50 +1,40 @@
-// controllers/documentController.js
-// Frappe HRMS — Document Controller
-// Ref: https://frappe.io/hr
-// Every handler delegates entirely to documentService.
-// Error handling  → catchAsync (no try/catch noise in controllers)
-// Response shape  → response.js utils (ok, created, noContent, etc.)
-
 'use strict';
 
+/**
+ * modules/document/controllers/documentController.js
+ *
+ * Thin controller layer — delegates all business logic to documentService.
+ *
+ * Every handler is wrapped with catchAsync so unhandled rejections
+ * are forwarded to the global error middleware automatically.
+ */
+
 const { catchAsync } = require('../../../utils/catchAsync');
-const {
-  ok,
-  created,
-  noContent,
-  badRequest,
-} = require('../../../utils/response');
+const { ok, created, noContent } = require('../../../utils/response');
 const documentService = require('../services/documentService');
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT TYPES  (the shelves)
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
- * POST /api/hrms/document-types
+ * POST /api/documents/types
  * Admin creates a new document type (shelf label).
- * e.g. "Employment Contract", "Passport", "Medical Certificate"
+ * e.g. "National ID", "Passport", "Employment Contract", "Medical Certificate"
  */
 const createDocumentType = catchAsync(async (req, res) => {
-  const { name, category, description, isRequired, allowedMimeTypes } = req.body;
+  const docType = await documentService.createDocumentType(req.body);
 
-  if (!name) return badRequest(res, 'Document type name is required');
-
-  const docType = await documentService.createDocumentType({
-    name,
-    category,
-    description,
-    isRequired,
-    allowedMimeTypes,
+  created(res, {
+    message: 'Document type created successfully',
+    data: docType,
   });
-
-  return created(res, docType, 'Document type created successfully');
 });
 
 /**
- * GET /api/hrms/document-types
- * List all active document types, optionally filtered by category.
- * Query: ?category=Compliance&includeDisabled=true
+ * GET /api/documents/types
+ * List all document types, optionally filtered by category.
+ * Query: ?category=Identity&includeDisabled=true
  */
 const getAllDocumentTypes = catchAsync(async (req, res) => {
   const { category, includeDisabled } = req.query;
@@ -54,115 +44,134 @@ const getAllDocumentTypes = catchAsync(async (req, res) => {
     includeDisabled: includeDisabled === 'true',
   });
 
-  return ok(res, types, 'Document types fetched successfully');
+  ok(res, {
+    message: 'Document types fetched successfully',
+    data: types,
+  });
 });
 
 /**
- * GET /api/hrms/document-types/:id
- * Fetch a single document type by primary key.
+ * GET /api/documents/types/:id
+ * Fetch a single document type by ID.
  */
 const getDocumentTypeById = catchAsync(async (req, res) => {
   const docType = await documentService.getDocumentTypeById(req.params.id);
-  return ok(res, docType, 'Document type fetched successfully');
+
+  ok(res, {
+    message: 'Document type fetched successfully',
+    data: docType,
+  });
 });
 
 /**
- * PATCH /api/hrms/document-types/:id
- * Update shelf metadata — name, category, allowed mime types, etc.
+ * PATCH /api/documents/types/:id
+ * Update shelf metadata — name, category, allowed extensions, etc.
  */
 const updateDocumentType = catchAsync(async (req, res) => {
   const updated = await documentService.updateDocumentType(req.params.id, req.body);
-  return ok(res, updated, 'Document type updated successfully');
+
+  ok(res, {
+    message: 'Document type updated successfully',
+    data: updated,
+  });
 });
 
 /**
- * DELETE /api/hrms/document-types/:id
- * Remove a shelf — blocked by service if documents are filed under it.
+ * DELETE /api/documents/types/:id
+ * Remove a shelf — blocked if documents are filed under it.
  */
 const deleteDocumentType = catchAsync(async (req, res) => {
   await documentService.deleteDocumentType(req.params.id);
-  return noContent(res);
+
+  noContent(res);
 });
 
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  DOCUMENTS  (the files on the shelves)
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
- * POST /api/hrms/documents
- * Attach a new document to any HRMS record.
+ * POST /api/documents
+ * Upload and attach a new document to any module record.
  *
- * Body must include voucherType + voucherNo to identify the owner
- * without a hard FK — mirrors Frappe's voucher pattern.
- *
- * e.g. attach a passport to Employee EMP-0042:
- *   { voucherType: "Employee", voucherNo: "EMP-0042", ... }
- *
- * In Frappe HR context voucherType maps to doctypes such as:
- *   Employee | Salary Slip | Expense Claim | Appraisal | Job Offer
+ * Form Data (multipart):
+ *   - file:             The actual file
+ *   - documentTypeId:   Which shelf this goes on
+ *   - voucherType:      Owner module (e.g. "Employee")
+ *   - voucherNo:        Owner identifier (e.g. "EMP-2026-0042")
+ *   - title:            (optional) Display name
+ *   - documentNumber:   (optional) Official document reference number
+ *   - issueDate:        (optional) When document was issued
+ *   - expiryDate:       (optional) When document expires
+ *   - isConfidential:   (optional) Hide from self-service
+ *   - notes:            (optional) Internal notes
  */
 const attachDocument = catchAsync(async (req, res) => {
   const {
     documentTypeId,
     voucherType,
     voucherNo,
-    description,
+    title,
+    documentNumber,
+    issueDate,
     expiryDate,
-    isPrivate,
+    isConfidential,
+    notes,
   } = req.body;
 
-  // Get file from multer middleware
+  // uploadedById resolved from the authenticated session's employee record
+  const uploadedById = req.employee?.id || null;
+
+  // File from multer middleware
   const uploadedFile = req.file;
-  
-  // uploadedById resolved from the authenticated session
-  const uploadedById = req.user?.employeeId || req.user?.id || null;
 
-  // Validate required fields
-  if (!documentTypeId || !voucherType || !voucherNo) {
-    return badRequest(res, 'documentTypeId, voucherType, and voucherNo are required');
-  }
-  
-  if (!uploadedFile) {
-    return badRequest(res, 'No file uploaded');
-  }
-
-  // Get relative path for database storage
-  const { getRelativePath } = require('../../../middlewares/upload.middleware');
-  const fileUrl = getRelativePath(uploadedFile);
+  // Build file path relative to uploads/ root
+  const { getRelativePath } = require('../../../middlewares/uploadMiddleware');
+  const filePath = getRelativePath(uploadedFile);
 
   const document = await documentService.attachDocument({
     documentTypeId,
     voucherType,
     voucherNo,
     uploadedById,
-    fileName: uploadedFile.originalname,      // From multer
-    fileUrl,                                   // Generated from multer
-    fileSize: uploadedFile.size,               // From multer
-    mimeType: uploadedFile.mimetype,           // From multer
-    description,
+    originalFileName: uploadedFile.originalname,
+    filePath,
+    mimeType: uploadedFile.mimetype,
+    fileSize: uploadedFile.size,
+    title,
+    documentNumber,
+    issueDate,
     expiryDate,
-    isPrivate,
+    isConfidential: isConfidential === 'true' || isConfidential === true,
+    notes,
   });
 
-  return created(res, document, 'Document attached successfully');
+  created(res, {
+    message: 'Document attached successfully',
+    data: document,
+  });
 });
 
 /**
- * GET /api/hrms/documents/:id
+ * GET /api/documents/:id
  * Single document — full shelf view (type + uploader + all versions).
  */
 const getDocumentById = catchAsync(async (req, res) => {
   const document = await documentService.getDocumentById(req.params.id);
-  return ok(res, document, 'Document fetched successfully');
+
+  ok(res, {
+    message: 'Document fetched successfully',
+    data: document,
+  });
 });
 
 /**
- * GET /api/hrms/documents/owner/:voucherType/:voucherNo
- * Browse all documents filed against one HRMS record,
- * grouped by document type (shelf section).
+ * GET /api/documents/owner/:voucherType/:voucherNo
+ * Browse all documents filed against one record, grouped by document type.
  *
- * e.g. GET /api/hrms/documents/owner/Employee/EMP-0042
- *   → { "Passport": [...], "Employment Contract": [...] }
+ * e.g. GET /api/documents/owner/Employee/EMP-2026-0042
+ *   → { "Passport": [...], "National ID": [...] }
  *
  * Query: ?includeExpired=true
  */
@@ -176,206 +185,246 @@ const getDocumentsByOwner = catchAsync(async (req, res) => {
     { includeExpired: includeExpired === 'true' },
   );
 
-  return ok(res, shelf, `Documents for ${voucherType} ${voucherNo} fetched successfully`);
+  ok(res, {
+    message: `Documents for ${voucherType} ${voucherNo} fetched successfully`,
+    data: shelf,
+  });
 });
 
 /**
- * GET /api/hrms/documents/type/:documentTypeId
- * All documents of one type across the entire system — paginated.
- * Query: ?voucherType=Employee&status=Active&includeExpired=false&page=1&limit=20
+ * GET /api/documents/type/:documentTypeId
+ * All documents of one type across the system — paginated.
+ *
+ * Query: ?voucherType=Employee&status=Verified&page=1&limit=20
  */
 const getDocumentsByType = catchAsync(async (req, res) => {
   const { documentTypeId } = req.params;
-  const { voucherType, status, includeExpired, page, limit } = req.query;
 
-  const result = await documentService.getDocumentsByType(documentTypeId, {
-    voucherType,
-    status,
-    includeExpired: includeExpired === 'true',
-    page: page ? parseInt(page) : 1,
-    limit: limit ? parseInt(limit) : 20,
-  });
+  const result = await documentService.getDocumentsByType(documentTypeId, req.query);
 
-  return ok(res, result, 'Documents fetched successfully', {
-    page: result.page,
-    totalPages: result.totalPages,
-    total: result.total,
+  ok(res, {
+    message: 'Documents fetched successfully',
+    data: result.data,
+    meta: result.meta,
   });
 });
 
 /**
- * GET /api/hrms/documents/search
+ * GET /api/documents/search
  * Full-text + filter search across all documents.
- * Query: ?search=passport&voucherType=Employee&status=Active
- *        &expiringWithinDays=30&isPrivate=false&page=1&limit=20
+ *
+ * Query: ?search=passport&voucherType=Employee&status=Pending
+ *        &expiringWithinDays=30&isConfidential=false&page=1&limit=20
  */
 const searchDocuments = catchAsync(async (req, res) => {
-  const {
-    search,
-    documentTypeId,
-    voucherType,
-    voucherNo,
-    uploadedById,
-    status,
-    expiringWithinDays,
-    isPrivate,
-    page,
-    limit,
-  } = req.query;
+  const result = await documentService.searchDocuments(req.query);
 
-  const result = await documentService.searchDocuments({
-    search,
-    documentTypeId,
-    voucherType,
-    voucherNo,
-    uploadedById,
-    status,
-    expiringWithinDays,
-    isPrivate: isPrivate !== undefined ? isPrivate === 'true' : undefined,
-    page: page ? parseInt(page) : 1,
-    limit: limit ? parseInt(limit) : 20,
-  });
-
-  return ok(res, result, 'Document search completed', {
-    page: result.page,
-    totalPages: result.totalPages,
-    total: result.total,
+  ok(res, {
+    message: 'Document search completed',
+    data: result.data,
+    meta: result.meta,
   });
 });
 
 /**
- * PATCH /api/hrms/documents/:id/metadata
- * Update description, expiryDate, isPrivate, or status.
- * File replacement always goes through PATCH /:id/replace.
+ * PATCH /api/documents/:id
+ * Update document metadata — title, notes, dates, confidential flag.
+ * Does NOT change the file. For file replacement, use POST /:id/replace.
  */
-const updateDocumentMetadata = catchAsync(async (req, res) => {
-  const { description, expiryDate, isPrivate, status } = req.body;
+const updateDocument = catchAsync(async (req, res) => {
+  const updated = await documentService.updateDocument(req.params.id, req.body);
 
-  const updated = await documentService.updateDocumentMetadata(req.params.id, {
-    description,
-    expiryDate,
-    isPrivate,
-    status,
+  ok(res, {
+    message: 'Document updated successfully',
+    data: updated,
   });
-
-  return ok(res, updated, 'Document metadata updated successfully');
 });
 
 /**
- * POST /api/hrms/documents/:id/replace
+ * POST /api/documents/:id/replace
  * Replace the physical file — archives old file as a DocumentVersion.
- * This is the ONLY correct way to update a document's file.
  *
- * Flow (handled in service):
- *   1. Snapshot current file → DocumentVersion (archived tab)
- *   2. Promote new file onto Document record
+ * Form Data (multipart):
+ *   - file:         The new file
+ *   - changeReason: Why the file is being replaced
  */
 const replaceDocument = catchAsync(async (req, res) => {
-  const {
-    replacedReason,
-    newFileName,
-    newFileUrl,
-    newFileSize,
-    newMimeType,
-  } = req.body;
+  const { changeReason } = req.body;
+  const replacedById = req.employee?.id || null;
+  const uploadedFile = req.file;
 
-  const replacedById = req.user?.employeeId || req.user?.id || null;
-
-  if (!newFileName || !newFileUrl || !newMimeType) {
-    return badRequest(res, 'newFileName, newFileUrl and newMimeType are required');
-  }
+  const { getRelativePath } = require('../../../middlewares/uploadMiddleware');
+  const filePath = getRelativePath(uploadedFile);
 
   const document = await documentService.replaceDocument(req.params.id, {
     replacedById,
-    replacedReason,
-    newFileName,
-    newFileUrl,
-    newFileSize,
-    newMimeType,
+    originalFileName: uploadedFile.originalname,
+    filePath,
+    mimeType: uploadedFile.mimetype,
+    fileSize: uploadedFile.size,
+    changeReason,
   });
 
-  return ok(res, document, 'Document replaced successfully — previous version archived');
+  ok(res, {
+    message: 'Document replaced successfully — previous version archived',
+    data: document,
+  });
 });
 
 /**
- * DELETE /api/hrms/documents/:id
+ * DELETE /api/documents/:id
  * Soft-delete a document. Versions are preserved for audit trail.
  */
 const deleteDocument = catchAsync(async (req, res) => {
   await documentService.deleteDocument(req.params.id);
-  return noContent(res);
+
+  noContent(res);
 });
 
-// ─────────────────────────────────────────────────────────────
-//  DOCUMENT VERSIONS  (the archived tabs)
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENT VERIFICATION  (status workflow)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
- * GET /api/hrms/documents/:id/versions
+ * POST /api/documents/:id/verify
+ * HR verifies a document — confirms it's authentic.
+ * Status: Pending → Verified
+ */
+const verifyDocument = catchAsync(async (req, res) => {
+  const verifiedById = req.employee?.id || req.user?.id;
+
+  const document = await documentService.verifyDocument(req.params.id, verifiedById);
+
+  ok(res, {
+    message: 'Document verified successfully',
+    data: document,
+  });
+});
+
+/**
+ * POST /api/documents/:id/reject
+ * HR rejects a document — flags it as invalid/incorrect.
+ * Status: Pending → Rejected
+ */
+const rejectDocument = catchAsync(async (req, res) => {
+  const { rejectionReason } = req.body;
+
+  const document = await documentService.rejectDocument(req.params.id, rejectionReason);
+
+  ok(res, {
+    message: 'Document rejected',
+    data: document,
+  });
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOCUMENT VERSIONS  (the archived tabs — read-only)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/documents/:id/versions
  * Full version history for one document — newest first.
  */
 const getDocumentVersions = catchAsync(async (req, res) => {
   const versions = await documentService.getDocumentVersions(req.params.id);
-  return ok(res, versions, 'Document versions fetched successfully');
+
+  ok(res, {
+    message: 'Document versions fetched successfully',
+    data: versions,
+  });
 });
 
 /**
- * GET /api/hrms/document-versions/:versionId
+ * GET /api/documents/versions/:versionId
  * Fetch one specific archived version by its own ID.
  */
 const getDocumentVersionById = catchAsync(async (req, res) => {
   const version = await documentService.getDocumentVersionById(req.params.versionId);
-  return ok(res, version, 'Document version fetched successfully');
+
+  ok(res, {
+    message: 'Document version fetched successfully',
+    data: version,
+  });
 });
 
-// ─────────────────────────────────────────────────────────────
-//  COMPLIANCE  (expiry & status monitoring)
-// ─────────────────────────────────────────────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  COMPLIANCE  (expiry & missing documents monitoring)
+// ═════════════════════════════════════════════════════════════════════════════
 
 /**
- * GET /api/hrms/documents/compliance/expiring
+ * GET /api/documents/compliance/expiring
  * Compliance officer's daily view — documents expiring within N days,
- * grouped by voucherType (Employee, Salary Slip, etc.).
+ * grouped by voucherType.
+ *
  * Query: ?withinDays=30&voucherType=Employee&documentTypeId=uuid
  */
 const getExpiringDocuments = catchAsync(async (req, res) => {
   const { withinDays, voucherType, documentTypeId } = req.query;
 
-  const shelf = await documentService.getExpiringDocuments({
-    withinDays: withinDays ? parseInt(withinDays) : 30,
+  const dashboard = await documentService.getExpiringDocuments({
+    withinDays: withinDays ? parseInt(withinDays, 10) : 30,
     voucherType,
     documentTypeId,
   });
 
-  return ok(res, shelf, 'Expiring documents fetched successfully');
+  ok(res, {
+    message: 'Expiring documents fetched successfully',
+    data: dashboard,
+  });
 });
 
 /**
- * PATCH /api/hrms/documents/:id/status
- * Manually set a document's status — Active | Expired | Superseded.
+ * POST /api/documents/:id/expire
+ * Manually mark a document as Expired.
  */
-const setDocumentStatus = catchAsync(async (req, res) => {
-  const { status } = req.body;
+const expireDocument = catchAsync(async (req, res) => {
+  const document = await documentService.expireDocument(req.params.id);
 
-  if (!status) return badRequest(res, 'status is required');
-
-  const updated = await documentService.setDocumentStatus(req.params.id, status);
-  return ok(res, updated, `Document status set to "${status}"`);
+  ok(res, {
+    message: 'Document marked as Expired',
+    data: document,
+  });
 });
 
 /**
- * POST /api/hrms/documents/compliance/expire-overdue
+ * POST /api/documents/compliance/expire-overdue
  * Bulk-expire all documents past their expiry date.
- * Intended for scheduled jobs (cron / worker) — not a user-facing action.
+ * Intended for scheduled jobs (cron).
  */
 const expireOverdueDocuments = catchAsync(async (req, res) => {
   const result = await documentService.expireOverdueDocuments();
-  return ok(res, result, `${result.expired} overdue document(s) marked as Expired`);
+
+  ok(res, {
+    message: `${result.expired} overdue document(s) marked as Expired`,
+    data: result,
+  });
 });
 
-// ─────────────────────────────────────────────────────────────
+/**
+ * GET /api/documents/compliance/missing/:voucherType/:voucherNo
+ * Find which required document types an owner is missing.
+ *
+ * e.g. GET /api/documents/compliance/missing/Employee/EMP-2026-0042
+ *   → [{ id: "...", name: "Passport", category: "Identity" }]
+ */
+const getMissingRequiredDocuments = catchAsync(async (req, res) => {
+  const { voucherType, voucherNo } = req.params;
+
+  const missing = await documentService.getMissingRequiredDocuments(voucherType, voucherNo);
+
+  ok(res, {
+    message: `Missing required documents for ${voucherType} ${voucherNo}`,
+    data: missing,
+  });
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 
 module.exports = {
   // Document Types
@@ -391,9 +440,13 @@ module.exports = {
   getDocumentsByOwner,
   getDocumentsByType,
   searchDocuments,
-  updateDocumentMetadata,
+  updateDocument,
   replaceDocument,
   deleteDocument,
+
+  // Verification
+  verifyDocument,
+  rejectDocument,
 
   // Document Versions
   getDocumentVersions,
@@ -401,6 +454,7 @@ module.exports = {
 
   // Compliance
   getExpiringDocuments,
-  setDocumentStatus,
+  expireDocument,
   expireOverdueDocuments,
+  getMissingRequiredDocuments,
 };
