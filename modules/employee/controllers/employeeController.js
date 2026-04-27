@@ -37,6 +37,20 @@ const createEmployee = catchAsync(async (req, res) => {
 });
 
 /**
+ * POST /api/employees/from-user/:userId
+ * Create an Employee record for an existing User account.
+ * Reuses User's name/email, accepts Employee-specific fields.
+ */
+const createEmployeeFromExistingUser = catchAsync(async (req, res) => {
+  const { userId } = req.params;
+  const employee = await employeeService.createEmployeeFromExistingUser(userId, req.body);
+  created(res, {
+    message: 'Employee record created from existing User — Active immediately',
+    data: employee,
+  });
+});
+
+/**
  * POST /api/employees/:id/approve
  * GM approves a pending employee → User account provisioned, status → Active.
  */
@@ -714,6 +728,7 @@ module.exports = {
   getDirectReports,
   deactivateUser,
   activateUser,
+  createEmployeeFromExistingUser,
   
 
   // Education

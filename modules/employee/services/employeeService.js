@@ -371,6 +371,126 @@ const createEmployee = async (data) => {
 };
 
 /**
+ * Create an Employee record for an existing User account.
+ * 
+ * Use case: Super Admin / System Manager already has a User account
+ * but needs an Employee record to participate in workflows
+ * (requisitions, approvals, etc.).
+ *
+ * The Employee is created as Active immediately — no GM approval needed
+ * because the User account already exists.
+ */
+const createEmployeeFromExistingUser = async (userId, data) => {
+  const user = await User.findByPk(userId, {
+    attributes: ['id', 'email', 'firstName', 'middleName', 'lastName', 'status']
+  });
+  
+  if (!user) throw new AppError('User not found', 404);
+  if (user.status !== 'Active') {
+    throw new AppError('User account must be Active to create an Employee record', 422);
+  }
+
+  const existingEmp = await Employee.findOne({ 
+    where: { userId: user.id } 
+  });
+  if (existingEmp) {
+    throw new AppError(
+      `Employee record already exists for this user (${existingEmp.employeeNumber})`, 
+      409
+    );
+  }
+
+  if (!data.companyId) throw new AppError('companyId is required', 422);
+  if (!data.dateOfJoining) throw new AppError('dateOfJoining is required', 422);
+  
+  await validateOrgFKs(data);
+
+  const companyEmail = data.companyEmail || user.email;
+  
+  const emailTaken = await Employee.findOne({
+    where: { companyEmail: companyEmail.toLowerCase().trim() }
+  });
+  if (emailTaken) {
+    throw new AppError('An employee with this company email already exists', 409);
+  }
+
+  const employee = await sequelize.transaction(async (t) => {
+    const empNumber = await generateEmployeeNumber(t);
+
+    const emp = await Employee.create({
+      userId:     user.id,
+      firstName:  user.firstName,
+      middleName: user.middleName || null,
+      lastName:   user.lastName,
+
+      companyId:        data.companyId,
+      branchId:         data.branchId         || null,
+      departmentId:     data.departmentId     || null,
+      designationId:    data.designationId    || null,
+      employmentTypeId: data.employmentTypeId || null,
+      employeeGradeId:  data.employeeGradeId  || null,
+      reportsToId:      data.reportsToId      || null,
+
+      employeeNumber:             empNumber,
+      dateOfJoining:              data.dateOfJoining,
+      scheduledConfirmationDate:  data.scheduledConfirmationDate || null,
+      contractEndDate:            data.contractEndDate           || null,
+      noticeNumberOfDays:         data.noticeNumberOfDays        ?? 30,
+      status:                     'Active',
+
+      personalEmail:  data.personalEmail?.toLowerCase().trim() || null,
+      companyEmail:   companyEmail.toLowerCase().trim(),
+      cellNumber:     data.cellNumber  || null,
+      phoneNumber:    data.phoneNumber || null,
+
+      currentAddress:    data.currentAddress    || null,
+      currentCity:       data.currentCity       || null,
+      currentState:      data.currentState      || null,
+      currentCountry:    data.currentCountry    || null,
+      currentPostalCode: data.currentPostalCode || null,
+      permanentAddress:    data.permanentAddress    || null,
+      permanentCity:       data.permanentCity       || null,
+      permanentState:      data.permanentState      || null,
+      permanentCountry:    data.permanentCountry    || null,
+      permanentPostalCode: data.permanentPostalCode || null,
+      isSameAddress:       data.isSameAddress       ?? false,
+
+      nationalId:           data.nationalId           || null,
+      passportNumber:       data.passportNumber       || null,
+      passportExpiry:       data.passportExpiry       || null,
+      taxId:                data.taxId                || null,
+      socialSecurityNumber: data.socialSecurityNumber || null,
+
+      bankName:          data.bankName          || null,
+      bankAccountNumber: data.bankAccountNumber || null,
+      bankBranch:        data.bankBranch        || null,
+      bankCode:          data.bankCode          || null,
+      mobileMoneyNumber: data.mobileMoneyNumber || null,
+      paymentMethod:     data.paymentMethod     || 'Bank Transfer',
+
+      holidayListId:       data.holidayListId       || null,
+      defaultShiftId:      data.defaultShiftId      || null,
+      attendanceDeviceId:  data.attendanceDeviceId  || null,
+      leaveApprovedById:   data.leaveApprovedById   || null,
+      expenseApprovedById: data.expenseApprovedById || null,
+
+      bio:          data.bio          || null,
+      customFields: data.customFields || null,
+    }, { transaction: t });
+
+    return emp;
+  });
+
+  logger.info('Employee created from existing User', {
+    userId:     user.id,
+    employeeId: employee.id,
+    employeeNumber: employee.employeeNumber,
+  });
+
+  return employee;
+};
+
+/**
  * GM approves a pending employee.
  *
  * On approval the system:
@@ -1463,7 +1583,7 @@ module.exports = {
   getDirectReports,
   deactivateUser,
   activateUser,
-  getEmployeeByUserId,     // used by auth middleware downstream
+  getEmployeeByUserId,    
 
   // Education
   getEducation,
@@ -1502,4 +1622,5 @@ module.exports = {
 
   // Promotions (read-only)
   getPromotionHistory,
+  createEmployeeFromExistingUser,
 };

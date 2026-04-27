@@ -243,6 +243,77 @@ router.post('/',
   authorize('Employee', action.CREATE),
   employeeController.createEmployee
 );
+/**
+ * @swagger
+ * /employees/from-user/{userId}:
+ *   post:
+ *     summary: Create Employee from existing User
+ *     description: >
+ *       For users who already have a User account (Super Admin, System Manager)
+ *       but need an Employee record. Reuses firstName, middleName, lastName, email
+ *       from the User. Employee is created immediately as **Active** — no approval needed.
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Existing User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - companyId
+ *               - dateOfJoining
+ *             properties:
+ *               companyId:
+ *                 type: string
+ *                 format: uuid
+ *               dateOfJoining:
+ *                 type: string
+ *                 format: date
+ *               companyEmail:
+ *                 type: string
+ *                 description: Defaults to User's email if not provided
+ *               branchId:
+ *                 type: string
+ *                 format: uuid
+ *               departmentId:
+ *                 type: string
+ *                 format: uuid
+ *               designationId:
+ *                 type: string
+ *                 format: uuid
+ *               employmentTypeId:
+ *                 type: string
+ *                 format: uuid
+ *               employeeGradeId:
+ *                 type: string
+ *                 format: uuid
+ *               reportsToId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       201:
+ *         description: Employee created from existing User
+ *       404:
+ *         description: User not found
+ *       409:
+ *         description: Employee already exists for this user
+ */
+router.post('/from-user/:userId',
+  authorize('Employee', action.CREATE),
+  employeeController.createEmployeeFromExistingUser
+);
+
+
 
 /**
  * @swagger
