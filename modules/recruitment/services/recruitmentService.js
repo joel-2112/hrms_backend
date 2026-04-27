@@ -30,13 +30,7 @@ const {
 //  CONSTANTS & CONFIGURATION
 // ════════════════════════════════════════════════════════════════════════════
 
-const VALID_APPLICANT_STATUSES = ['Open', 'Replied', 'Hold', 'Accepted', 'Rejected'];
-const VALID_INTERVIEW_STATUSES = ['Scheduled', 'Under Review', 'Pending', 'Cleared', 'Not Cleared', 'Cancelled', 'No Show'];
-const VALID_INTERVIEW_TYPES = ['One-on-One', 'Panel', 'Technical', 'HR', 'Case Study', 'Group Discussion', 'Video Call', 'Phone Screening'];
-const VALID_OFFER_STATUSES = ['Draft', 'Awaiting Approval', 'Approved', 'Rejected by HR', 'Offer Sent', 'Accepted', 'Declined', 'Expired', 'Cancelled'];
-const VALID_LETTER_STATUSES = ['Draft', 'Issued', 'Delivered', 'Acknowledged', 'Cancelled'];
-const VALID_REFERRAL_STATUSES = ['Pending', 'Accepted', 'Rejected', 'In Process'];
-const VALID_SOURCES = ['Website Listing', 'Employee Referral', 'Campaign', 'Walk In'];
+
 const VALID_RESULTS = ['Cleared', 'Not Cleared', 'On Hold'];
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -405,7 +399,6 @@ const REQUISITION_INCLUDES = [
   { model: Employee, as: 'requestedBy', attributes: ['id', 'firstName', 'lastName'] },
   { model: Employee, as: 'hrManager', attributes: ['id', 'firstName', 'lastName'], required: false },
   { model: Employee, as: 'generalManager', attributes: ['id', 'firstName', 'lastName'], required: false },
-  { model: JobOpening, as: 'jobOpening', attributes: ['id', 'jobTitle', 'status'], required: false },
 ];
 
 /**
