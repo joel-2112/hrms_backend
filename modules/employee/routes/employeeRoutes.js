@@ -797,6 +797,47 @@ router.get('/:id/direct-reports',
   employeeController.getDirectReports
 );
 
+/**
+ * @swagger
+ * /employees/{id}/activate-user:
+ *   post:
+ *     summary: Reactivate a suspended User account
+ *     description: >
+ *       Re-enables the linked User account (e.g., after suspension is lifted).
+ *       Does NOT change employee status.
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Employee ID
+ *     responses:
+ *       200:
+ *         description: User account reactivated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                   example: User account reactivated — employee record unchanged
+ *       404:
+ *         description: Employee not found
+ *       422:
+ *         description: No linked User account or already active
+ */
+router.post('/:id/activate-user',
+  authorize('Employee', action.SUBMIT),
+  employeeController.activateUser
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EDUCATION

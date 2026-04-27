@@ -417,6 +417,7 @@ const approveEmployee = async (employeeId, approverUserId) => {
         passwordHash: newHash,
         status:       'Active',
         firstName:    employee.firstName,
+        middleName:   employee.middleName,
         lastName:     employee.lastName,
       }, { transaction: t });
       user = existingUser;
@@ -425,6 +426,7 @@ const approveEmployee = async (employeeId, approverUserId) => {
       // The beforeSave hook on User.js hashes passwordHash automatically
       user = await User.create({
         firstName:    employee.firstName,
+        middleName:   employee.middleName,
         lastName:     employee.lastName,
         email:        employee.companyEmail,
         passwordHash: temporaryPassword,   // hook hashes this
@@ -451,7 +453,7 @@ const approveEmployee = async (employeeId, approverUserId) => {
 
   return {
     employee:          result.employee,
-    temporaryPassword,   // never stored in plain text — caller must email this immediately
+    temporaryPassword,
   };
 };
 
@@ -788,16 +790,16 @@ const getOrgChart = async (rootEmployeeId, depth = 0, maxDepth = 4) => {
   if (depth >= maxDepth) return null;
 
   const employee = await Employee.findByPk(rootEmployeeId, {
-    attributes: ['id', 'employeeNumber', 'firstName', 'lastName', 'image', 'status'],
-    include:    [{ model: Designation, attributes: ['id', 'name'], required: false }],
+    attributes: ['id', 'employeeNumber', 'firstName', 'middleName', 'lastName', 'image', 'status'],
+    include:    [{ model: Designation, as: 'designation', attributes: ['id', 'name'], required: false }],
   });
 
   if (!employee) throw new AppError('Employee not found', 404);
 
   const reports = await Employee.findAll({
     where:      { reportsToId: rootEmployeeId, status: { [Op.ne]: 'Exit' } },
-    attributes: ['id', 'employeeNumber', 'firstName', 'lastName', 'image', 'status'],
-    include:    [{ model: Designation, attributes: ['id', 'name'], required: false }],
+    attributes: ['id', 'employeeNumber', 'firstName', 'middleName', 'lastName', 'image', 'status'],
+    include:    [{ model: Designation, as: 'designation', attributes: ['id', 'name'], required: false }],
     order:      [['lastName', 'ASC']],
   });
 
@@ -846,7 +848,27 @@ const deactivateUser = async (employeeId) => {
   logger.info('User account suspended independently', { employeeId, userId: employee.userId });
   return { message: 'User account suspended — employee record unchanged' };
 };
+/**
+ * Reactivates the linked User account (e.g., after suspension is lifted).
+ * Does NOT change employee status — that's a separate HR decision.
+ */
+const activateUser = async (employeeId) => {
+  const employee = await Employee.findByPk(employeeId, { 
+    attributes: ['id', 'userId', 'status'] 
+  });
+  if (!employee) throw new AppError('Employee not found', 404);
+  if (!employee.userId) throw new AppError('This employee has no linked User account', 422);
 
+  const user = await User.findByPk(employee.userId, { attributes: ['id', 'status'] });
+  if (user.status === 'Active') {
+    throw new AppError('User account is already active', 422);
+  }
+
+  await User.update({ status: 'Active' }, { where: { id: employee.userId } });
+
+  logger.info('User account reactivated', { employeeId, userId: employee.userId });
+  return { message: 'User account reactivated — employee record unchanged' };
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EDUCATION
@@ -1440,6 +1462,7 @@ module.exports = {
   getOrgChart,
   getDirectReports,
   deactivateUser,
+  activateUser,
   getEmployeeByUserId,     // used by auth middleware downstream
 
   // Education

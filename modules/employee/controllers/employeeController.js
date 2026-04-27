@@ -212,6 +212,20 @@ const deactivateUser = catchAsync(async (req, res) => {
   });
 });
 
+/**
+ * POST /api/employees/:id/activate-user
+ * Reactivates the linked User account (e.g., after suspension is lifted).
+ */
+const activateUser = catchAsync(async (req, res) => {
+  const { id } = req.params;
+
+  const result = await employeeService.activateUser(id);
+
+  ok(res, {
+    message: result.message,
+  });
+});
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EDUCATION
@@ -699,6 +713,8 @@ module.exports = {
   getOrgChart,
   getDirectReports,
   deactivateUser,
+  activateUser,
+  
 
   // Education
   getEducation,
