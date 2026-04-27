@@ -8,6 +8,7 @@ const documentRoutes = require('./modules/document/routes/documentRoute');
 const organizationRoutes = require('./modules/organization/routes/organizationRoute');
 const recruitmentRoutes = require('./modules/recruitment/routes/recruitmentRoutes');
 const employeeRoutes = require('./modules/employee/routes/employeeRoutes');
+const leaveRoutes = require('./modules/leave/routes/leaveRoutes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
 const cookieParser = require('cookie-parser');
@@ -57,6 +58,7 @@ app.use('/organizations', organizationRoutes);
 app.use('/documents', documentRoutes);
 app.use('/recruitment', recruitmentRoutes);
 app.use('/employees', employeeRoutes);
+app.use('/leaves', leaveRoutes);
 // ── Error handling middleware ─────────────────────────────────
 app.use(notFoundHandler);  
 app.use(errorHandler);
