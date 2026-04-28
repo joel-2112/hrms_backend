@@ -77,6 +77,7 @@ router.get(
   roleController.getAllResourceNames
 );
 
+
 /**
  * @swagger
  * /roles/permissions:
