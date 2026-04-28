@@ -1409,6 +1409,60 @@ router.get(
 
 /**
  * @swagger
+ * /roles/users/with-permissions:
+ *   get:
+ *     summary: Get all user permissions with user details
+ *     tags: [UserPermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of user permissions with user details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       user:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           firstName:
+ *                             type: string
+ *                           email:
+ *                             type: string
+ *                       permissions:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                             resource:
+ *                               type: string
+ *                             resourceId:
+ *                               type: string
+ *                             action:
+ *                               type: string
+*                             effect:
+*                               type: string
+ */
+router.get(
+  "/users/with-permissions",
+  authorize("UserPermission", action.READ),
+  userPermissionController.getAllUserPermissionsWithUser,
+);
+
+/**
+ * @swagger
  * /roles/users/{userId}/permissions:
  *   post:
  *     summary: Add a new permission for a user

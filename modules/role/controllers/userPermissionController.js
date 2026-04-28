@@ -30,6 +30,19 @@ const getUserPermissions = async (req, res, next) => {
   }
 };
 
+const getAllUserPermissionsWithUser = async (req, res, next) => {
+  try {
+    const { page, limit } = req.query;
+    const result = await roleService.getAllUserPermissionsWithUser(req.params.userId, {
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20
+    });
+    ok(res, result.data, 'User permissions with user details fetched successfully', result.meta);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const deleteUserPermission = async (req, res, next) => {
   try {
     await roleService.deleteUserPermission(req.params.permissionId);
@@ -66,4 +79,5 @@ module.exports = {
   deleteUserPermission,
   replaceUserPermissions,
   getUserEffectivePermissions,
+  getAllUserPermissionsWithUser,
 };

@@ -967,6 +967,26 @@ const getUserPermissions = async (userId, { page = 1, limit = 20 } = {}) => {
   return { data: rows, meta: buildMeta(count, page, lim) };
 };
 
+const getAllUserPermissionsWithUser = async ({ page = 1, limit = 20 } = {}) => {
+  const { limit: lim, offset } = getPaginationOptions({ page, limit });
+  const { count, rows } = await UserPermission.findAndCountAll({
+    include: [
+      {
+        model: User,
+        as: 'user',
+        attributes: ['id', 'firstName', 'email'],
+      },
+    ],
+    limit: lim,
+    offset,
+    order: [
+      ['allowDocType', 'ASC'],
+      ['allowValue', 'ASC'],
+    ],
+  });
+  return { data: rows, meta: buildMeta(count, page, lim) };
+}
+
 /**
  * Delete a single record-level permission by its own PK.
  */
@@ -1256,6 +1276,7 @@ module.exports = {
   getUserPermissions,
   deleteUserPermission,
   replaceUserPermissions,
+  getAllUserPermissionsWithUser,
 
   // Permission resolution
   getUserEffectivePermissions,
