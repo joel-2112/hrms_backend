@@ -76,7 +76,54 @@ router.get(
   authorize('RolePermission', action.READ),
   roleController.getAllResourceNames
 );
-
+/**
+ * @swagger
+ * /roles/profiles:
+ *   get:
+ *     summary: Get all role profiles
+ *     tags: [RoleProfiles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: includeDisabled
+ *         schema:
+ *           type: boolean
+ *         description: Include disabled profiles
+ *     responses:
+ *       200:
+ *         description: List of role profiles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     profiles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           roles:
+ *                             type: array
+ *                           disabled:
+ *                             type: boolean
+ */
+router.get(
+  "/profiles",
+  authorize("RoleProfile", action.READ),
+  roleProfileController.getAllRoleProfiles,
+);
 
 /**
  * @swagger
@@ -1158,54 +1205,7 @@ router.post(
   roleProfileController.createRoleProfile,
 );
 
-/**
- * @swagger
- * /roles/profiles:
- *   get:
- *     summary: Get all role profiles
- *     tags: [RoleProfiles]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: includeDisabled
- *         schema:
- *           type: boolean
- *         description: Include disabled profiles
- *     responses:
- *       200:
- *         description: List of role profiles
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     profiles:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           id:
- *                             type: string
- *                           name:
- *                             type: string
- *                           description:
- *                             type: string
- *                           roles:
- *                             type: array
- *                           disabled:
- *                             type: boolean
- */
-router.get(
-  "/profiles",
-  authorize("RoleProfile", action.READ),
-  roleProfileController.getAllRoleProfiles,
-);
+
 
 /**
  * @swagger

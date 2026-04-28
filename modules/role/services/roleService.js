@@ -169,9 +169,7 @@ const getRoleById = async (id) => {
         model: RolePermission,
         as: "permissions",
         order: [
-          ["moduleName", "ASC"],
           ["resourceName", "ASC"],
-          ["permLevel", "ASC"],
         ],
       },
     ],
@@ -284,7 +282,7 @@ const getAllRoleProfiles = async ({
         model: Role,
         as: "roles",
         through: { attributes: [] },
-        where: { disabled: false },
+        // where: { disabled: false },
         required: false,
       },
     ],
@@ -307,7 +305,7 @@ const getRoleProfileById = async (id) => {
         model: Role,
         as: "roles",
         through: { attributes: [] },
-        where: { disabled: false },
+        // where: { disabled: false },
         required: false,
       },
     ],
@@ -361,34 +359,49 @@ const deleteRoleProfile = async (id) => {
  * Internal helper — called by createRoleProfile and setRoleProfileRoles.
  */
 const _applyProfileRoles = async (profileId, roleIds, transaction = null) => {
-  // Validate every supplied ID exists and is active
-  const roles = await Role.findAll({
-    where: { id: { [Op.in]: roleIds }, disabled: false },
-  });
-
-  if (roles.length !== roleIds.length) {
-    const foundIds = roles.map((r) => r.id);
-    const bad = roleIds.filter((id) => !foundIds.includes(id));
-    throw new AppError(
-      `Role ID(s) not found or disabled: ${bad.join(", ")}`,
-      422,
-    );
+  // Validate all role IDs exist and are active
+  if (roleIds.length > 0) {
+    const roles = await Role.findAll({
+      where: { id: { [Op.in]: roleIds }, disabled: false },
+    });
+    if (roles.length !== roleIds.length) {
+      const foundIds = roles.map((r) => r.id);
+      const bad = roleIds.filter((id) => !foundIds.includes(id));
+      throw new AppError(`Role ID(s) not found or disabled: ${bad.join(", ")}`, 422);
+    }
   }
 
   const t = transaction ?? (await sequelize.transaction());
   const managed = !transaction;
 
   try {
+    // 1. Remove roles no longer in the list
     await RoleProfileRole.destroy({
-      where: { roleProfileId: profileId },
+      where: {
+        roleProfileId: profileId,
+        roleId: { [Op.notIn]: roleIds.length > 0 ? roleIds : ['__none__'] },
+      },
+      force: true,
       transaction: t,
     });
-    if (roleIds.length) {
+
+    // 2. Get existing role IDs
+    const existing = await RoleProfileRole.findAll({
+      where: { roleProfileId: profileId },
+      attributes: ['roleId'],
+      transaction: t,
+    });
+    const existingIds = existing.map(r => r.roleId);
+
+    // 3. Insert only new ones
+    const newIds = roleIds.filter(id => !existingIds.includes(id));
+    if (newIds.length > 0) {
       await RoleProfileRole.bulkCreate(
-        roleIds.map((roleId) => ({ roleProfileId: profileId, roleId })),
+        newIds.map(roleId => ({ roleProfileId: profileId, roleId })),
         { transaction: t },
       );
     }
+
     if (managed) await t.commit();
   } catch (err) {
     if (managed) await t.rollback();
