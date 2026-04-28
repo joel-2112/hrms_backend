@@ -135,7 +135,60 @@ const createRole = async ({ name, isSystemRole = false }) => {
   const exists = await Role.findOne({ where: { name: trimmed } });
   if (exists) throw new AppError(`Role "${trimmed}" already exists`, 409);
 
-  return Role.create({ name: trimmed, isSystemRole, disabled: false });
+  // ── All resource names — master list ───────────────────────
+  const ALL_RESOURCES = [
+    "Employee", "EmployeeEducation", "EmployeeExternalWork", "EmployeeEmergencyContact",
+    "EmployeeSkillMap", "EmployeeSeparation", "EmployeePromotion", "EmployeeTransfer",
+    "EmployeeOnboarding", "EmployeeHealthInsurance",
+    "LeaveApplication", "LeaveType", "LeavePeriod", "LeaveAllocation", "LeavePolicy",
+    "LeavePolicyAssignment", "LeaveEncashment", "LeaveLedgerEntry", "CompensatoryLeaveRequest",
+    "LeaveBlockList", "HolidayList",
+    "Attendance", "AttendanceRequest", "EmployeeCheckin", "ShiftType", "ShiftAssignment", "ShiftRequest",
+    "SalarySlip", "SalaryStructure", "SalaryComponent", "PayrollEntry", "PayrollPeriod",
+    "IncomeTaxSlab", "AdditionalSalary", "RetentionBonus", "EmployeeIncentive",
+    "StaffingPlan", "JobRequisition", "JobOpening", "JobApplicant", "EmployeeReferral",
+    "Interview", "InterviewFeedback", "JobOffer", "AppointmentLetter",
+    "Appraisal", "AppraisalTemplate", "AppraisalCycle", "Goal", "EmployeePerformanceFeedback",
+    "Role", "RoleProfile", "RolePermission", "UserRole", "UserPermission",
+    "Company", "Branch", "Department", "Designation", "EmploymentType", "EmployeeGrade",
+    "Document", "DocumentType", "DocumentVersion",
+  ];
+
+  const role = await sequelize.transaction(async (t) => {
+    // 1. Create the role
+    const newRole = await Role.create(
+      { name: trimmed, isSystemRole, disabled: false },
+      { transaction: t }
+    );
+
+    // 2. Seed all resources with default (all false) permissions
+    const permissionRows = ALL_RESOURCES.map(resourceName => ({
+      roleId: newRole.id,
+      moduleName: "hr",
+      resourceName,
+      permLevel: 0,
+      canRead: false,
+      canWrite: false,
+      canCreate: false,
+      canDelete: false,
+      canSubmit: false,
+      canCancel: false,
+      canAmend: false,
+      canPrint: false,
+      canEmail: false,
+      canImport: false,
+      canExport: false,
+      canReport: false,
+      canSetPermissions: false,
+    }));
+
+    await RolePermission.bulkCreate(permissionRows, { transaction: t });
+
+    return newRole;
+  });
+
+  invalidateAllCache();
+  return role;
 };
 
 /**
@@ -782,6 +835,50 @@ const assignRolesToUser = async (userId, roleIds) => {
 };
 
 /**
+ * Replace ALL roles for a user atomically.
+ * Removes any roles not in the list, adds any that are new.
+ */
+const setUserRoles = async (userId, roleIds) => {
+  if (!Array.isArray(roleIds)) {
+    throw new AppError("roleIds must be an array", 422);
+  }
+
+  const user = await User.findByPk(userId);
+  if (!user) throw new AppError("User not found", 404);
+
+  // Validate all role IDs if any are provided
+  if (roleIds.length > 0) {
+    const roles = await Role.findAll({
+      where: { id: { [Op.in]: roleIds }, disabled: false },
+    });
+    if (roles.length !== roleIds.length) {
+      const foundIds = roles.map((r) => r.id);
+      const bad = roleIds.filter((id) => !foundIds.includes(id));
+      throw new AppError(
+        `Role ID(s) not found or disabled: ${bad.join(", ")}`,
+        422,
+      );
+    }
+  }
+
+  await sequelize.transaction(async (t) => {
+    // Remove all existing roles for this user
+    await UserRole.destroy({ where: { userId },force: true, transaction: t });
+
+    // Insert the new set
+    if (roleIds.length > 0) {
+      await UserRole.bulkCreate(
+        roleIds.map((roleId) => ({ userId, roleId })),
+        { transaction: t },
+      );
+    }
+  });
+
+  invalidateUserCache(userId);
+  return getUserRoles(userId);
+};
+
+/**
  * Revoke specific roles from a user.
  */
 const revokeRolesFromUser = async (userId, roleIds) => {
@@ -1277,6 +1374,7 @@ module.exports = {
 
   // User ↔ Role
   assignRolesToUser,
+  setUserRoles,
   revokeRolesFromUser,
   getUserRoles,
   getUsersWithRoles,

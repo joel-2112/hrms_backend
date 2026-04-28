@@ -851,6 +851,48 @@ router.post(
 
 /**
  * @swagger
+ * /roles/users/{userId}/roles:
+ *   put:
+ *     summary: Replace all roles for a user
+ *     tags: [UserRoles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [roleIds]
+ *             properties:
+ *               roleIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 description: Complete list of role IDs for the user
+ *     responses:
+ *       200:
+ *         description: Roles updated successfully
+ *       404:
+ *         description: User or role not found
+ */
+router.put(
+  "/users/:userId/roles",
+  authorize("UserRole", action.SET_PERMISSIONS),
+  roleController.setUserRoles,
+);
+
+/**
+ * @swagger
  * /roles/users/{userId}/roles/{roleId}:
  *   delete:
  *     summary: Remove a specific role from a user

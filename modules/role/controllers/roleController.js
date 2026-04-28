@@ -211,6 +211,21 @@ const assignRolesToUser = async (req, res, next) => {
 };
 
 /**
+ * Replace all roles for a user
+ * PUT /roles/users/:userId/roles
+ */
+const setUserRoles = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { roleIds } = req.body;
+    const result = await roleService.setUserRoles(userId, roleIds);
+    ok(res, result.data, 'Roles updated successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Remove a role from a user
  * DELETE /roles/users/:userId/roles/:roleId
  */
@@ -235,6 +250,7 @@ module.exports = {
   deletePermission,
   getUserRoles,
   assignRolesToUser,
+  setUserRoles,
   revokeRoleFromUser,
   getUsersWithRoles,
   getAllResourceNames,
