@@ -652,6 +652,28 @@ const getUserRoles = async (userId, { page = 1, limit = 20 } = {}) => {
 };
 
 /**
+ * List all users with their assigned roles (paginated).
+ */
+const getUsersWithRoles = async ({ page = 1, limit = 20 } = {}) => {  
+  const { limit: lim, offset } = getPaginationOptions({ page, limit });
+  const { count, rows } = await User.findAndCountAll({
+    attributes: { exclude: ['passwordHash'] },
+    include: [{
+      model: Role,
+      as: 'roles',
+      through: { attributes: [] },
+      where: { disabled: false },
+      required: false,
+    }],
+    limit: lim,
+    offset,
+    order: [['createdAt', 'DESC']],
+    distinct: true, 
+  });
+  return { data: rows, meta: buildMeta(count, page, lim) };
+};
+
+/**
  * Assign a role profile to a user.
  * Also grants all active roles within that profile as direct UserRole rows
  * so permission lookups don't need to traverse the profile join.
@@ -1059,6 +1081,7 @@ module.exports = {
   assignRolesToUser,
   revokeRolesFromUser,
   getUserRoles,
+  getUsersWithRoles,
   assignRoleProfileToUser,
   removeRoleProfileFromUser,
   getUserWithRolesAndProfile,

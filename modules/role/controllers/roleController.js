@@ -107,6 +107,23 @@ const getUserRoles = async (req, res, next) => {
 };
 
 /**
+ * get all users with their assigned roles
+ * GET /roles/users/with-roles
+ */
+const getUsersWithRoles = async (req, res, next) => {
+  try {
+    const { page, limit } = req.query;
+    const result = await roleService.getUsersWithRoles({
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20
+    });
+    ok(res, result.data, 'Users with roles fetched successfully', result.meta);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Assign roles to a user
  * POST /roles/users/:userId/roles
  */
@@ -147,5 +164,6 @@ module.exports = {
   getUserRoles,
   assignRolesToUser,
   revokeRoleFromUser,
+  getUsersWithRoles
 
 };

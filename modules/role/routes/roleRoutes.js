@@ -1,11 +1,11 @@
-'use strict';
+"use strict";
 
-const router = require('express').Router();
-const roleController = require('../controllers/roleController');
-const roleProfileController = require('../controllers/roleProfileController');
-const userPermissionController = require('../controllers/userPermissionController');
-const { authenticate } = require('../../../middlewares/authMiddleware');
-const { authorize, action } = require('../../../middlewares/rbacMiddleware');
+const router = require("express").Router();
+const roleController = require("../controllers/roleController");
+const roleProfileController = require("../controllers/roleProfileController");
+const userPermissionController = require("../controllers/userPermissionController");
+const { authenticate } = require("../../../middlewares/authMiddleware");
+const { authorize, action } = require("../../../middlewares/rbacMiddleware");
 
 // All role routes require authentication
 router.use(authenticate);
@@ -87,10 +87,7 @@ router.use(authenticate);
  *       409:
  *         description: Role already exists
  */
-router.post('/', 
-  authorize('Role', action.CREATE), 
-  roleController.createRole
-);
+router.post("/", authorize("Role", action.CREATE), roleController.createRole);
 
 /**
  * @swagger
@@ -151,10 +148,7 @@ router.post('/',
  *                     total:
  *                       type: integer
  */
-router.get('/', 
-  authorize('Role', action.READ), 
-  roleController.getAllRoles
-);
+router.get("/", authorize("Role", action.READ), roleController.getAllRoles);
 
 /**
  * @swagger
@@ -207,10 +201,7 @@ router.get('/',
  *       404:
  *         description: Role not found
  */
-router.get('/:id', 
-  authorize('Role', action.READ), 
-  roleController.getRole
-);
+router.get("/:id", authorize("Role", action.READ), roleController.getRole);
 
 /**
  * @swagger
@@ -250,9 +241,10 @@ router.get('/:id',
  *       404:
  *         description: Role not found
  */
-router.patch('/:id', 
-  authorize('Role', action.WRITE), 
-  roleController.updateRole
+router.patch(
+  "/:id",
+  authorize("Role", action.WRITE),
+  roleController.updateRole,
 );
 
 /**
@@ -279,9 +271,10 @@ router.patch('/:id',
  *       409:
  *         description: Cannot delete - role is in use
  */
-router.delete('/:id', 
-  authorize('Role', action.DELETE), 
-  roleController.deleteRole
+router.delete(
+  "/:id",
+  authorize("Role", action.DELETE),
+  roleController.deleteRole,
 );
 // ══════════════════════════════════════════════
 //  USER ROLE ASSIGNMENT ROUTES
@@ -364,9 +357,124 @@ router.delete('/:id',
  *       404:
  *         description: User not found
  */
-router.get('/users/:userId/roles',
-  authorize('UserRole', action.READ),
-  roleController.getUserRoles
+router.get(
+  "/users/:userId/roles",
+  authorize("UserRole", action.READ),
+  roleController.getUserRoles,
+);
+
+/**
+ * @swagger
+ * /roles/users/with-roles:
+ *   get:
+ *     summary: Get all users with their assigned roles
+ *     tags:
+ *       - UserRoles
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of items per page
+ *     responses:
+ *       200:
+ *         description: Users with roles fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               required:
+ *                 - success
+ *                 - message
+ *                 - data
+ *                 - meta
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Users with roles fetched successfully
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     required:
+ *                       - id
+ *                       - email
+ *                       - roles
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                         example: "b3f9c3d2-1c2a-4a7e-9c8f-123456789abc"
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                         example: user@example.com
+ *                       roles:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           required:
+ *                             - id
+ *                             - name
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                               format: uuid
+ *                               example: "a12b34c5-d678-90ef-1234-56789abcdef0"
+ *                             name:
+ *                               type: string
+ *                               example: HR Manager
+ *                             isSystemRole:
+ *                               type: boolean
+ *                               example: false
+ *                             disabled:
+ *                               type: boolean
+ *                               example: false
+ *                 meta:
+ *                   type: object
+ *                   required:
+ *                     - total
+ *                     - page
+ *                     - limit
+ *                     - totalPages
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       example: 100
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 20
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 5
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: No users found
+ */
+router.get(
+  "/users/with-roles",
+  authorize("UserRole", action.READ),
+  roleController.getUsersWithRoles
 );
 
 /**
@@ -439,9 +547,10 @@ router.get('/users/:userId/roles',
  *       409:
  *         description: Role already assigned to user
  */
-router.post('/users/:userId/roles',
-  authorize('UserRole', action.SET_PERMISSIONS),
-  roleController.assignRolesToUser
+router.post(
+  "/users/:userId/roles",
+  authorize("UserRole", action.SET_PERMISSIONS),
+  roleController.assignRolesToUser,
 );
 
 /**
@@ -479,9 +588,10 @@ router.post('/users/:userId/roles',
  *       404:
  *         description: User or role assignment not found
  */
-router.delete('/users/:userId/roles/:roleId',
-  authorize('UserRole', action.SET_PERMISSIONS),
-  roleController.revokeRoleFromUser
+router.delete(
+  "/users/:userId/roles/:roleId",
+  authorize("UserRole", action.SET_PERMISSIONS),
+  roleController.revokeRoleFromUser,
 );
 
 // ══════════════════════════════════════════════
@@ -568,9 +678,10 @@ router.delete('/users/:userId/roles/:roleId',
  *                     totalPages:
  *                       type: integer
  */
-router.get('/:id/permissions', 
-  authorize('Role', action.READ), 
-  roleController.getRolePermissions
+router.get(
+  "/:id/permissions",
+  authorize("Role", action.READ),
+  roleController.getRolePermissions,
 );
 
 /**
@@ -710,9 +821,10 @@ router.get('/:id/permissions',
  *       404:
  *         description: Role not found
  */
-router.put('/:id/permissions', 
-  authorize('Role', action.SET_PERMISSIONS), 
-  roleController.upsertPermission
+router.put(
+  "/:id/permissions",
+  authorize("Role", action.SET_PERMISSIONS),
+  roleController.upsertPermission,
 );
 
 /**
@@ -744,9 +856,10 @@ router.put('/:id/permissions',
  *       404:
  *         description: Role or permission not found
  */
-router.delete('/:id/permissions/:permissionId', 
-  authorize('Role', action.SET_PERMISSIONS), 
-  roleController.deletePermission
+router.delete(
+  "/:id/permissions/:permissionId",
+  authorize("Role", action.SET_PERMISSIONS),
+  roleController.deletePermission,
 );
 
 // ══════════════════════════════════════════════
@@ -788,9 +901,10 @@ router.delete('/:id/permissions/:permissionId',
  *       409:
  *         description: Profile name already exists
  */
-router.post('/profiles', 
-  authorize('RoleProfile', action.CREAwTE), 
-  roleProfileController.createRoleProfile
+router.post(
+  "/profiles",
+  authorize("RoleProfile", action.CREAwTE),
+  roleProfileController.createRoleProfile,
 );
 
 /**
@@ -836,9 +950,10 @@ router.post('/profiles',
  *                           disabled:
  *                             type: boolean
  */
-router.get('/profiles', 
-  authorize('RoleProfile', action.READ), 
-  roleProfileController.getAllRoleProfiles
+router.get(
+  "/profiles",
+  authorize("RoleProfile", action.READ),
+  roleProfileController.getAllRoleProfiles,
 );
 
 /**
@@ -863,9 +978,10 @@ router.get('/profiles',
  *       404:
  *         description: Role profile not found
  */
-router.get('/profiles/:id', 
-  authorize('RoleProfile', action.READ), 
-  roleProfileController.getRoleProfile
+router.get(
+  "/profiles/:id",
+  authorize("RoleProfile", action.READ),
+  roleProfileController.getRoleProfile,
 );
 
 /**
@@ -904,9 +1020,10 @@ router.get('/profiles/:id',
  *       404:
  *         description: Role profile not found
  */
-router.patch('/profiles/:id', 
-  authorize('RoleProfile', action.WRITE), 
-  roleProfileController.updateRoleProfile
+router.patch(
+  "/profiles/:id",
+  authorize("RoleProfile", action.WRITE),
+  roleProfileController.updateRoleProfile,
 );
 
 /**
@@ -933,9 +1050,10 @@ router.patch('/profiles/:id',
  *       409:
  *         description: Cannot delete - profile is assigned to users
  */
-router.delete('/profiles/:id', 
-  authorize('RoleProfile', action.DELETE), 
-  roleProfileController.deleteRoleProfile
+router.delete(
+  "/profiles/:id",
+  authorize("RoleProfile", action.DELETE),
+  roleProfileController.deleteRoleProfile,
 );
 
 /**
@@ -975,9 +1093,10 @@ router.delete('/profiles/:id',
  *       404:
  *         description: Role profile not found
  */
-router.put('/profiles/:id/roles', 
-  authorize('RoleProfile', action.WRITE), 
-  roleProfileController.setProfileRoles
+router.put(
+  "/profiles/:id/roles",
+  authorize("RoleProfile", action.WRITE),
+  roleProfileController.setProfileRoles,
 );
 
 // ══════════════════════════════════════════════
@@ -1031,9 +1150,10 @@ router.put('/profiles/:id/roles',
  *                           effect:
  *                             type: string
  */
-router.get('/users/:userId/permissions', 
-  authorize('UserPermission', action.READ), 
-  userPermissionController.getUserPermissions
+router.get(
+  "/users/:userId/permissions",
+  authorize("UserPermission", action.READ),
+  userPermissionController.getUserPermissions,
 );
 
 /**
@@ -1083,9 +1203,10 @@ router.get('/users/:userId/permissions',
  *       400:
  *         description: Invalid permission data
  */
-router.post('/users/:userId/permissions', 
-  authorize('UserPermission', action.SET_PERMISSIONS), 
-  userPermissionController.addUserPermission
+router.post(
+  "/users/:userId/permissions",
+  authorize("UserPermission", action.SET_PERMISSIONS),
+  userPermissionController.addUserPermission,
 );
 
 /**
@@ -1134,9 +1255,10 @@ router.post('/users/:userId/permissions',
  *       200:
  *         description: Permissions replaced successfully
  */
-router.put('/users/:userId/permissions', 
-  authorize('UserPermission', action.SET_PERMISSIONS), 
-  userPermissionController.replaceUserPermissions
+router.put(
+  "/users/:userId/permissions",
+  authorize("UserPermission", action.SET_PERMISSIONS),
+  userPermissionController.replaceUserPermissions,
 );
 
 /**
@@ -1168,9 +1290,10 @@ router.put('/users/:userId/permissions',
  *       404:
  *         description: Permission not found
  */
-router.delete('/users/:userId/permissions/:permissionId', 
-  authorize('UserPermission', action.SET_PERMISSIONS), 
-  userPermissionController.deleteUserPermission
+router.delete(
+  "/users/:userId/permissions/:permissionId",
+  authorize("UserPermission", action.SET_PERMISSIONS),
+  userPermissionController.deleteUserPermission,
 );
 
 /**
@@ -1224,9 +1347,10 @@ router.delete('/users/:userId/permissions/:permissionId',
  *                           effect:
  *                             type: string
  */
-router.get('/users/:userId/effective-permissions', 
-  authorize('UserPermission', action.READ), 
-  userPermissionController.getUserEffectivePermissions
+router.get(
+  "/users/:userId/effective-permissions",
+  authorize("UserPermission", action.READ),
+  userPermissionController.getUserEffectivePermissions,
 );
 
 module.exports = router;
