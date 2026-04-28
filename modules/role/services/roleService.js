@@ -560,6 +560,168 @@ const getRolePermissions = async (roleId, { page = 1, limit = 20 } = {}) => {
 };
 
 /**
+ * Get all distinct resource names across all permission rules.
+ * Used by the frontend for the resource search/autocomplete dropdown.
+ */
+const getAllResourceNames = async () => {
+  const resources = await RolePermission.findAll({
+    attributes: ['resourceName'],
+    group: ['resourceName'],
+    order: [['resourceName', 'ASC']],
+  });
+
+  return resources.map(r => r.resourceName);
+};
+
+/**
+ * Get permissions with combined resource and role filters.
+ * Used by the frontend permission matrix table.
+ * 
+ * @param {object} filters
+ * @param {string} [filters.resourceName] - Filter by resource name
+ * @param {string} [filters.roleName]     - Filter by role name
+ * @param {string} [filters.roleId]       - Filter by role ID
+ * @param {number} [filters.page]         - Page number
+ * @param {number} [filters.limit]        - Items per page
+ */
+const getFilteredPermissions = async ({
+  resourceName,
+  roleName,
+  roleId,
+  page = 1,
+  limit = 50,
+} = {}) => {
+  const where = {};
+  
+  // Build role filter
+  let roleWhere = {};
+  if (roleId) {
+    roleWhere.id = roleId;
+  } else if (roleName) {
+    roleWhere.name = { [Op.iLike]: `%${roleName}%` };
+  }
+
+  // Build permission filter
+  if (resourceName) {
+    where.resourceName = resourceName;
+  }
+
+  // Find matching roles
+  const roles = await Role.findAll({
+    where: roleWhere,
+    attributes: ['id', 'name'],
+    order: [['name', 'ASC']],
+  });
+
+  // For each matching role, get its permissions filtered by resource
+  const results = await Promise.all(
+    roles.map(async (role) => {
+      const permissions = await RolePermission.findAll({
+        where: {
+          roleId: role.id,
+          ...where,
+        },
+        order: [
+          ['permLevel', 'ASC'],
+        ],
+      });
+
+      return permissions.map(perm => ({
+        documentType: `${perm.moduleName} / ${perm.resourceName}`,
+        resourceName: perm.resourceName,
+        moduleName: perm.moduleName,
+        role: role.name,
+        roleId: role.id,
+        level: perm.permLevel,
+        canRead: perm.canRead,
+        canWrite: perm.canWrite,
+        canCreate: perm.canCreate,
+        canDelete: perm.canDelete,
+        canSubmit: perm.canSubmit,
+        canCancel: perm.canCancel,
+        canAmend: perm.canAmend,
+        canPrint: perm.canPrint,
+        canEmail: perm.canEmail,
+        canReport: perm.canReport,
+        canImport: perm.canImport,
+        canExport: perm.canExport,
+        canSetPermissions: perm.canSetPermissions,
+        permissionId: perm.id,
+      }));
+    })
+  );
+
+  // Flatten and paginate
+  const flatResults = results.flat();
+  const total = flatResults.length;
+  const totalPages = Math.ceil(total / limit);
+  const offset = (page - 1) * limit;
+  const paginatedResults = flatResults.slice(offset, offset + limit);
+
+  return {
+    data: paginatedResults,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrevious: page > 1,
+    },
+  };
+};
+
+/**
+ * Get all permission rules for a specific resource across all roles.
+ * Used to see "who has what access" to a given resource.
+ */
+const getPermissionsByResource = async (resourceName) => {
+  const permissions = await RolePermission.findAll({
+    where: { resourceName },
+    include: [
+      {
+        model: Role,
+        as: 'role',
+        attributes: ['id', 'name', 'disabled'],
+        where: { disabled: false },
+        required: true,
+      },
+    ],
+    order: [
+      [{ model: Role, as: 'role' }, 'name', 'ASC'],
+      ['permLevel', 'ASC'],
+    ],
+  });
+
+  return permissions.map(perm => ({
+    documentType: `${perm.moduleName} / ${perm.resourceName}`,
+    resourceName: perm.resourceName,
+    moduleName: perm.moduleName,
+    role: perm.role?.name || 'Unknown',
+    roleId: perm.roleId,
+    level: perm.permLevel,
+    canRead: perm.canRead,
+    canWrite: perm.canWrite,
+    canCreate: perm.canCreate,
+    canDelete: perm.canDelete,
+    canSubmit: perm.canSubmit,
+    canCancel: perm.canCancel,
+    canAmend: perm.canAmend,
+    canPrint: perm.canPrint,
+    canEmail: perm.canEmail,
+    canReport: perm.canReport,
+    canImport: perm.canImport,
+    canExport: perm.canExport,
+    canSetPermissions: perm.canSetPermissions,
+    permissionId: perm.id,
+  }));
+};
+
+
+
+
+
+/**
  * Delete a single permission rule by its own PK.
  */
 const deleteRolePermission = async (permissionId) => {
@@ -1076,6 +1238,9 @@ module.exports = {
   batchUpsertRolePermissions,
   getRolePermissions,
   deleteRolePermission,
+  getAllResourceNames,
+  getFilteredPermissions,
+  getPermissionsByResource,
 
   // User ↔ Role
   assignRolesToUser,

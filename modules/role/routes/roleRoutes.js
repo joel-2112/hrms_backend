@@ -27,6 +27,254 @@ router.use(authenticate);
  *     description: User permissions - Record-level access control
  */
 
+
+
+// ══════════════════════════════════════════════
+//  PERMISSION MANAGEMENT (frontend matrix)
+// ══════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /roles/permissions/resources:
+ *   get:
+ *     summary: Get all distinct resource names
+ *     description: Returns a flat array of resource names for the frontend suggestion dropdown
+ *     tags: [RolePermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Optional filter by resource name
+ *     responses:
+ *       200:
+ *         description: Resource names fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: ["Employee", "LeaveApplication", "SalarySlip"]
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ */
+router.get(
+  '/permissions/resources',
+  authorize('RolePermission', action.READ),
+  roleController.getAllResourceNames
+);
+
+/**
+ * @swagger
+ * /roles/permissions:
+ *   get:
+ *     summary: Get filtered permissions for the permission matrix table
+ *     description: >
+ *       Returns permission rows filtered by resource name and/or role.
+ *       Both filters are optional. Used by the frontend permission management
+ *       screen with two search fields (resource + role).
+ *     tags: [RolePermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: resourceName
+ *         schema:
+ *           type: string
+ *         description: Filter by resource name (e.g. LeaveApplication)
+ *       - in: query
+ *         name: roleName
+ *         schema:
+ *           type: string
+ *         description: Filter by role name — partial match (e.g. "HR")
+ *       - in: query
+ *         name: roleId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by exact role ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *     responses:
+ *       200:
+ *         description: Filtered permissions fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       documentType:
+ *                         type: string
+ *                         example: "hr / LeaveApplication"
+ *                       resourceName:
+ *                         type: string
+ *                       moduleName:
+ *                         type: string
+ *                       role:
+ *                         type: string
+ *                         example: "HR User"
+ *                       roleId:
+ *                         type: string
+ *                         format: uuid
+ *                       level:
+ *                         type: integer
+ *                       canRead:
+ *                         type: boolean
+ *                       canWrite:
+ *                         type: boolean
+ *                       canCreate:
+ *                         type: boolean
+ *                       canDelete:
+ *                         type: boolean
+ *                       canSubmit:
+ *                         type: boolean
+ *                       canCancel:
+ *                         type: boolean
+ *                       canAmend:
+ *                         type: boolean
+ *                       canPrint:
+ *                         type: boolean
+ *                       canEmail:
+ *                         type: boolean
+ *                       canReport:
+ *                         type: boolean
+ *                       canImport:
+ *                         type: boolean
+ *                       canExport:
+ *                         type: boolean
+ *                       canSetPermissions:
+ *                         type: boolean
+ *                       permissionId:
+ *                         type: string
+ *                         format: uuid
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ */
+router.get(
+  '/permissions',
+  authorize('RolePermission', action.READ),
+  roleController.getFilteredPermissions
+);
+
+/**
+ * @swagger
+ * /roles/permissions/by-resource/{resourceName}:
+ *   get:
+ *     summary: Get all permission rules for a specific resource across all roles
+ *     description: >
+ *       Returns every role's permissions for one resource.
+ *       Used to see "who has what access" to a given resource.
+ *     tags: [RolePermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: resourceName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Resource name (e.g. LeaveApplication, Employee)
+ *     responses:
+ *       200:
+ *         description: Permissions for the resource fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       resourceName:
+ *                         type: string
+ *                       role:
+ *                         type: string
+ *                       roleId:
+ *                         type: string
+ *                         format: uuid
+ *                       level:
+ *                         type: integer
+ *                       canRead:
+ *                         type: boolean
+ *                       canWrite:
+ *                         type: boolean
+ *                       canCreate:
+ *                         type: boolean
+ *                       canDelete:
+ *                         type: boolean
+ *                       canSubmit:
+ *                         type: boolean
+ *                       canCancel:
+ *                         type: boolean
+ *                       canAmend:
+ *                         type: boolean
+ *                       canPrint:
+ *                         type: boolean
+ *                       canEmail:
+ *                         type: boolean
+ *                       canReport:
+ *                         type: boolean
+ *                       canImport:
+ *                         type: boolean
+ *                       canExport:
+ *                         type: boolean
+ *                       canSetPermissions:
+ *                         type: boolean
+ *                       permissionId:
+ *                         type: string
+ *                         format: uuid
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ */
+router.get(
+  '/permissions/by-resource/:resourceName',
+  authorize('RolePermission', action.READ),
+  roleController.getPermissionsByResource
+);
 // ══════════════════════════════════════════════
 //  ROLE CRUD
 // ══════════════════════════════════════════════
@@ -861,6 +1109,8 @@ router.delete(
   authorize("Role", action.SET_PERMISSIONS),
   roleController.deletePermission,
 );
+
+
 
 // ══════════════════════════════════════════════
 //  ROLE PROFILE ROUTES

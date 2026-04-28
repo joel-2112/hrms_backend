@@ -2,6 +2,9 @@
 
 const roleService = require('../services/roleService');
 const { ok, created, noContent, notFound, conflict, unprocessable } = require('../../../utils/response');
+const { catchAsync } = require('../../../utils/catchAsync');
+
+
 
 const createRole = async (req, res, next) => {
   try {
@@ -86,7 +89,76 @@ const deletePermission = async (req, res, next) => {
   }
 };
 
-// Add after the existing functions (before module.exports)
+/**
+ * GET /api/roles/permissions/resources
+ *
+ * Returns a flat array of distinct resource names across all permission rules.
+ * Used by the frontend for the "Resource" search/autocomplete dropdown.
+ *
+ * Query: ?search=Leave  (optional client-side filter)
+ */
+const getAllResourceNames = catchAsync(async (req, res) => {
+  const resourceNames = await roleService.getAllResourceNames();
+
+  const { search } = req.query;
+  let filtered = resourceNames;
+  if (search) {
+    const term = search.toLowerCase();
+    filtered = resourceNames.filter(name => name.toLowerCase().includes(term));
+  }
+
+  ok(res, {
+    message: 'Resource names fetched successfully',
+    data: filtered,
+    meta: { total: filtered.length },
+  });
+});
+
+
+/**
+ * GET /api/roles/permissions
+ *
+ * Returns permission rows filtered by resource name and/or role.
+ * Both filters are optional.
+ *
+ * Query: ?resourceName=LeaveApplication&roleName=HR User&roleId=uuid&page=1&limit=50
+ */
+const getFilteredPermissions = catchAsync(async (req, res) => {
+  const { resourceName, roleName, roleId, page, limit } = req.query;
+
+  const result = await roleService.getFilteredPermissions({
+    resourceName,
+    roleName,
+    roleId,
+    page: page ? parseInt(page, 10) : 1,
+    limit: limit ? parseInt(limit, 10) : 50,
+  });
+
+  ok(res, {
+    message: 'Permissions fetched successfully',
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+
+/**
+ * GET /api/roles/permissions/by-resource/:resourceName
+ *
+ * Returns all permission rules for a specific resource across all active roles.
+ */
+const getPermissionsByResource = catchAsync(async (req, res) => {
+  const { resourceName } = req.params;
+
+  const permissions = await roleService.getPermissionsByResource(resourceName);
+
+  ok(res, {
+    message: `Permissions for "${resourceName}" fetched successfully`,
+    data: permissions,
+    meta: { total: permissions.length },
+  });
+});
+
 
 /**
  * Get all roles assigned to a user
@@ -164,6 +236,9 @@ module.exports = {
   getUserRoles,
   assignRolesToUser,
   revokeRoleFromUser,
-  getUsersWithRoles
+  getUsersWithRoles,
+  getAllResourceNames,
+  getFilteredPermissions,
+  getPermissionsByResource
 
 };

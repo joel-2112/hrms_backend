@@ -94,11 +94,11 @@ router.post('/register', authController.register);
  *               email:
  *                 type: string
  *                 format: email
- *                 example: aisha.mensah@company.com
+ *                 example: eyuel@gmail.com
  *               password:
  *                 type: string
  *                 format: password
- *                 example: StrongPass@123
+ *                 example: 1Q0p2#9o
  *     responses:
  *       200:
  *         description: Login successful — token set in HTTP-only cookie
