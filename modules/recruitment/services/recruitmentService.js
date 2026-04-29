@@ -260,9 +260,9 @@ const enrichPlanDetails = async (planDetails, companyId, departmentId) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  PHASE 1 — STAFFING PLAN
 // ════════════════════════════════════════════════════════════════════════════
-
 /**
  * List staffing plans with pagination and filters.
+ * Enriches planDetails with LIVE headcount on every read.
  */
 const getStaffingPlans = async ({ companyId, docStatus, page, limit } = {}) => {
   const where = {};
@@ -277,15 +277,32 @@ const getStaffingPlans = async ({ companyId, docStatus, page, limit } = {}) => {
     offset,
     order: [['createdAt', 'DESC']],
     include: [
-     { model: Company, as: 'company', attributes: ['id', 'name'] },
-     { model: Department, as: 'department', attributes: ['id', 'name'], required: false },
+      { model: Company, as: 'company', attributes: ['id', 'name'] },
+      { model: Department, as: 'department', attributes: ['id', 'name'], required: false },
     ],
   });
-  return { data: rows, meta: buildMeta(count, page || 1, lim) };
-};
 
+  // ── Reuse existing helper for live headcount ──────────────────
+  const enrichedRows = await Promise.all(
+    rows.map(async (plan) => {
+      if (!plan.planDetails?.length) return plan;
+
+      const { enrichedDetails, totalEstimatedBudget } = await enrichPlanDetails(
+        plan.planDetails,
+        plan.companyId,
+        plan.departmentId,
+      );
+
+      plan.setDataValue('planDetails', enrichedDetails);
+      plan.setDataValue('totalEstimatedBudget', totalEstimatedBudget);
+      return plan;
+    })
+  );
+
+  return { data: enrichedRows, meta: buildMeta(count, page || 1, lim) };
+};
 /**
- * Get single staffing plan by ID.
+ * Get single staffing plan by ID with live headcount.
  */
 const getStaffingPlanById = async (id) => {
   const plan = await StaffingPlan.findByPk(id, {
@@ -295,6 +312,19 @@ const getStaffingPlanById = async (id) => {
     ],
   });
   if (!plan) throw new AppError('Staffing plan not found', 404);
+
+  // ── Reuse existing helper for live headcount ──────────────────
+  if (plan.planDetails?.length) {
+    const { enrichedDetails, totalEstimatedBudget } = await enrichPlanDetails(
+      plan.planDetails,
+      plan.companyId,
+      plan.departmentId,
+    );
+
+    plan.setDataValue('planDetails', enrichedDetails);
+    plan.setDataValue('totalEstimatedBudget', totalEstimatedBudget);
+  }
+
   return plan;
 };
 
