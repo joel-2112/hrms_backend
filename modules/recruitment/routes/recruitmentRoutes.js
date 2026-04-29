@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 /**
  * modules/recruitment/routes/recruitmentRoutes.js
@@ -14,10 +14,10 @@
  * All other routes require a valid JWT + role permission.
  */
 
-const express                  = require('express');
-const recruitmentController                        = require('../controllers/recruitmentController');
-const { authenticate }         = require('../../../middlewares/authMiddleware');
-const { authorize }            = require('../../../middlewares/rbacMiddleware');
+const express = require("express");
+const recruitmentController = require("../controllers/recruitmentController");
+const { authenticate } = require("../../../middlewares/authMiddleware");
+const { authorize } = require("../../../middlewares/rbacMiddleware");
 
 const router = express.Router();
 
@@ -37,7 +37,6 @@ const router = express.Router();
 //  ALL ROUTES BELOW REQUIRE AUTHENTICATION
 // ─────────────────────────────────────────────
 router.use(authenticate);
-
 
 // ══════════════════════════════════════════════
 //  STAFFING PLAN  —  /recruitment/staffing-plans
@@ -119,9 +118,15 @@ router.use(authenticate);
  *         description: Validation error — missing required fields or invalid dates
  */
 router
-  .route('/staffing-plans')
-  .get(authorize('recruitment', 'StaffingPlan', 'canRead'),   recruitmentController.listStaffingPlans)
-  .post(authorize('recruitment', 'StaffingPlan', 'canCreate'), recruitmentController.createStaffingPlan);
+  .route("/staffing-plans")
+  .get(
+    authorize("recruitment", "StaffingPlan", "canRead"),
+    recruitmentController.listStaffingPlans,
+  )
+  .post(
+    authorize("recruitment", "StaffingPlan", "canCreate"),
+    recruitmentController.createStaffingPlan,
+  );
 
 /**
  * @swagger
@@ -143,8 +148,49 @@ router
  *         description: Staffing plan not found
  */
 router
-  .route('/staffing-plans/:id')
-  .get(authorize('recruitment', 'StaffingPlan', 'canRead'), recruitmentController.getStaffingPlan);
+  .route("/staffing-plans/:id")
+  .get(
+    authorize("recruitment", "StaffingPlan", "canRead"),
+    recruitmentController.getStaffingPlan,
+  );
+
+/**
+ * @swagger
+ * /recruitment/staffing-plans/{id}:
+ *   patch:
+ *     summary: Update a staffing plan (only allowed in Draft status)
+ *     tags: [Recruitment]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *             example:
+ *               name: "Updated Plan Name"
+ *     responses:
+ *       200:
+ *         description: Staffing plan updated successfully
+ *       422:
+ *         description: Only Draft plans can be updated
+ */
+router.patch(
+  "/staffing-plans/:id",
+  authorize("recruitment", "StaffingPlan", "canWrite"),
+  recruitmentController.updateStaffingPlan,
+);
 
 /**
  * @swagger
@@ -166,8 +212,8 @@ router
  *         description: Only Draft plans can be submitted
  */
 router.put(
-  '/staffing-plans/:id/submit',
-  authorize('recruitment', 'StaffingPlan', 'canSubmit'),
+  "/staffing-plans/:id/submit",
+  authorize("recruitment", "StaffingPlan", "canSubmit"),
   recruitmentController.submitStaffingPlan,
 );
 
@@ -191,11 +237,10 @@ router.put(
  *         description: Only submitted plans can be approved
  */
 router.put(
-  '/staffing-plans/:id/approve',
-  authorize('recruitment', 'StaffingPlan', 'canSubmit'),
+  "/staffing-plans/:id/approve",
+  authorize("recruitment", "StaffingPlan", "canSubmit"),
   recruitmentController.approveStaffingPlan,
 );
-
 
 // ══════════════════════════════════════════════
 //  JOB REQUISITION  —  /recruitment/job-requisitions
@@ -287,9 +332,15 @@ router.put(
  *         description: Missing required fields
  */
 router
-  .route('/job-requisitions')
-  .get(authorize('recruitment', 'JobRequisition', 'canRead'),   recruitmentController.listJobRequisitions)
-  .post(authorize('recruitment', 'JobRequisition', 'canCreate'), recruitmentController.createJobRequisition);
+  .route("/job-requisitions")
+  .get(
+    authorize("recruitment", "JobRequisition", "canRead"),
+    recruitmentController.listJobRequisitions,
+  )
+  .post(
+    authorize("recruitment", "JobRequisition", "canCreate"),
+    recruitmentController.createJobRequisition,
+  );
 
 /**
  * @swagger
@@ -311,8 +362,11 @@ router
  *         description: Job requisition not found
  */
 router
-  .route('/job-requisitions/:id')
-  .get(authorize('recruitment', 'JobRequisition', 'canRead'), recruitmentController.getJobRequisition);
+  .route("/job-requisitions/:id")
+  .get(
+    authorize("recruitment", "JobRequisition", "canRead"),
+    recruitmentController.getJobRequisition,
+  );
 
 /**
  * @swagger
@@ -336,8 +390,8 @@ router
  *         description: Only Draft requisitions can be submitted
  */
 router.put(
-  '/job-requisitions/:id/submit',
-  authorize('recruitment', 'JobRequisition', 'canSubmit'),
+  "/job-requisitions/:id/submit",
+  authorize("recruitment", "JobRequisition", "canSubmit"),
   recruitmentController.submitJobRequisition,
 );
 
@@ -369,8 +423,8 @@ router.put(
  *         description: Requisition is not pending HR review
  */
 router.put(
-  '/job-requisitions/:id/approve-hr',
-  authorize('recruitment', 'JobRequisition', 'canWrite'),
+  "/job-requisitions/:id/approve-hr",
+  authorize("recruitment", "JobRequisition", "canWrite"),
   recruitmentController.approveHRRequisition,
 );
 
@@ -404,8 +458,8 @@ router.put(
  *         description: reason is required / requisition not pending HR review
  */
 router.put(
-  '/job-requisitions/:id/reject-hr',
-  authorize('recruitment', 'JobRequisition', 'canWrite'),
+  "/job-requisitions/:id/reject-hr",
+  authorize("recruitment", "JobRequisition", "canWrite"),
   recruitmentController.rejectHRRequisition,
 );
 
@@ -437,8 +491,8 @@ router.put(
  *         description: Requisition is not pending GM review
  */
 router.put(
-  '/job-requisitions/:id/approve-gm',
-  authorize('recruitment', 'JobRequisition', 'canWrite'),
+  "/job-requisitions/:id/approve-gm",
+  authorize("recruitment", "JobRequisition", "canWrite"),
   recruitmentController.approveGMRequisition,
 );
 
@@ -472,10 +526,9 @@ router.put(
  *         description: reason is required / requisition not pending GM review
  */
 router.put(
-  '/job-requisitions/:id/reject-gm',
-  authorize('recruitment', 'JobRequisition', 'canWrite'),
+  "/job-requisitions/:id/reject-gm",
+  authorize("recruitment", "JobRequisition", "canWrite"),
   recruitmentController.rejectGMRequisition,
 );
-
 
 module.exports = router;

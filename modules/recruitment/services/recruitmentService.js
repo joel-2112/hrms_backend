@@ -371,6 +371,8 @@ const approveStaffingPlan = async (id, gmUserId) => {
   const plan = await getStaffingPlanById(id);
   if (plan.docStatus !== 1) throw new AppError('Only submitted plans can be approved', 422);
 
+  await plan.update({ docStatus: 2 });  // 2 = Active
+
   logger.info('StaffingPlan approved', { planId: id, gmUserId });
   return plan;
 };

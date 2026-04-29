@@ -29,6 +29,11 @@ const getStaffingPlan = catchAsync(async (req, res) => {
   ok(res, plan, 'Staffing plan fetched successfully');
 });
 
+const updateStaffingPlan = catchAsync(async (req, res) => {
+  const plan = await recruitmentService.updateStaffingPlan(req.params.id, req.body);
+  ok(res, plan, 'Staffing plan updated successfully');
+});
+
 const submitStaffingPlan = catchAsync(async (req, res) => {
   const plan = await recruitmentService.submitStaffingPlan(req.params.id);
   ok(res, plan, 'Staffing plan submitted successfully');
@@ -124,6 +129,7 @@ module.exports = {
   getStaffingPlan,
   submitStaffingPlan,
   approveStaffingPlan,
+  updateStaffingPlan,
 
   // Job Requisition
   listJobRequisitions,
