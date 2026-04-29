@@ -559,7 +559,7 @@ const rejectHRRequisition = async (id, userId, reason) => {
  */
 const approveGMRequisition = async (id, userId, remarks = null) => {
   const requisition = await JobRequisition.findByPk(id, {
-    include: [{ model: Designation, attributes: ['id', 'name'] }],
+    include: [{ model: Designation, as: 'designation', attributes: ['id', 'name'] }],
   });
   if (!requisition) throw new AppError('Job requisition not found', 404);
   if (requisition.overallStatus !== 'Pending GM Review') {

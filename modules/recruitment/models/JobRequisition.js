@@ -11,7 +11,6 @@ module.exports = (sequelize, DataTypes) => {
     requisitionNumber: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      // ❌ REMOVED:
       comment: 'Auto-generated e.g., REQ-2025-001',
     },
 

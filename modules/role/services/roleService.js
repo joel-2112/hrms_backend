@@ -137,32 +137,65 @@ const createRole = async ({ name, isSystemRole = false }) => {
 
   // ── All resource names — master list ───────────────────────
   const ALL_RESOURCES = [
-    "Employee", "EmployeeEducation", "EmployeeExternalWork", "EmployeeEmergencyContact",
-    "EmployeeSkillMap", "EmployeeSeparation", "EmployeePromotion", "EmployeeTransfer",
-    "EmployeeOnboarding", "EmployeeHealthInsurance",
-    "LeaveApplication", "LeaveType", "LeavePeriod", "LeaveAllocation", "LeavePolicy",
-    "LeavePolicyAssignment", "LeaveEncashment", "LeaveLedgerEntry", "CompensatoryLeaveRequest",
-    "LeaveBlockList", "HolidayList",
-    "Attendance", "AttendanceRequest", "EmployeeCheckin", "ShiftType", "ShiftAssignment", "ShiftRequest",
-    "SalarySlip", "SalaryStructure", "SalaryComponent", "PayrollEntry", "PayrollPeriod",
-    "IncomeTaxSlab", "AdditionalSalary", "RetentionBonus", "EmployeeIncentive",
-    "StaffingPlan", "JobRequisition", "JobOpening", "JobApplicant", "EmployeeReferral",
-    "Interview", "InterviewFeedback", "JobOffer", "AppointmentLetter",
-    "Appraisal", "AppraisalTemplate", "AppraisalCycle", "Goal", "EmployeePerformanceFeedback",
-    "Role", "RoleProfile", "RolePermission", "UserRole", "UserPermission",
-    "Company", "Branch", "Department", "Designation", "EmploymentType", "EmployeeGrade",
-    "Document", "DocumentType", "DocumentVersion",
+    "Employee",
+    "EmployeeEducation",
+    "EmployeeExternalWork",
+    "EmployeeEmergencyContact",
+    "EmployeeSkillMap",
+    "EmployeeSeparation",
+    "EmployeePromotion",
+    "LeaveApplication",
+    "LeaveType",
+    "LeavePeriod",
+    "LeaveAllocation",
+    "LeavePolicy",
+    "LeavePolicyAssignment",
+    "LeaveEncashment",
+    "LeaveLedgerEntry",
+    "CompensatoryLeaveRequest",
+    "LeaveBlockList",
+    "HolidayList",
+    "SalarySlip",
+    "SalaryStructure",
+    "SalaryComponent",
+    "PayrollEntry",
+    "PayrollPeriod",
+    "IncomeTaxSlab",
+    "AdditionalSalary",
+    "RetentionBonus",
+    "EmployeeIncentive",
+    "StaffingPlan",
+    "JobRequisition",
+    "Appraisal",
+    "AppraisalTemplate",
+    "AppraisalCycle",
+    "Goal",
+    "EmployeePerformanceFeedback",
+    "Role",
+    "RoleProfile",
+    "RolePermission",
+    "UserRole",
+    "UserPermission",
+    "Company",
+    "Branch",
+    "Department",
+    "Designation",
+    "EmploymentType",
+    "EmployeeGrade",
+    "Document",
+    "DocumentType",
+    "DocumentVersion",
   ];
 
   const role = await sequelize.transaction(async (t) => {
     // 1. Create the role
     const newRole = await Role.create(
       { name: trimmed, isSystemRole, disabled: false },
-      { transaction: t }
+      { transaction: t },
     );
 
     // 2. Seed all resources with default (all false) permissions
-    const permissionRows = ALL_RESOURCES.map(resourceName => ({
+    const permissionRows = ALL_RESOURCES.map((resourceName) => ({
       roleId: newRole.id,
       moduleName: "hr",
       resourceName,
@@ -221,9 +254,7 @@ const getRoleById = async (id) => {
       {
         model: RolePermission,
         as: "permissions",
-        order: [
-          ["resourceName", "ASC"],
-        ],
+        order: [["resourceName", "ASC"]],
       },
     ],
   });
@@ -420,7 +451,10 @@ const _applyProfileRoles = async (profileId, roleIds, transaction = null) => {
     if (roles.length !== roleIds.length) {
       const foundIds = roles.map((r) => r.id);
       const bad = roleIds.filter((id) => !foundIds.includes(id));
-      throw new AppError(`Role ID(s) not found or disabled: ${bad.join(", ")}`, 422);
+      throw new AppError(
+        `Role ID(s) not found or disabled: ${bad.join(", ")}`,
+        422,
+      );
     }
   }
 
@@ -432,7 +466,7 @@ const _applyProfileRoles = async (profileId, roleIds, transaction = null) => {
     await RoleProfileRole.destroy({
       where: {
         roleProfileId: profileId,
-        roleId: { [Op.notIn]: roleIds.length > 0 ? roleIds : ['__none__'] },
+        roleId: { [Op.notIn]: roleIds.length > 0 ? roleIds : ["__none__"] },
       },
       force: true,
       transaction: t,
@@ -441,16 +475,16 @@ const _applyProfileRoles = async (profileId, roleIds, transaction = null) => {
     // 2. Get existing role IDs
     const existing = await RoleProfileRole.findAll({
       where: { roleProfileId: profileId },
-      attributes: ['roleId'],
+      attributes: ["roleId"],
       transaction: t,
     });
-    const existingIds = existing.map(r => r.roleId);
+    const existingIds = existing.map((r) => r.roleId);
 
     // 3. Insert only new ones
-    const newIds = roleIds.filter(id => !existingIds.includes(id));
+    const newIds = roleIds.filter((id) => !existingIds.includes(id));
     if (newIds.length > 0) {
       await RoleProfileRole.bulkCreate(
-        newIds.map(roleId => ({ roleProfileId: profileId, roleId })),
+        newIds.map((roleId) => ({ roleProfileId: profileId, roleId })),
         { transaction: t },
       );
     }
@@ -631,18 +665,18 @@ const getRolePermissions = async (roleId, { page = 1, limit = 20 } = {}) => {
  */
 const getAllResourceNames = async () => {
   const resources = await RolePermission.findAll({
-    attributes: ['resourceName'],
-    group: ['resourceName'],
-    order: [['resourceName', 'ASC']],
+    attributes: ["resourceName"],
+    group: ["resourceName"],
+    order: [["resourceName", "ASC"]],
   });
 
-  return resources.map(r => r.resourceName);
+  return resources.map((r) => r.resourceName);
 };
 
 /**
  * Get permissions with combined resource and role filters.
  * Used by the frontend permission matrix table.
- * 
+ *
  * @param {object} filters
  * @param {string} [filters.resourceName] - Filter by resource name
  * @param {string} [filters.roleName]     - Filter by role name
@@ -658,7 +692,7 @@ const getFilteredPermissions = async ({
   limit = 50,
 } = {}) => {
   const where = {};
-  
+
   // Build role filter
   let roleWhere = {};
   if (roleId) {
@@ -675,8 +709,8 @@ const getFilteredPermissions = async ({
   // Find matching roles
   const roles = await Role.findAll({
     where: roleWhere,
-    attributes: ['id', 'name'],
-    order: [['name', 'ASC']],
+    attributes: ["id", "name"],
+    order: [["name", "ASC"]],
   });
 
   // For each matching role, get its permissions filtered by resource
@@ -687,12 +721,10 @@ const getFilteredPermissions = async ({
           roleId: role.id,
           ...where,
         },
-        order: [
-          ['permLevel', 'ASC'],
-        ],
+        order: [["permLevel", "ASC"]],
       });
 
-      return permissions.map(perm => ({
+      return permissions.map((perm) => ({
         documentType: `${perm.moduleName} / ${perm.resourceName}`,
         resourceName: perm.resourceName,
         moduleName: perm.moduleName,
@@ -714,7 +746,7 @@ const getFilteredPermissions = async ({
         canSetPermissions: perm.canSetPermissions,
         permissionId: perm.id,
       }));
-    })
+    }),
   );
 
   // Flatten and paginate
@@ -747,23 +779,23 @@ const getPermissionsByResource = async (resourceName) => {
     include: [
       {
         model: Role,
-        as: 'role',
-        attributes: ['id', 'name', 'disabled'],
+        as: "role",
+        attributes: ["id", "name", "disabled"],
         where: { disabled: false },
         required: true,
       },
     ],
     order: [
-      [{ model: Role, as: 'role' }, 'name', 'ASC'],
-      ['permLevel', 'ASC'],
+      [{ model: Role, as: "role" }, "name", "ASC"],
+      ["permLevel", "ASC"],
     ],
   });
 
-  return permissions.map(perm => ({
+  return permissions.map((perm) => ({
     documentType: `${perm.moduleName} / ${perm.resourceName}`,
     resourceName: perm.resourceName,
     moduleName: perm.moduleName,
-    role: perm.role?.name || 'Unknown',
+    role: perm.role?.name || "Unknown",
     roleId: perm.roleId,
     level: perm.permLevel,
     canRead: perm.canRead,
@@ -782,10 +814,6 @@ const getPermissionsByResource = async (resourceName) => {
     permissionId: perm.id,
   }));
 };
-
-
-
-
 
 /**
  * Delete a single permission rule by its own PK.
@@ -863,7 +891,7 @@ const setUserRoles = async (userId, roleIds) => {
 
   await sequelize.transaction(async (t) => {
     // Remove all existing roles for this user
-    await UserRole.destroy({ where: { userId },force: true, transaction: t });
+    await UserRole.destroy({ where: { userId }, force: true, transaction: t });
 
     // Insert the new set
     if (roleIds.length > 0) {
@@ -900,24 +928,26 @@ const revokeRolesFromUser = async (userId, roleIds) => {
  */
 const getUserRoles = async (userId, { page = 1, limit = 20 } = {}) => {
   const user = await User.findByPk(userId);
-  if (!user) throw new AppError('User not found', 404);
+  if (!user) throw new AppError("User not found", 404);
 
   const { limit: lim, offset } = getPaginationOptions({ page, limit });
 
   // Use the many-to-many association through User
   const { count, rows } = await Role.findAndCountAll({
-    include: [{
-      model: User,
-      as: 'users',  // ← This matches the alias in Role.belongsToMany(User)
-      where: { id: userId },
-      through: { attributes: [] },  // ← This tells Sequelize to use the junction table
-      attributes: [],  // Don't return User attributes
-      required: true,  // Only return roles that have this user
-    }],
+    include: [
+      {
+        model: User,
+        as: "users", // ← This matches the alias in Role.belongsToMany(User)
+        where: { id: userId },
+        through: { attributes: [] }, // ← This tells Sequelize to use the junction table
+        attributes: [], // Don't return User attributes
+        required: true, // Only return roles that have this user
+      },
+    ],
     where: { disabled: false },
     limit: lim,
     offset,
-    order: [['name', 'ASC']],
+    order: [["name", "ASC"]],
   });
 
   return { data: rows, meta: buildMeta(count, page, lim) };
@@ -926,21 +956,23 @@ const getUserRoles = async (userId, { page = 1, limit = 20 } = {}) => {
 /**
  * List all users with their assigned roles (paginated).
  */
-const getUsersWithRoles = async ({ page = 1, limit = 20 } = {}) => {  
+const getUsersWithRoles = async ({ page = 1, limit = 20 } = {}) => {
   const { limit: lim, offset } = getPaginationOptions({ page, limit });
   const { count, rows } = await User.findAndCountAll({
-    attributes: { exclude: ['passwordHash'] },
-    include: [{
-      model: Role,
-      as: 'roles',
-      through: { attributes: [] },
-      where: { disabled: false },
-      required: false,
-    }],
+    attributes: { exclude: ["passwordHash"] },
+    include: [
+      {
+        model: Role,
+        as: "roles",
+        through: { attributes: [] },
+        where: { disabled: false },
+        required: false,
+      },
+    ],
     limit: lim,
     offset,
-    order: [['createdAt', 'DESC']],
-    distinct: true, 
+    order: [["createdAt", "DESC"]],
+    distinct: true,
   });
   return { data: rows, meta: buildMeta(count, page, lim) };
 };
@@ -1083,19 +1115,19 @@ const getAllUserPermissionsWithUser = async ({ page = 1, limit = 20 } = {}) => {
     include: [
       {
         model: User,
-        as: 'user',
-        attributes: ['id', 'firstName', 'email'],
+        as: "user",
+        attributes: ["id", "firstName", "email"],
       },
     ],
     limit: lim,
     offset,
     order: [
-      ['allowDocType', 'ASC'],
-      ['allowValue', 'ASC'],
+      ["allowDocType", "ASC"],
+      ["allowValue", "ASC"],
     ],
   });
   return { data: rows, meta: buildMeta(count, page, lim) };
-}
+};
 
 /**
  * Delete a single record-level permission by its own PK.
@@ -1310,25 +1342,18 @@ const getUserPermissionFilter = async (userId, allowDocType, fkColumn) => {
  * check the return value — though returning the boolean is also supported
  * for service-layer guards.
  */
-const checkPermission = async (
-  userId,
-  resourceName,
-  action,
-  permLevel = 0,        
-) => {
+const checkPermission = async (userId, resourceName, action, permLevel = 0) => {
   const field = ACTION_FIELD_MAP[action];
   if (!field) throw new AppError(`Unknown action "${action}"`, 400);
 
   const effective = await getUserEffectivePermissions(userId);
 
   if (effective.isSuperUser) return true;
-  if (effective.isSystemManager && action === 'read') return true;
+  if (effective.isSystemManager && action === "read") return true;
 
   // ← moduleName removed from find — resourceName is the unique key per role
   const matchingRule = effective.permissions.find(
-    (p) =>
-      p.resourceName === resourceName &&
-      p.permLevel <= permLevel,
+    (p) => p.resourceName === resourceName && p.permLevel <= permLevel,
   );
 
   if (!matchingRule) return false;
