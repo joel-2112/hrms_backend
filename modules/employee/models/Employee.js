@@ -9,7 +9,6 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
-
       // ─────────────────────────────────────────────
       //  SECTION 1 — ORGANIZATION FKs
       // ─────────────────────────────────────────────
