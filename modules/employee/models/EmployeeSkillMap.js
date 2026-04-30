@@ -14,12 +14,8 @@ module.exports = (sequelize, DataTypes) => {
       unique:    true,
       comment:   'FK → employees.id',
     },
+    // ── Skills ───────────────────────────────────────────────
 
-    // ── Skills ─────────────────────────────────────────────────
-    // Stored as JSONB arrays for flexibility — skill taxonomy can evolve
-    // without schema migrations. Each skill entry:
-    // { skillName, category, proficiency (Beginner/Intermediate/Advanced/Expert),
-    //   yearsOfExperience, lastUsed (date), isCurrent }
     skills: {
       type:         DataTypes.JSONB,
       allowNull:    false,
@@ -28,29 +24,19 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     // ── Certifications ─────────────────────────────────────────
-    // Each entry: { certificationName, issuingBody, issueDate, expiryDate,
-    //               certificateNumber, verificationUrl, isVerified }
     certifications: {
       type:         DataTypes.JSONB,
       allowNull:    false,
       defaultValue: [],
       comment:      'Professional certifications and licences',
     },
-
-    // ── Training history ───────────────────────────────────────
-    // Each entry: { trainingName, provider, startDate, endDate,
-    //               trainingType (Internal/External/Online), completionStatus,
-    //               cost, currency, notes }
-    trainings: {
+    certificateUrls: {
       type:         DataTypes.JSONB,
       allowNull:    false,
       defaultValue: [],
-      comment:      'Internal and external trainings attended',
+      comment:      'URLs to digital copies of certifications',
     },
-
     // ── Languages ──────────────────────────────────────────────
-    // Each entry: { language, readProficiency, writeProficiency, spokenProficiency }
-    // Proficiency levels: 'Basic' | 'Conversational' | 'Fluent' | 'Native'
     languages: {
       type:         DataTypes.JSONB,
       allowNull:    false,

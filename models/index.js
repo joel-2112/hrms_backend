@@ -77,7 +77,6 @@ const DocumentVersion = require('../modules/document/models/DocumentVersion')(se
 
 const Employee                 = require('../modules/employee/models/Employee')(sequelize, DataTypes);
 const EmployeePromotion        = require('../modules/employee/models/EmployeePromotion')(sequelize, DataTypes);
-const EmployeeTransfer         = require('../modules/employee/models/EmployeeTransfer')(sequelize, DataTypes);
 const EmployeeSeparation       = require('../modules/employee/models/EmployeeSeparation')(sequelize, DataTypes);
 const EmployeeSkillMap         = require('../modules/employee/models/EmployeeSkillMap')(sequelize, DataTypes);
 const EmployeeEducation        = require('../modules/employee/models/EmployeeEducation')(sequelize, DataTypes);
@@ -304,12 +303,6 @@ EmployeePromotion.belongsTo(Employee, { foreignKey: 'employeeId',  allowNull: fa
 EmployeePromotion.belongsTo(Employee, { foreignKey: 'approvedById',                  as: 'approvedBy' });
 Employee.hasMany(EmployeePromotion,   { foreignKey: 'employeeId',                    as: 'promotions' });
 Employee.hasMany(EmployeePromotion,   { foreignKey: 'approvedById',                  as: 'approvedPromotions' });
-
-// ── EmployeeTransfer → Employee + optional FK to approver ────────────────────
-EmployeeTransfer.belongsTo(Employee, { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
-EmployeeTransfer.belongsTo(Employee, { foreignKey: 'approvedById',                  as: 'approvedBy' });
-Employee.hasMany(EmployeeTransfer,   { foreignKey: 'employeeId',                    as: 'transfers' });
-Employee.hasMany(EmployeeTransfer,   { foreignKey: 'approvedById',                  as: 'approvedTransfers' });
 
 // ── EmployeeSeparation → Employee + optional FK to approver ──────────────────
 EmployeeSeparation.belongsTo(Employee, { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
@@ -659,7 +652,6 @@ module.exports = {
   // ── employee ──────────────────────────────────────────────────────────────
   Employee,
   EmployeePromotion,
-  EmployeeTransfer,
   EmployeeSeparation,
   EmployeeSkillMap,
   EmployeeEducation,
