@@ -13,7 +13,7 @@
  *  deleteLeaveType              Soft-delete (disable)
  *
  *  ── LEAVE PERIOD ──────────────────────────────────────────────────────
- *  createLeavePeriod            Define financial/leave year boundaries
+ *  createLeavePeriod            Define leave year boundaries
  *  getLeavePeriods              List all periods per company
  *  getLeavePeriodById           Single period
  *  getActiveLeavePeriod         The currently active period for a company

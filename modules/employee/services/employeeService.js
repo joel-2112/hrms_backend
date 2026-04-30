@@ -252,8 +252,8 @@ const validateOrgFKs = async (data) => {
  */
 const createEmployee = async (data) => {
   // ── 1. Validate required fields ───────────────────────────────────────────
-  if (!data.firstName || !data.lastName) {
-    throw new AppError('firstName and lastName are required', 422);
+  if (!data.firstName || !data.lastName || !data.lastName) {
+    throw new AppError('Full name required', 422);
   }
   if (!data.companyId) {
     throw new AppError('companyId is required', 422);
