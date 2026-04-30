@@ -524,10 +524,12 @@ JobRequisition.belongsTo(Department,     { foreignKey: 'departmentId',     allow
 JobRequisition.belongsTo(Designation,    { foreignKey: 'designationId',    allowNull: false, as: 'designation' });
 JobRequisition.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false, as: 'company' });
 JobRequisition.belongsTo(EmploymentType, { foreignKey: 'employmentTypeId',                   as: 'employmentType' });
+JobRequisition.belongsTo(EmployeeGrade,  { foreignKey: 'employeeGradeId',                    as: 'employeeGrade' });
 Department.hasMany(JobRequisition,       { foreignKey: 'departmentId',                        as: 'jobRequisitions' });
 Designation.hasMany(JobRequisition,      { foreignKey: 'designationId',                       as: 'jobRequisitions' });
 Company.hasMany(JobRequisition,          { foreignKey: 'companyId',                           as: 'jobRequisitions' });
 EmploymentType.hasMany(JobRequisition,   { foreignKey: 'employmentTypeId',                    as: 'jobRequisitions' });
+EmployeeGrade.hasMany(JobRequisition,    { foreignKey: 'employeeGradeId',                     as: 'jobRequisitions' });
 
 // ── JobRequisition → Employee (requester, HR manager, GM approver) ────────────
 JobRequisition.belongsTo(Employee, { foreignKey: 'requestedById', allowNull: false, as: 'requestedBy' });

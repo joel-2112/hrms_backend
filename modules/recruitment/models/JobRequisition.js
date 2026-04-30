@@ -35,6 +35,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'FK → employment_types.id',
     },
+    employeeGradeId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      comment: 'FK → employee_grades.id',
+    },
 
     // ── Requester (Department Head) ────────────────────────────
     requestedById: {
@@ -175,7 +180,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.SMALLINT,
       allowNull: false,
       defaultValue: 0,
-      comment: '0 = Draft, 1 = Submitted, 2 = Cancelled',
+      comment: '0 = Draft, 1 = Submitted, 2 = approved, 3 = rejected, 4 = cancelled',
     },
 
     // ── Misc ───────────────────────────────────────────────────

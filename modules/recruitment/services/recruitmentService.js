@@ -1,9 +1,12 @@
-'use strict';
-const { Op } = require('sequelize');
-const { sequelize, ...models } = require('../../../models');
-const { AppError } = require('../../../middlewares/errorMiddleware');
-const { getPaginationOptions, buildMeta } = require('../../../utils/pagination');
-const logger = require('../../../utils/logger');
+"use strict";
+const { Op } = require("sequelize");
+const { sequelize, ...models } = require("../../../models");
+const { AppError } = require("../../../middlewares/errorMiddleware");
+const {
+  getPaginationOptions,
+  buildMeta,
+} = require("../../../utils/pagination");
+const logger = require("../../../utils/logger");
 
 // Destructure models for cleaner access
 const {
@@ -30,8 +33,7 @@ const {
 //  CONSTANTS & CONFIGURATION
 // ════════════════════════════════════════════════════════════════════════════
 
-
-const VALID_RESULTS = ['Cleared', 'Not Cleared', 'On Hold'];
+const VALID_RESULTS = ["Cleared", "Not Cleared", "On Hold"];
 
 // ════════════════════════════════════════════════════════════════════════════
 //  INTERNAL HELPERS — Utilities
@@ -53,7 +55,7 @@ const getEmployeeByUserId = async (userId) => {
 
   const emp = await Employee.findOne({ where: { userId } });
   if (!emp) {
-    throw new AppError('No employee record linked to this user account', 403);
+    throw new AppError("No employee record linked to this user account", 403);
   }
 
   employeeCache.set(userId, { data: emp, timestamp: Date.now() });
@@ -83,7 +85,12 @@ const generateReferenceNumber = async (prefix, where = {}) => {
   };
 
   const Model = modelMap[prefix] || JobRequisition;
-  const field = prefix === 'REQ' ? 'requisitionNumber' : (prefix === 'APT' ? 'referenceNumber' : 'name');
+  const field =
+    prefix === "REQ"
+      ? "requisitionNumber"
+      : prefix === "APT"
+        ? "referenceNumber"
+        : "name";
 
   const count = await Model.count({
     where: {
@@ -92,14 +99,18 @@ const generateReferenceNumber = async (prefix, where = {}) => {
     },
   });
 
-  const seq = String(count + 1).padStart(4, '0');
+  const seq = String(count + 1).padStart(4, "0");
   return `${prefix}-${year}-${seq}`;
 };
 
 /**
  * Validates date range.
  */
-const validateDateRange = (fromDate, toDate, fieldNames = ['fromDate', 'toDate']) => {
+const validateDateRange = (
+  fromDate,
+  toDate,
+  fieldNames = ["fromDate", "toDate"],
+) => {
   if (new Date(fromDate) >= new Date(toDate)) {
     throw new AppError(`${fieldNames[0]} must be before ${fieldNames[1]}`, 422);
   }
@@ -117,14 +128,15 @@ const parseApplicantName = (fullName) => {
   const parts = fullName.trim().split(/\s+/);
   return {
     firstName: parts[0],
-    lastName: parts.length > 1 ? parts.slice(1).join(' ') : '.',
+    lastName: parts.length > 1 ? parts.slice(1).join(" ") : ".",
   };
 };
 
 /**
  * Generates temporary password for new employee.
  */
-const generateTemporaryPassword = () => `Hrms@${Math.random().toString(36).slice(2, 10)}`;
+const generateTemporaryPassword = () =>
+  `Hrms@${Math.random().toString(36).slice(2, 10)}`;
 
 /**
  * Generates employee number.
@@ -132,7 +144,7 @@ const generateTemporaryPassword = () => `Hrms@${Math.random().toString(36).slice
 const generateEmployeeNumber = async (transaction) => {
   const year = new Date().getFullYear();
   const count = await Employee.count({ transaction });
-  return `EMP-${year}-${String(count + 1).padStart(4, '0')}`;
+  return `EMP-${year}-${String(count + 1).padStart(4, "0")}`;
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -142,7 +154,11 @@ const generateEmployeeNumber = async (transaction) => {
 /**
  * Gets active staffing plan for a designation.
  */
-const getActiveStaffingPlan = async (designationId, departmentId, companyId) => {
+const getActiveStaffingPlan = async (
+  designationId,
+  departmentId,
+  companyId,
+) => {
   const today = new Date().toISOString().slice(0, 10);
 
   return StaffingPlan.findOne({
@@ -153,7 +169,7 @@ const getActiveStaffingPlan = async (designationId, departmentId, companyId) => 
       fromDate: { [Op.lte]: today },
       toDate: { [Op.gte]: today },
     },
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
   });
 };
 
@@ -167,14 +183,16 @@ const getStaffingSnapshot = async (designationId, departmentId, companyId) => {
         designationId,
         ...(departmentId ? { departmentId } : {}),
         companyId,
-        status: 'Active',
+        status: "Active",
       },
     }),
     getActiveStaffingPlan(designationId, departmentId, companyId),
   ]);
 
   if (!activePlan) {
-    const designation = await Designation.findByPk(designationId, { attributes: ['name'] });
+    const designation = await Designation.findByPk(designationId, {
+      attributes: ["name"],
+    });
     return {
       staffingPlanId: null,
       planName: null,
@@ -187,18 +205,24 @@ const getStaffingSnapshot = async (designationId, departmentId, companyId) => {
     };
   }
 
-  const detail = (activePlan.planDetails || []).find((d) => d.designationId === designationId);
+  const detail = (activePlan.planDetails || []).find(
+    (d) => d.designationId === designationId,
+  );
   const plannedHeadcount = detail?.numberOfPositions ?? 0;
 
   const openRequisitions = await JobRequisition.count({
     where: {
       designationId,
       companyId,
-      overallStatus: { [Op.in]: ['Pending HR Review', 'Pending GM Review', 'Approved'] },
+      overallStatus: {
+        [Op.in]: ["Pending HR Review", "Pending GM Review", "Approved"],
+      },
     },
   });
 
-  const designation = await Designation.findByPk(designationId, { attributes: ['name'] });
+  const designation = await Designation.findByPk(designationId, {
+    attributes: ["name"],
+  });
 
   return {
     staffingPlanId: activePlan.id,
@@ -208,7 +232,10 @@ const getStaffingSnapshot = async (designationId, departmentId, companyId) => {
     plannedHeadcount,
     currentHeadcount,
     openRequisitions,
-    availableVacancies: Math.max(0, plannedHeadcount - currentHeadcount - openRequisitions),
+    availableVacancies: Math.max(
+      0,
+      plannedHeadcount - currentHeadcount - openRequisitions,
+    ),
   };
 };
 
@@ -221,7 +248,10 @@ const enrichPlanDetails = async (planDetails, companyId, departmentId) => {
   const enriched = await Promise.all(
     planDetails.map(async (detail) => {
       if (!detail.designationId || !detail.numberOfPositions) {
-        throw new AppError('Each planDetail must have designationId and numberOfPositions', 422);
+        throw new AppError(
+          "Each planDetail must have designationId and numberOfPositions",
+          422,
+        );
       }
 
       const currentCount = await Employee.count({
@@ -229,7 +259,7 @@ const enrichPlanDetails = async (planDetails, companyId, departmentId) => {
           designationId: detail.designationId,
           companyId,
           ...(departmentId ? { departmentId } : {}),
-          status: 'Active',
+          status: "Active",
         },
       });
 
@@ -245,17 +275,11 @@ const enrichPlanDetails = async (planDetails, companyId, departmentId) => {
         estimatedCostPerPosition,
         totalEstimatedCost,
       };
-    })
+    }),
   );
 
   return { enrichedDetails: enriched, totalEstimatedBudget };
 };
-
-
-
-
-
-
 
 // ════════════════════════════════════════════════════════════════════════════
 //  PHASE 1 — STAFFING PLAN
@@ -275,10 +299,15 @@ const getStaffingPlans = async ({ companyId, docStatus, page, limit } = {}) => {
     where,
     limit: lim,
     offset,
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
     include: [
-      { model: Company, as: 'company', attributes: ['id', 'name'] },
-      { model: Department, as: 'department', attributes: ['id', 'name'], required: false },
+      { model: Company, as: "company", attributes: ["id", "name"] },
+      {
+        model: Department,
+        as: "department",
+        attributes: ["id", "name"],
+        required: false,
+      },
     ],
   });
 
@@ -293,10 +322,10 @@ const getStaffingPlans = async ({ companyId, docStatus, page, limit } = {}) => {
         plan.departmentId,
       );
 
-      plan.setDataValue('planDetails', enrichedDetails);
-      plan.setDataValue('totalEstimatedBudget', totalEstimatedBudget);
+      plan.setDataValue("planDetails", enrichedDetails);
+      plan.setDataValue("totalEstimatedBudget", totalEstimatedBudget);
       return plan;
-    })
+    }),
   );
 
   return { data: enrichedRows, meta: buildMeta(count, page || 1, lim) };
@@ -307,11 +336,16 @@ const getStaffingPlans = async ({ companyId, docStatus, page, limit } = {}) => {
 const getStaffingPlanById = async (id) => {
   const plan = await StaffingPlan.findByPk(id, {
     include: [
-      { model: Company, as: 'company', attributes: ['id', 'name'] },
-      { model: Department, as: 'department', attributes: ['id', 'name'], required: false },
+      { model: Company, as: "company", attributes: ["id", "name"] },
+      {
+        model: Department,
+        as: "department",
+        attributes: ["id", "name"],
+        required: false,
+      },
     ],
   });
-  if (!plan) throw new AppError('Staffing plan not found', 404);
+  if (!plan) throw new AppError("Staffing plan not found", 404);
 
   // ── Reuse existing helper for live headcount ──────────────────
   if (plan.planDetails?.length) {
@@ -321,8 +355,8 @@ const getStaffingPlanById = async (id) => {
       plan.departmentId,
     );
 
-    plan.setDataValue('planDetails', enrichedDetails);
-    plan.setDataValue('totalEstimatedBudget', totalEstimatedBudget);
+    plan.setDataValue("planDetails", enrichedDetails);
+    plan.setDataValue("totalEstimatedBudget", totalEstimatedBudget);
   }
 
   return plan;
@@ -332,17 +366,35 @@ const getStaffingPlanById = async (id) => {
  * Create staffing plan (Draft).
  */
 const createStaffingPlan = async (data) => {
-  const { name, companyId, departmentId, fromDate, toDate, planDetails = [] } = data;
+  const {
+    name,
+    companyId,
+    departmentId,
+    fromDate,
+    toDate,
+    planDetails = [],
+  } = data;
 
   if (!name || !companyId || !fromDate || !toDate) {
-    throw new AppError('name, companyId, fromDate and toDate are required', 422);
+    throw new AppError(
+      "name, companyId, fromDate and toDate are required",
+      422,
+    );
   }
   validateDateRange(fromDate, toDate);
 
   const duplicate = await StaffingPlan.findOne({ where: { name, companyId } });
-  if (duplicate) throw new AppError('Staffing plan with this name already exists for this company', 409);
+  if (duplicate)
+    throw new AppError(
+      "Staffing plan with this name already exists for this company",
+      409,
+    );
 
-  const { enrichedDetails, totalEstimatedBudget } = await enrichPlanDetails(planDetails, companyId, departmentId);
+  const { enrichedDetails, totalEstimatedBudget } = await enrichPlanDetails(
+    planDetails,
+    companyId,
+    departmentId,
+  );
 
   const plan = await StaffingPlan.create({
     name,
@@ -355,7 +407,7 @@ const createStaffingPlan = async (data) => {
     docStatus: 0,
   });
 
-  logger.info('StaffingPlan created', { planId: plan.id, name, companyId });
+  logger.info("StaffingPlan created", { planId: plan.id, name, companyId });
   return plan;
 };
 
@@ -364,20 +416,21 @@ const createStaffingPlan = async (data) => {
  */
 const updateStaffingPlan = async (id, data) => {
   const plan = await getStaffingPlanById(id);
-  if (plan.docStatus !== 0) throw new AppError('Only Draft staffing plans can be edited', 422);
+  if (plan.docStatus !== 0)
+    throw new AppError("Only Draft staffing plans can be edited", 422);
 
   if (data.planDetails) {
     const { enrichedDetails, totalEstimatedBudget } = await enrichPlanDetails(
       data.planDetails,
       plan.companyId,
-      plan.departmentId
+      plan.departmentId,
     );
     data.planDetails = enrichedDetails;
     data.totalEstimatedBudget = totalEstimatedBudget;
   }
 
   await plan.update(data);
-  logger.info('StaffingPlan updated', { planId: id });
+  logger.info("StaffingPlan updated", { planId: id });
   return plan.reload();
 };
 
@@ -386,11 +439,13 @@ const updateStaffingPlan = async (id, data) => {
  */
 const submitStaffingPlan = async (id) => {
   const plan = await getStaffingPlanById(id);
-  if (plan.docStatus !== 0) throw new AppError('Only Draft plans can be submitted', 422);
-  if (!plan.planDetails?.length) throw new AppError('Cannot submit staffing plan with no detail rows', 422);
+  if (plan.docStatus !== 0)
+    throw new AppError("Only Draft plans can be submitted", 422);
+  if (!plan.planDetails?.length)
+    throw new AppError("Cannot submit staffing plan with no detail rows", 422);
 
   await plan.update({ docStatus: 1 });
-  logger.info('StaffingPlan submitted', { planId: id });
+  logger.info("StaffingPlan submitted", { planId: id });
   return plan;
 };
 
@@ -399,11 +454,12 @@ const submitStaffingPlan = async (id) => {
  */
 const approveStaffingPlan = async (id, gmUserId) => {
   const plan = await getStaffingPlanById(id);
-  if (plan.docStatus !== 1) throw new AppError('Only submitted plans can be approved', 422);
+  if (plan.docStatus !== 1)
+    throw new AppError("Only submitted plans can be approved", 422);
 
-  await plan.update({ docStatus: 2 });  // 2 = Active
+  await plan.update({ docStatus: 2 }); // 2 = Active
 
-  logger.info('StaffingPlan approved', { planId: id, gmUserId });
+  logger.info("StaffingPlan approved", { planId: id, gmUserId });
   return plan;
 };
 
@@ -412,10 +468,11 @@ const approveStaffingPlan = async (id, gmUserId) => {
  */
 const cancelStaffingPlan = async (id) => {
   const plan = await getStaffingPlanById(id);
-  if (plan.docStatus === 2) throw new AppError('Plan is already cancelled', 422);
+  if (plan.docStatus === 2)
+    throw new AppError("Plan is already cancelled", 422);
 
   await plan.update({ docStatus: 2 });
-  logger.info('StaffingPlan cancelled', { planId: id });
+  logger.info("StaffingPlan cancelled", { planId: id });
   return plan;
 };
 
@@ -424,19 +481,51 @@ const cancelStaffingPlan = async (id) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 const REQUISITION_INCLUDES = [
-  { model: Department, as: 'department', attributes: ['id', 'name'] },
-  { model: Designation, as: 'designation', attributes: ['id', 'name'] },
-  { model: Company, as: 'company', attributes: ['id', 'name'] },
-  { model: EmploymentType, as: 'employmentType', attributes: ['id', 'name'], required: false },
-  { model: Employee, as: 'requestedBy', attributes: ['id', 'firstName', 'lastName'] },
-  { model: Employee, as: 'hrManager', attributes: ['id', 'firstName', 'lastName'], required: false },
-  { model: Employee, as: 'generalManager', attributes: ['id', 'firstName', 'lastName'], required: false },
+  { model: Department, as: "department", attributes: ["id", "name"] },
+  { model: Designation, as: "designation", attributes: ["id", "name"] },
+  { model: Company, as: "company", attributes: ["id", "name"] },
+  {
+    model: EmploymentType,
+    as: "employmentType",
+    attributes: ["id", "name"],
+    required: false,
+  },
+  {
+    model: EmployeeGrade,
+    as: "employeeGrade",
+    attributes: ["id", "name"],
+    required: false,
+  },
+  {
+    model: Employee,
+    as: "requestedBy",
+    attributes: ["id", "firstName", "lastName"],
+  },
+  {
+    model: Employee,
+    as: "hrManager",
+    attributes: ["id", "firstName", "lastName"],
+    required: false,
+  },
+  {
+    model: Employee,
+    as: "generalManager",
+    attributes: ["id", "firstName", "lastName"],
+    required: false,
+  },
 ];
 
 /**
  * List job requisitions with pagination.
  */
-const getJobRequisitions = async ({ companyId, departmentId, overallStatus, requestedById, page, limit } = {}) => {
+const getJobRequisitions = async ({
+  companyId,
+  departmentId,
+  overallStatus,
+  requestedById,
+  page,
+  limit,
+} = {}) => {
   const where = {};
   if (companyId !== undefined) where.companyId = companyId;
   if (departmentId !== undefined) where.departmentId = departmentId;
@@ -449,7 +538,7 @@ const getJobRequisitions = async ({ companyId, departmentId, overallStatus, requ
     where,
     limit: lim,
     offset,
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
     include: REQUISITION_INCLUDES,
   });
 
@@ -460,8 +549,10 @@ const getJobRequisitions = async ({ companyId, departmentId, overallStatus, requ
  * Get single job requisition by ID.
  */
 const getJobRequisitionById = async (id) => {
-  const req = await JobRequisition.findByPk(id, { include: REQUISITION_INCLUDES });
-  if (!req) throw new AppError('Job requisition not found', 404);
+  const req = await JobRequisition.findByPk(id, {
+    include: REQUISITION_INCLUDES,
+  });
+  if (!req) throw new AppError("Job requisition not found", 404);
   return req;
 };
 
@@ -474,6 +565,7 @@ const createJobRequisition = async (data, userId) => {
     designationId,
     companyId,
     employmentTypeId,
+    employeeGradeId,
     numberOfPositions = 1,
     replacementFor,
     isNewPosition = false,
@@ -481,16 +573,19 @@ const createJobRequisition = async (data, userId) => {
     proposedSalaryMin,
     proposedSalaryMax,
     targetHireDate,
-    currency = 'ETB',
+    currency = "ETB",
   } = data;
 
   if (!departmentId || !designationId || !companyId || !reasonForHiring) {
-    throw new AppError('departmentId, designationId, companyId and reasonForHiring are required', 422);
+    throw new AppError(
+      "departmentId, designationId, companyId and reasonForHiring are required",
+      422,
+    );
   }
 
   const requester = await getEmployeeByUserId(userId);
   const [requisitionNumber, staffingSnapshot] = await Promise.all([
-    generateReferenceNumber('REQ', { companyId }),
+    generateReferenceNumber("REQ", { companyId }),
     getStaffingSnapshot(designationId, departmentId, companyId),
   ]);
 
@@ -500,6 +595,7 @@ const createJobRequisition = async (data, userId) => {
     designationId,
     companyId,
     employmentTypeId: employmentTypeId || null,
+    employeeGradeId: employeeGradeId || null,
     requestedById: requester.id,
     requestedOn: new Date(),
     numberOfPositions,
@@ -511,13 +607,16 @@ const createJobRequisition = async (data, userId) => {
     targetHireDate: targetHireDate || null,
     currency,
     staffingSnapshot,
-    overallStatus: 'Draft',
-    hrStatus: 'Pending',
-    gmStatus: 'Pending',
+    overallStatus: "Draft",
+    hrStatus: "Pending",
+    gmStatus: "Pending",
     docStatus: 0,
   });
 
-  logger.info('JobRequisition created', { requisitionId: requisition.id, requisitionNumber });
+  logger.info("JobRequisition created", {
+    requisitionId: requisition.id,
+    requisitionNumber,
+  });
   return requisition;
 };
 
@@ -526,15 +625,19 @@ const createJobRequisition = async (data, userId) => {
  */
 const submitJobRequisition = async (id, userId) => {
   const requisition = await getJobRequisitionById(id);
-  if (requisition.overallStatus !== 'Draft') throw new AppError('Only Draft requisitions can be submitted', 422);
+  if (requisition.overallStatus !== "Draft")
+    throw new AppError("Only Draft requisitions can be submitted", 422);
 
   const requester = await getEmployeeByUserId(userId);
   if (requisition.requestedById !== requester.id) {
-    throw new AppError('Only the creator can submit this requisition', 403);
+    throw new AppError("Only the creator can submit this requisition", 403);
   }
 
-  await requisition.update({ overallStatus: 'Pending HR Review', docStatus: 1 });
-  logger.info('JobRequisition submitted', { requisitionId: id });
+  await requisition.update({
+    overallStatus: "Pending HR Review",
+    docStatus: 1,
+  });
+  logger.info("JobRequisition submitted", { requisitionId: id });
   return requisition;
 };
 
@@ -543,21 +646,24 @@ const submitJobRequisition = async (id, userId) => {
  */
 const approveHRRequisition = async (id, userId, remarks = null) => {
   const requisition = await getJobRequisitionById(id);
-  if (requisition.overallStatus !== 'Pending HR Review') {
-    throw new AppError('Requisition is not pending HR review', 422);
+  if (requisition.overallStatus !== "Pending HR Review") {
+    throw new AppError("Requisition is not pending HR review", 422);
   }
 
   const hrManager = await getEmployeeByUserId(userId);
 
   await requisition.update({
-    hrStatus: 'Approved',
+    hrStatus: "Approved",
     hrManagerId: hrManager.id,
     hrReviewedOn: new Date(),
     hrRemarks: remarks,
-    overallStatus: 'Pending GM Review',
+    overallStatus: "Pending GM Review",
   });
 
-  logger.info('JobRequisition HR-approved', { requisitionId: id, hrManagerId: hrManager.id });
+  logger.info("JobRequisition HR-approved", {
+    requisitionId: id,
+    hrManagerId: hrManager.id,
+  });
   return requisition;
 };
 
@@ -565,24 +671,24 @@ const approveHRRequisition = async (id, userId, remarks = null) => {
  * HR rejects requisition (Level 1).
  */
 const rejectHRRequisition = async (id, userId, reason) => {
-  if (!reason) throw new AppError('Rejection reason is required', 422);
+  if (!reason) throw new AppError("Rejection reason is required", 422);
 
   const requisition = await getJobRequisitionById(id);
-  if (requisition.overallStatus !== 'Pending HR Review') {
-    throw new AppError('Requisition is not pending HR review', 422);
+  if (requisition.overallStatus !== "Pending HR Review") {
+    throw new AppError("Requisition is not pending HR review", 422);
   }
 
   const hrManager = await getEmployeeByUserId(userId);
 
   await requisition.update({
-    hrStatus: 'Rejected',
+    hrStatus: "Rejected",
     hrManagerId: hrManager.id,
     hrReviewedOn: new Date(),
     hrRemarks: reason,
-    overallStatus: 'HR Rejected',
+    overallStatus: "HR Rejected",
   });
 
-  logger.info('JobRequisition HR-rejected', { requisitionId: id, reason });
+  logger.info("JobRequisition HR-rejected", { requisitionId: id, reason });
   return requisition;
 };
 
@@ -591,11 +697,13 @@ const rejectHRRequisition = async (id, userId, reason) => {
  */
 const approveGMRequisition = async (id, userId, remarks = null) => {
   const requisition = await JobRequisition.findByPk(id, {
-    include: [{ model: Designation, as: 'designation', attributes: ['id', 'name'] }],
+    include: [
+      { model: Designation, as: "designation", attributes: ["id", "name"] },
+    ],
   });
-  if (!requisition) throw new AppError('Job requisition not found', 404);
-  if (requisition.overallStatus !== 'Pending GM Review') {
-    throw new AppError('Requisition is not pending GM review', 422);
+  if (!requisition) throw new AppError("Job requisition not found", 404);
+  if (requisition.overallStatus !== "Pending GM Review") {
+    throw new AppError("Requisition is not pending GM review", 422);
   }
 
   const gm = await getEmployeeByUserId(userId);
@@ -603,16 +711,16 @@ const approveGMRequisition = async (id, userId, remarks = null) => {
   const result = await sequelize.transaction(async (t) => {
     await requisition.update(
       {
-        gmStatus: 'Approved',
+        gmStatus: "Approved",
         gmId: gm.id,
         gmReviewedOn: new Date(),
         gmRemarks: remarks,
-        overallStatus: 'Approved',
+        overallStatus: "Approved",
       },
-      { transaction: t }
+      { transaction: t },
     );
 
-    const jobTitle = requisition.Designation?.name || 'Open Position';
+    const jobTitle = requisition.Designation?.name || "Open Position";
 
     const opening = await JobOpening.create(
       {
@@ -624,10 +732,10 @@ const approveGMRequisition = async (id, userId, remarks = null) => {
         plannedNumberOfPositions: requisition.numberOfPositions,
         expectedSalaryFrom: requisition.proposedSalaryMin || null,
         expectedSalaryTo: requisition.proposedSalaryMax || null,
-        status: 'Open',
+        status: "Open",
         publishOnWebsite: false,
       },
-      { transaction: t }
+      { transaction: t },
     );
 
     await requisition.update({ jobOpeningId: opening.id }, { transaction: t });
@@ -635,7 +743,7 @@ const approveGMRequisition = async (id, userId, remarks = null) => {
     return { requisition, opening };
   });
 
-  logger.info('JobRequisition GM-approved, JobOpening created', {
+  logger.info("JobRequisition GM-approved, JobOpening created", {
     requisitionId: id,
     jobOpeningId: result.opening.id,
   });
@@ -647,24 +755,24 @@ const approveGMRequisition = async (id, userId, remarks = null) => {
  * GM rejects requisition (Level 2).
  */
 const rejectGMRequisition = async (id, userId, reason) => {
-  if (!reason) throw new AppError('Rejection reason is required', 422);
+  if (!reason) throw new AppError("Rejection reason is required", 422);
 
   const requisition = await getJobRequisitionById(id);
-  if (requisition.overallStatus !== 'Pending GM Review') {
-    throw new AppError('Requisition is not pending GM review', 422);
+  if (requisition.overallStatus !== "Pending GM Review") {
+    throw new AppError("Requisition is not pending GM review", 422);
   }
 
   const gm = await getEmployeeByUserId(userId);
 
   await requisition.update({
-    gmStatus: 'Rejected',
+    gmStatus: "Rejected",
     gmId: gm.id,
     gmReviewedOn: new Date(),
     gmRemarks: reason,
-    overallStatus: 'GM Rejected',
+    overallStatus: "GM Rejected",
   });
 
-  logger.info('JobRequisition GM-rejected', { requisitionId: id, reason });
+  logger.info("JobRequisition GM-rejected", { requisitionId: id, reason });
   return requisition;
 };
 
@@ -673,16 +781,21 @@ const rejectGMRequisition = async (id, userId, reason) => {
  */
 const cancelJobRequisition = async (id, userId, remarks = null) => {
   const requisition = await getJobRequisitionById(id);
-  if (requisition.overallStatus === 'Approved') {
-    throw new AppError('Approved requisition cannot be cancelled. Cancel the Job Opening instead.', 422);
+  if (requisition.overallStatus === "Approved") {
+    throw new AppError(
+      "Approved requisition cannot be cancelled. Cancel the Job Opening instead.",
+      422,
+    );
   }
 
-  await requisition.update({ overallStatus: 'Cancelled', remarks, docStatus: 2 });
-  logger.info('JobRequisition cancelled', { requisitionId: id });
+  await requisition.update({
+    overallStatus: "Cancelled",
+    remarks,
+    docStatus: 2,
+  });
+  logger.info("JobRequisition cancelled", { requisitionId: id });
   return requisition;
 };
-
-
 
 // ════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
