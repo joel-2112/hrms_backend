@@ -430,6 +430,130 @@ router.get(
   employeeController.getEmployees,
 );
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD & STATISTICS (static routes — must be before /:id)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /employees/stats:
+ *   get:
+ *     summary: Get employee dashboard statistics
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Employee statistics
+ */
+router.get('/stats',
+  authorize('Employee', action.READ),
+  employeeController.getEmployeeStats
+);
+
+/**
+ * @swagger
+ * /employees/birthdays:
+ *   get:
+ *     summary: Get upcoming birthdays this month
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Upcoming birthdays
+ */
+router.get('/birthdays',
+  authorize('Employee', action.READ),
+  employeeController.getUpcomingBirthdays
+);
+
+/**
+ * @swagger
+ * /employees/anniversaries:
+ *   get:
+ *     summary: Get work anniversaries this month
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Work anniversaries
+ */
+router.get('/anniversaries',
+  authorize('Employee', action.READ),
+  employeeController.getWorkAnniversaries
+);
+
+/**
+ * @swagger
+ * /employees/recently-joined:
+ *   get:
+ *     summary: Get recently joined employees (last 30 days)
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Recently joined employees
+ */
+router.get('/recently-joined',
+  authorize('Employee', action.READ),
+  employeeController.getRecentlyJoined
+);
+
+/**
+ * @swagger
+ * /employees/filter-options:
+ *   get:
+ *     summary: Get distinct values for filter dropdowns
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Filter options
+ */
+router.get('/filter-options',
+  authorize('Employee', action.READ),
+  employeeController.getFilterOptions
+);
+
 /**
  * @swagger
  * /employees/me:
@@ -1555,6 +1679,159 @@ router.get(
   "/:id/promotions",
   authorize("Employee", action.READ),
   employeeController.getPromotionHistory,
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD & STATISTICS (static routes — must be before /:id)
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /employees/stats:
+ *   get:
+ *     summary: Get employee dashboard statistics
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Employee statistics
+ */
+router.get('/stats',
+  authorize('Employee', action.READ),
+  employeeController.getEmployeeStats
+);
+
+/**
+ * @swagger
+ * /employees/birthdays:
+ *   get:
+ *     summary: Get upcoming birthdays this month
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Upcoming birthdays
+ */
+router.get('/birthdays',
+  authorize('Employee', action.READ),
+  employeeController.getUpcomingBirthdays
+);
+
+/**
+ * @swagger
+ * /employees/anniversaries:
+ *   get:
+ *     summary: Get work anniversaries this month
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Work anniversaries
+ */
+router.get('/anniversaries',
+  authorize('Employee', action.READ),
+  employeeController.getWorkAnniversaries
+);
+
+/**
+ * @swagger
+ * /employees/recently-joined:
+ *   get:
+ *     summary: Get recently joined employees (last 30 days)
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Recently joined employees
+ */
+router.get('/recently-joined',
+  authorize('Employee', action.READ),
+  employeeController.getRecentlyJoined
+);
+
+/**
+ * @swagger
+ * /employees/filter-options:
+ *   get:
+ *     summary: Get distinct values for filter dropdowns
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Filter options
+ */
+router.get('/filter-options',
+  authorize('Employee', action.READ),
+  employeeController.getFilterOptions
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  EMPLOYEE TIMELINE
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /employees/{id}/timeline:
+ *   get:
+ *     summary: Get employee activity timeline
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Employee timeline
+ */
+router.get('/:id/timeline',
+  authorize('Employee', action.READ),
+  employeeController.getEmployeeTimeline
 );
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -494,6 +494,113 @@ const stripHRFields = (employee) => {
   return plain;
 };
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD & STATISTICS
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/employees/stats
+ * Dashboard statistics.
+ */
+const getEmployeeStats = catchAsync(async (req, res) => {
+  const { companyId } = req.query;
+
+  const stats = await employeeService.getEmployeeStats(companyId);
+
+  ok(res, {
+    message: 'Employee statistics retrieved',
+    data: stats,
+  });
+});
+
+/**
+ * GET /api/employees/birthdays
+ * Upcoming birthdays this month.
+ */
+const getUpcomingBirthdays = catchAsync(async (req, res) => {
+  const { companyId } = req.query;
+
+  const birthdays = await employeeService.getUpcomingBirthdays(companyId);
+
+  ok(res, {
+    message: 'Upcoming birthdays retrieved',
+    data: birthdays,
+  });
+});
+
+/**
+ * GET /api/employees/anniversaries
+ * Work anniversaries this month.
+ */
+const getWorkAnniversaries = catchAsync(async (req, res) => {
+  const { companyId } = req.query;
+
+  const anniversaries = await employeeService.getWorkAnniversaries(companyId);
+
+  ok(res, {
+    message: 'Work anniversaries retrieved',
+    data: anniversaries,
+  });
+});
+
+/**
+ * GET /api/employees/recently-joined
+ * Recently joined employees (last 30 days).
+ */
+const getRecentlyJoined = catchAsync(async (req, res) => {
+  const { companyId, limit } = req.query;
+
+  const employees = await employeeService.getRecentlyJoined(
+    companyId,
+    limit ? parseInt(limit, 10) : 10,
+  );
+
+  ok(res, {
+    message: 'Recently joined employees retrieved',
+    data: employees,
+  });
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  FILTER OPTIONS
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/employees/filter-options
+ * Distinct values for filter dropdowns.
+ */
+const getFilterOptions = catchAsync(async (req, res) => {
+  const { companyId } = req.query;
+
+  const options = await employeeService.getFilterOptions(companyId);
+
+  ok(res, {
+    message: 'Filter options retrieved',
+    data: options,
+  });
+});
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  EMPLOYEE TIMELINE
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/employees/:id/timeline
+ * Employee activity timeline.
+ */
+const getEmployeeTimeline = catchAsync(async (req, res) => {
+  const { id } = req.params;
+
+  const timeline = await employeeService.getEmployeeTimeline(id);
+
+  ok(res, {
+    message: 'Employee timeline retrieved',
+    data: timeline,
+  });
+});
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
@@ -545,4 +652,16 @@ module.exports = {
 
   // Promotions (read-only)
   getPromotionHistory,
+
+    // Dashboard & Stats
+  getEmployeeStats,
+  getUpcomingBirthdays,
+  getWorkAnniversaries,
+  getRecentlyJoined,
+
+  // Filters
+  getFilterOptions,
+
+  // Timeline
+  getEmployeeTimeline,
 };

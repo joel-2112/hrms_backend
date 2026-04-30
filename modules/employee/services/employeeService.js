@@ -1065,6 +1065,419 @@ const getPromotionHistory = async (employeeId, query = {}) => {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD & STATISTICS
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get employee statistics for dashboard cards.
+ */
+const getEmployeeStats = async (companyId) => {
+  const where = {};
+  if (companyId) where.companyId = companyId;
+
+  const [total, active, onLeave, suspended, inactive, exited] = await Promise.all([
+    Employee.count({ where }),
+    Employee.count({ where: { ...where, status: 'Active' } }),
+    Employee.count({ where: { ...where, status: 'onLeave' } }),
+    Employee.count({ where: { ...where, status: 'Suspended' } }),
+    Employee.count({ where: { ...where, status: 'Inactive' } }),
+    Employee.count({ where: { ...where, status: 'exited' } }),
+  ]);
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+
+  const endOfMonth = new Date(startOfMonth);
+  endOfMonth.setMonth(endOfMonth.getMonth() + 1, 0);
+  const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+
+  const [newHiresThisMonth, exitsThisMonth] = await Promise.all([
+    Employee.count({
+      where: { ...where, dateOfJoining: { [Op.gte]: startOfMonthStr } },
+    }),
+    Employee.count({
+      where: { ...where, status: 'exited', relievingDate: { [Op.gte]: startOfMonthStr } },
+    }),
+  ]);
+
+// Branch distribution — show "Not Assigned" instead of null
+const branchRows = await sequelize.query(
+  `SELECT e.branch_id, COALESCE(b.name, 'Not Assigned') as branch_name, COUNT(e.id) as count
+   FROM employees e
+   LEFT JOIN branches b ON b.id = e.branch_id
+   WHERE e.status = 'Active'
+   ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+   AND e.deleted_at IS NULL
+   GROUP BY e.branch_id, b.name
+   ORDER BY count DESC
+   LIMIT 15`,
+  { type: sequelize.QueryTypes.SELECT }
+);
+
+
+  // ── Department distribution ───────────────────────────────────────────────
+  const deptRows = await sequelize.query(
+    `SELECT e.department_id, d.name as department_name, COUNT(e.id) as count
+     FROM employees e
+     LEFT JOIN departments d ON d.id = e.department_id
+     WHERE e.status = 'Active'
+     ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     AND e.deleted_at IS NULL
+     GROUP BY e.department_id, d.name
+     ORDER BY count DESC
+     LIMIT 10`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
+
+  // ── Designation distribution ──────────────────────────────────────────────
+  const desigRows = await sequelize.query(
+    `SELECT e.designation_id, d.name as designation_name, COUNT(e.id) as count
+     FROM employees e
+     LEFT JOIN designations d ON d.id = e.designation_id
+     WHERE e.status = 'Active'
+     ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     AND e.deleted_at IS NULL
+     GROUP BY e.designation_id, d.name
+     ORDER BY count DESC
+     LIMIT 10`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
+
+  // ── Employment type distribution ──────────────────────────────────────────
+  const empTypeRows = await sequelize.query(
+    `SELECT e.employment_type_id, et.name as type_name, COUNT(e.id) as count
+     FROM employees e
+     LEFT JOIN employment_types et ON et.id = e.employment_type_id
+     WHERE e.status = 'Active'
+     ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     AND e.deleted_at IS NULL
+     GROUP BY e.employment_type_id, et.name
+     ORDER BY count DESC`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
+
+// Gender distribution — show "Not Specified" for null
+const genderRows = await sequelize.query(
+  `SELECT COALESCE(e.gender, 'Not Specified') as gender, COUNT(e.id) as count
+   FROM employees e
+   WHERE e.status = 'Active'
+   ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+   AND e.deleted_at IS NULL
+   GROUP BY COALESCE(e.gender, 'Not Specified')`,
+  { type: sequelize.QueryTypes.SELECT }
+);
+
+// Grade distribution
+const gradeRows = await sequelize.query(
+  `SELECT e.employee_grade_id, COALESCE(eg.name, 'Not Assigned') as grade_name, COUNT(e.id) as count
+   FROM employees e
+   LEFT JOIN employee_grades eg ON eg.id = e.employee_grade_id
+   WHERE e.status = 'Active'
+   ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+   AND e.deleted_at IS NULL
+   GROUP BY e.employee_grade_id, eg.name
+   ORDER BY count DESC`,
+  { type: sequelize.QueryTypes.SELECT }
+);
+
+  // ── Monthly joiners (last 12 months) ──────────────────────────────────────
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split('T')[0];
+
+  const monthlyJoiners = await sequelize.query(
+    `SELECT TO_CHAR(date_of_joining, 'YYYY-MM') as month, COUNT(id) as count
+     FROM employees
+     WHERE date_of_joining >= '${twelveMonthsAgoStr}'
+     ${companyId ? `AND company_id = '${companyId}'` : ''}
+     AND deleted_at IS NULL
+     GROUP BY TO_CHAR(date_of_joining, 'YYYY-MM')
+     ORDER BY month ASC`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
+
+  // ── Monthly exits (last 12 months) ────────────────────────────────────────
+  const monthlyExits = await sequelize.query(
+    `SELECT TO_CHAR(relieving_date, 'YYYY-MM') as month, COUNT(id) as count
+     FROM employees
+     WHERE relieving_date >= '${twelveMonthsAgoStr}'
+     AND status = 'exited'
+     ${companyId ? `AND company_id = '${companyId}'` : ''}
+     AND deleted_at IS NULL
+     GROUP BY TO_CHAR(relieving_date, 'YYYY-MM')
+     ORDER BY month ASC`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
+
+  // ── Turnover rate = (exits ÷ avg headcount) × 100 ────────────────────────
+  const turnoverRate = total > 0
+    ? parseFloat(((exitsThisMonth / total) * 100).toFixed(2))
+    : 0;
+
+  // ── Growth rate = ((newHires - exits) ÷ previous total) × 100 ────────────
+  const growthRate = total > 0
+    ? parseFloat((((newHiresThisMonth - exitsThisMonth) / total) * 100).toFixed(2))
+    : 0;
+
+  return {
+    // Counts
+    total,
+    active,
+    onLeave,
+    suspended,
+    inactive,
+    exited,
+    newHiresThisMonth,
+    exitsThisMonth,
+    turnoverRate,
+    growthRate,
+
+    // Distributions
+    branchDistribution: branchRows.map(r => ({
+      branchId: r.branch_id,
+      branchName: r.branch_name || 'Unassigned',
+      count: parseInt(r.count, 10),
+    })),
+    departmentDistribution: deptRows.map(r => ({
+      departmentId: r.department_id,
+      departmentName: r.department_name || 'Unknown',
+      count: parseInt(r.count, 10),
+    })),
+    designationDistribution: desigRows.map(r => ({
+      designationId: r.designation_id,
+      designationName: r.designation_name || 'Unknown',
+      count: parseInt(r.count, 10),
+    })),
+    employmentTypeDistribution: empTypeRows.map(r => ({
+      employmentTypeId: r.employment_type_id,
+      typeName: r.type_name || 'Unknown',
+      count: parseInt(r.count, 10),
+    })),
+    gradeDistribution: gradeRows.map(r => ({
+      gradeId: r.employee_grade_id,
+      gradeName: r.grade_name || 'Unassigned',
+      count: parseInt(r.count, 10),
+    })),
+    genderDistribution: genderRows.map(r => ({
+      gender: r.gender || 'Unspecified',
+      count: parseInt(r.count, 10),
+    })),
+
+    // Trends
+    monthlyJoiners: monthlyJoiners.map(r => ({
+      month: r.month,
+      count: parseInt(r.count, 10),
+    })),
+    monthlyExits: monthlyExits.map(r => ({
+      month: r.month,
+      count: parseInt(r.count, 10),
+    })),
+  };
+};
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  BIRTHDAYS & WORK ANNIVERSARIES
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get upcoming birthdays (current month).
+ */
+const getUpcomingBirthdays = async (companyId) => {
+  const where = { status: 'Active' };
+  if (companyId) where.companyId = companyId;
+
+  const currentMonth = new Date().getMonth() + 1;
+
+  const employees = await Employee.findAll({
+    where,
+    attributes: ['id', 'firstName', 'lastName', 'dateOfBirth', 'image', 'departmentId', 'designationId'],
+    include: [
+      { model: Department, as: 'department', attributes: ['name'] },
+      { model: Designation, as: 'designation', attributes: ['name'] },
+    ],
+  });
+
+  // Filter in JS since dateOfBirth month extraction varies by DB
+  return employees
+    .filter(e => e.dateOfBirth && new Date(e.dateOfBirth).getMonth() + 1 === currentMonth)
+    .map(e => ({
+      id: e.id,
+      name: `${e.firstName} ${e.lastName}`,
+      dateOfBirth: e.dateOfBirth,
+      department: e.department?.name,
+      designation: e.designation?.name,
+      image: e.image,
+      day: new Date(e.dateOfBirth).getDate(),
+    }))
+    .sort((a, b) => a.day - b.day);
+};
+
+/**
+ * Get work anniversaries (current month).
+ */
+const getWorkAnniversaries = async (companyId) => {
+  const where = { status: 'Active' };
+  if (companyId) where.companyId = companyId;
+
+  const currentMonth = new Date().getMonth() + 1;
+
+  const employees = await Employee.findAll({
+    where,
+    attributes: ['id', 'firstName', 'lastName', 'dateOfJoining', 'image', 'departmentId'],
+    include: [
+      { model: Department, as: 'department', attributes: ['name'] },
+    ],
+  });
+
+  return employees
+    .filter(e => e.dateOfJoining && new Date(e.dateOfJoining).getMonth() + 1 === currentMonth)
+    .map(e => ({
+      id: e.id,
+      name: `${e.firstName} ${e.lastName}`,
+      dateOfJoining: e.dateOfJoining,
+      department: e.department?.name,
+      image: e.image,
+      years: new Date().getFullYear() - new Date(e.dateOfJoining).getFullYear(),
+      day: new Date(e.dateOfJoining).getDate(),
+    }))
+    .sort((a, b) => a.day - b.day);
+};
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  RECENTLY JOINED
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get recently joined employees (last 30 days).
+ */
+const getRecentlyJoined = async (companyId, limit = 10) => {
+  const where = { status: { [Op.in]: ['Active', 'onLeave'] } };
+  if (companyId) where.companyId = companyId;
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  where.dateOfJoining = { [Op.gte]: thirtyDaysAgo.toISOString().split('T')[0] };
+
+  return Employee.findAll({
+    where,
+    attributes: ['id', 'firstName', 'lastName', 'dateOfJoining', 'image', 'designationId'],
+    include: [
+      { model: Designation, as: 'designation', attributes: ['name'] },
+    ],
+    order: [['dateOfJoining', 'DESC']],
+    limit,
+  });
+};
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  ADVANCED FILTERS
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get distinct values for filter dropdowns.
+ */
+const getFilterOptions = async (companyId) => {
+  const where = {};
+  if (companyId) where.companyId = companyId;
+
+  const [departments, designations, employmentTypes, employeeGrades, branches] = await Promise.all([
+    Employee.findAll({
+      attributes: ['departmentId'],
+      where: { ...where, departmentId: { [Op.ne]: null } },
+      include: [{ model: Department, as: 'department', attributes: ['id', 'name'] }],
+      group: ['departmentId', 'department.id', 'department.name'],
+    }),
+    Employee.findAll({
+      attributes: ['designationId'],
+      where: { ...where, designationId: { [Op.ne]: null } },
+      include: [{ model: Designation, as: 'designation', attributes: ['id', 'name'] }],
+      group: ['designationId', 'designation.id', 'designation.name'],
+    }),
+    Employee.findAll({
+      attributes: ['employmentTypeId'],
+      where: { ...where, employmentTypeId: { [Op.ne]: null } },
+      include: [{ model: EmploymentType, as: 'employmentType', attributes: ['id', 'name'] }],
+      group: ['employmentTypeId', 'employmentType.id', 'employmentType.name'],
+    }),
+    Employee.findAll({
+      attributes: ['employeeGradeId'],
+      where: { ...where, employeeGradeId: { [Op.ne]: null } },
+      include: [{ model: EmployeeGrade, as: 'employeeGrade', attributes: ['id', 'name'] }],
+      group: ['employeeGradeId', 'employeeGrade.id', 'employeeGrade.name'],
+    }),
+    Employee.findAll({
+      attributes: ['branchId'],
+      where: { ...where, branchId: { [Op.ne]: null } },
+      include: [{ model: Branch, as: 'branch', attributes: ['id', 'name'] }],
+      group: ['branchId', 'branch.id', 'branch.name'],
+    }),
+  ]);
+
+  return {
+    departments: departments.map(d => ({ id: d.departmentId, name: d.department?.name })),
+    designations: designations.map(d => ({ id: d.designationId, name: d.designation?.name })),
+    employmentTypes: employmentTypes.map(d => ({ id: d.employmentTypeId, name: d.employmentType?.name })),
+    employeeGrades: employeeGrades.map(d => ({ id: d.employeeGradeId, name: d.employeeGrade?.name })),
+    branches: branches.map(d => ({ id: d.branchId, name: d.branch?.name })),
+  };
+};
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  EMPLOYEE TIMELINE
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get employee activity timeline (promotions, separations, etc.).
+ */
+const getEmployeeTimeline = async (employeeId) => {
+  await assertEmployeeExists(employeeId);
+
+  const [promotions, separations] = await Promise.all([
+    EmployeePromotion.findAll({
+      where: { employeeId },
+      order: [['promotionDate', 'DESC']],
+      include: [
+        { model: Designation, as: 'newDesignation', foreignKey: 'newDesignationId', attributes: ['name'], required: false },
+        { model: EmployeeGrade, as: 'newGrade', foreignKey: 'newGradeId', attributes: ['name'], required: false },
+      ],
+    }),
+    EmployeeSeparation.findAll({
+      where: { employeeId },
+      order: [['createdAt', 'DESC']],
+    }),
+  ]);
+
+  const timeline = [
+    ...promotions.map(p => ({
+      type: p.promotionType === 'Promotion' ? 'promotion' : 'demotion',
+      date: p.promotionDate,
+      title: p.promotionType === 'Promotion' ? 'Promoted' : 'Demoted',
+      description: p.newDesignation?.name
+        ? `${p.newDesignation.name}${p.newGrade?.name ? ` (${p.newGrade.name})` : ''}`
+        : null,
+      reason: p.reason,
+    })),
+    ...separations.map(s => ({
+      type: 'separation',
+      date: s.createdAt,
+      title: `Separation — ${s.separationType}`,
+      description: s.status === 'Approved' ? 'Approved' : s.status,
+      reason: s.reasonForLeaving,
+    })),
+  ];
+
+  return timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+};
+
+
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -1115,4 +1528,16 @@ module.exports = {
 
   // Promotions (read-only)
   getPromotionHistory,
+
+    // Dashboard & Stats
+  getEmployeeStats,
+  getUpcomingBirthdays,
+  getWorkAnniversaries,
+  getRecentlyJoined,
+
+  // Filters
+  getFilterOptions,
+
+  // Timeline
+  getEmployeeTimeline,
 };
