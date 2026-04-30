@@ -17,19 +17,21 @@ module.exports = (sequelize, DataTypes) => {
 
     // ── Contact identity ───────────────────────────────────────
     fullName: {
-      type:      DataTypes.STRING(255),
+      type:      DataTypes.STRING,
       allowNull: false,
     },
     relationship: {
       type:      DataTypes.STRING,
       allowNull: false,
       validate: {
-        isIn: [['Spouse',
+        isIn: [[
+        'Spouse',
         'Parent',
         'Sibling',
         'Child',
         'Friend',
         'Guardian',
+        'Other',
         ]],
       },
     },
@@ -52,18 +54,6 @@ module.exports = (sequelize, DataTypes) => {
       type:      DataTypes.STRING(255),
       allowNull: true,
       validate:  { isEmail: true },
-    },
-    address: {
-      type:      DataTypes.TEXT,
-      allowNull: true,
-    },
-
-    // ── Priority ───────────────────────────────────────────────
-    isPrimary: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-      comment:      'True for the first person to contact — only one should be primary per employee',
     },
   }, {
     tableName: 'employee_emergency_contacts',

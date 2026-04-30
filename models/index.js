@@ -84,7 +84,6 @@ const EmployeeSkillMap         = require('../modules/employee/models/EmployeeSki
 const EmployeeEducation        = require('../modules/employee/models/EmployeeEducation')(sequelize, DataTypes);
 const EmployeeExternalWork     = require('../modules/employee/models/EmployeeExternalWork')(sequelize, DataTypes);
 const EmployeeEmergencyContact = require('../modules/employee/models/EmployeeEmergencyContact')(sequelize, DataTypes);
-const EmployeeHealthInsurance  = require('../modules/employee/models/EmployeeHealthInsurance')(sequelize, DataTypes);
 
 // ── 2.5  attendance/  ─────────────────────────────────────────────────────────
 
@@ -340,11 +339,6 @@ Employee.hasMany(EmployeeExternalWork,   { foreignKey: 'employeeId',            
 // ── EmployeeEmergencyContact → Employee ──────────────────────────────────────
 EmployeeEmergencyContact.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
 Employee.hasMany(EmployeeEmergencyContact,   { foreignKey: 'employeeId',                   as: 'emergencyContacts' });
-
-// ── EmployeeHealthInsurance → Employee ────────────────────────────────────────
-EmployeeHealthInsurance.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
-Employee.hasOne(EmployeeHealthInsurance,    { foreignKey: 'employeeId',                    as: 'healthInsurance' });
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  3.5  ATTENDANCE MODULE
@@ -678,7 +672,6 @@ module.exports = {
   EmployeeEducation,
   EmployeeExternalWork,
   EmployeeEmergencyContact,
-  EmployeeHealthInsurance,
 
   // ── attendance ────────────────────────────────────────────────────────────
   ShiftType,

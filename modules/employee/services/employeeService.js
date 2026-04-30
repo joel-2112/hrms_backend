@@ -84,7 +84,6 @@ const {
   EmployeeSkillMap,
   EmployeeSeparation,
   EmployeePromotion,
-  EmployeeHealthInsurance,
 } = require('../../../models');
 
 const { AppError }                           = require('../../../middlewares/errorMiddleware');
@@ -697,7 +696,7 @@ const getMyProfile = async (userId) => {
       USER_INCLUDE,
       ...ORG_INCLUDES,
       MANAGER_INCLUDE,
-      { model: EmployeeHealthInsurance, required: false },
+    
       {
         model:      EmployeeEducation,
         required:   false,

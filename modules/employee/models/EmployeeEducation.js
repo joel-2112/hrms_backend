@@ -31,31 +31,25 @@ module.exports = (sequelize, DataTypes) => {
               "Master",
               "Doctorate",
               "Professional",
-              "Other",
             ],
           ],
         },
         comment: 'Education level e.g. "Bachelor", "Master", "High School"',
       },
       qualification: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING,
         allowNull: false,
         comment: 'Degree / qualification name e.g. "BSc Computer Science"',
       },
       majorOrField: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING,
         allowNull: true,
         comment: "Major subject or field of study",
       },
       institution: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING,
         allowNull: false,
         comment: "School / university / college name",
-      },
-      country: {
-        type: DataTypes.STRING(100),
-        allowNull: true,
-        comment: "Country where the institution is located",
       },
 
       // ── Timeline ───────────────────────────────────────────────
@@ -69,31 +63,18 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Graduation / completion date",
       },
-      isCurrentlyEnrolled: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
-        comment: "True for in-progress qualifications — toDate will be null",
-      },
-
       // ── Outcome ────────────────────────────────────────────────
       grade: {
         type: DataTypes.STRING(50),
         allowNull: true,
         comment: 'Grade, GPA, classification e.g. "First Class", "3.8 / 4.0"',
       },
-      certificateAttached: {
-        type: DataTypes.BOOLEAN,
+      certificateUrl: {
+        type: DataTypes.STRING,
         allowNull: false,
         defaultValue: false,
         comment:
           "True when a document has been uploaded to verify this qualification",
-      },
-
-      // ── Misc ───────────────────────────────────────────────────
-      notes: {
-        type: DataTypes.TEXT,
-        allowNull: true,
       },
     },
     {
