@@ -9,7 +9,6 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       // ── Parent FK ──────────────────────────────────────────────
-      // association: Branch.belongsTo(Company, { foreignKey: 'companyId', allowNull: false })
       companyId: {
         type: DataTypes.UUID,
         allowNull: false,
@@ -45,20 +44,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
         allowNull: true,
       },
-      address: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-      },
       phone: {
         type: DataTypes.STRING(30),
         allowNull: true,
       },
-      email: {
-        type: DataTypes.STRING(255),
-        allowNull: true,
-        validate: { isEmail: true },
-      },
-
       // ── Behaviour flags ────────────────────────────────────────
       disabled: {
         type: DataTypes.BOOLEAN,

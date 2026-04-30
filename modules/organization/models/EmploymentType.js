@@ -11,7 +11,6 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(100),
       allowNull: false,
-      // unique:    true,
       comment:   'Contract category e.g. "Full-time", "Part-time", "Contract", "Intern"',
     },
     description: {
@@ -20,8 +19,6 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     // ── Payroll behaviour hints ────────────────────────────────
-    // These flags let payroll and leave logic branch
-    // without hard-coding string comparisons on the name field.
     isFullTime: {
       type:         DataTypes.BOOLEAN,
       allowNull:    false,

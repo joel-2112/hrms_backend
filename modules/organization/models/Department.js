@@ -8,9 +8,6 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     // ── Parent FKs ─────────────────────────────────────────────
-    // association: Department.belongsTo(Company,    { foreignKey: 'companyId', allowNull: false })
-    // association: Department.belongsTo(Department, { as: 'parentDepartment', foreignKey: 'parentDepartmentId' })
-    // association: Department.hasMany(Department,   { as: 'subDepartments',   foreignKey: 'parentDepartmentId' })
     companyId: {
       type:      DataTypes.UUID,
       allowNull: false,

@@ -22,9 +22,6 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       // ── Pay band boundaries ────────────────────────────────────
-      // Stored here as reference values; actual salary is on SalaryStructure.
-      // They give HR a quick view of the expected range for a grade without
-      // querying payroll tables.
       minBaseSalary: {
         type: DataTypes.DECIMAL(15, 2),
         allowNull: true,
