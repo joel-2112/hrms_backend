@@ -22,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull:    false,
       defaultValue: 'Draft',
       validate: {
-        isIn: [['Draft', 'Pending Approval', 'Approved', 'Rejected', 'Completed']],
+        isIn: [['Draft', 'Pending', 'Approved', 'Rejected']],
       },
     },
     approvedById: {
@@ -40,14 +40,11 @@ module.exports = (sequelize, DataTypes) => {
       type:      DataTypes.STRING,
       allowNull: false,
       validate: {
-        isIn: [['Resignation',
+        isIn: [[
+        'Resignation',
         'Termination',
-        'Retirement',
         'End of Contract',
-        'Redundancy',
-        'Death',
-        'Abandonment',
-        'Mutual Agreement']],
+        ]],
       },
     },
     initiatedBy: {
@@ -76,75 +73,9 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     // ── Exit interview ─────────────────────────────────────────
-    exitInterviewDate: {
-      type:      DataTypes.DATEONLY,
-      allowNull: true,
-    },
-    exitInterviewConductedById: {
-      type:      DataTypes.UUID,
-      allowNull: true,
-      comment:   'FK → employees.id — HR officer who conducted exit interview',
-    },
-    exitRemarks: {
-      type:      DataTypes.TEXT,
-      allowNull: true,
-      comment:   'Exit interview summary / confidential notes',
-    },
     reasonForLeaving: {
       type:      DataTypes.TEXT,
       allowNull: true,
-    },
-    wouldRehire: {
-      type:      DataTypes.BOOLEAN,
-      allowNull: true,
-      comment:   'HR assessment — is this employee eligible for future rehire',
-    },
-
-    // ── Clearance checklist ────────────────────────────────────
-    clearanceTasks: {
-      type:         DataTypes.JSONB,
-      allowNull:    false,
-      defaultValue: [],
-      comment:      'Offboarding tasks e.g. [{ task:"Return laptop", assignedTo, completedOn, status }]',
-    },
-    equipmentReturned: {
-      type:         DataTypes.JSONB,
-      allowNull:    false,
-      defaultValue: [],
-      comment:      'Equipment returned e.g. [{ item:"Laptop", serial:"XYZ", returnedOn:"..." }]',
-    },
-    systemAccessRevoked: {
-      type:         DataTypes.JSONB,
-      allowNull:    false,
-      defaultValue: [],
-      comment:      'Systems access revoked e.g. [{ system:"GitHub", revokedOn:"..." }]',
-    },
-    fullAndFinalSettled: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-      comment:      'True when final payroll settlement has been processed',
-    },
-    fullAndFinalDate: {
-      type:      DataTypes.DATEONLY,
-      allowNull: true,
-    },
-
-    // ── Notice period ──────────────────────────────────────────
-    noticePeriodServed: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-    },
-    noticePeriodWaived: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-    },
-    noticeShortfallDays: {
-      type:      DataTypes.INTEGER,
-      allowNull: true,
-      comment:   'Days of notice NOT served — relevant for recovery from final payroll',
     },
 
     // ── Misc ───────────────────────────────────────────────────

@@ -76,7 +76,6 @@ const DocumentVersion = require('../modules/document/models/DocumentVersion')(se
 // ── 2.4  employee/  ───────────────────────────────────────────────────────────
 
 const Employee                 = require('../modules/employee/models/Employee')(sequelize, DataTypes);
-const EmployeeOnboarding       = require('../modules/employee/models/EmployeeOnboarding')(sequelize, DataTypes);
 const EmployeePromotion        = require('../modules/employee/models/EmployeePromotion')(sequelize, DataTypes);
 const EmployeeTransfer         = require('../modules/employee/models/EmployeeTransfer')(sequelize, DataTypes);
 const EmployeeSeparation       = require('../modules/employee/models/EmployeeSeparation')(sequelize, DataTypes);
@@ -300,11 +299,6 @@ RoleProfile.hasMany(Employee,    { foreignKey: 'roleProfileId',    as: 'employee
 // ── Employee self-reference (reporting line) ──────────────────────────────────
 Employee.belongsTo(Employee, { foreignKey: 'reportsToId', as: 'reportsTo' });
 Employee.hasMany(Employee,   { foreignKey: 'reportsToId', as: 'directReports' });
-
-// ── EmployeeOnboarding → Employee ────────────────────────────────────────────
-EmployeeOnboarding.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
-Employee.hasMany(EmployeeOnboarding,   { foreignKey: 'employeeId',                   as: 'onboardings' });
-
 // ── EmployeePromotion → Employee  +  optional FK to approver ─────────────────
 EmployeePromotion.belongsTo(Employee, { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
 EmployeePromotion.belongsTo(Employee, { foreignKey: 'approvedById',                  as: 'approvedBy' });
@@ -664,7 +658,6 @@ module.exports = {
 
   // ── employee ──────────────────────────────────────────────────────────────
   Employee,
-  EmployeeOnboarding,
   EmployeePromotion,
   EmployeeTransfer,
   EmployeeSeparation,
