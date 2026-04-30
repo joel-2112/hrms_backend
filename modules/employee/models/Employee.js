@@ -163,7 +163,7 @@ module.exports = (sequelize, DataTypes) => {
       // ─────────────────────────────────────────────
       //  SECTION 5 — CONTACT
       // ─────────────────────────────────────────────
-      companyEmail: {
+      email: {
         type: DataTypes.STRING(255),
         allowNull: true,
         validate: { isEmail: true },
@@ -198,7 +198,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(20),
         allowNull: true,
       },
-
       // ─────────────────────────────────────────────
       //  SECTION 9 — BANK DETAILS
       // ─────────────────────────────────────────────

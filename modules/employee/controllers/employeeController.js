@@ -31,19 +31,20 @@ const createEmployee = catchAsync(async (req, res) => {
   const employee = await employeeService.createEmployee(req.body);
 
   created(res, {
-    message: 'Employee record created successfully — pending GM approval',
+    message: 'Employee record created — pending GM approval',
     data: employee,
   });
 });
 
 /**
  * POST /api/employees/from-user/:userId
- * Create an Employee record for an existing User account.
- * Reuses User's name/email, accepts Employee-specific fields.
+ * Create Employee from existing User account.
  */
 const createEmployeeFromExistingUser = catchAsync(async (req, res) => {
   const { userId } = req.params;
+
   const employee = await employeeService.createEmployeeFromExistingUser(userId, req.body);
+
   created(res, {
     message: 'Employee record created from existing User — Active immediately',
     data: employee,
@@ -71,7 +72,7 @@ const approveEmployee = catchAsync(async (req, res) => {
 
 /**
  * GET /api/employees
- * Paginated list with rich filters + RBAC scope from req.perms.
+ * Paginated list with rich filters + RBAC scope.
  */
 const getEmployees = catchAsync(async (req, res) => {
   const permFilter = req.perms?.employeeFilter || {};
@@ -94,7 +95,6 @@ const getEmployeeById = catchAsync(async (req, res) => {
 
   let employee = await employeeService.getEmployeeById(id);
 
-  // Strip confidential fields for non-HR callers
   if (req.perms && !req.perms.isHR) {
     employee = stripHRFields(employee);
   }
@@ -120,7 +120,7 @@ const getMyProfile = catchAsync(async (req, res) => {
 
 /**
  * PATCH /api/employees/:id
- * HR updates employee fields (no status, no promotion fields through this route).
+ * HR updates employee fields.
  */
 const updateEmployee = catchAsync(async (req, res) => {
   const { id } = req.params;
@@ -135,7 +135,7 @@ const updateEmployee = catchAsync(async (req, res) => {
 
 /**
  * PATCH /api/employees/:id/status
- * HR changes employee lifecycle status (Active ↔ Suspended ↔ On Leave).
+ * HR changes employee lifecycle status.
  */
 const updateEmployeeStatus = catchAsync(async (req, res) => {
   const { id } = req.params;
@@ -214,7 +214,6 @@ const getDirectReports = catchAsync(async (req, res) => {
 /**
  * POST /api/employees/:id/deactivate-user
  * Suspends the linked User account without changing employee status.
- * Used for security lockouts while HR investigates.
  */
 const deactivateUser = catchAsync(async (req, res) => {
   const { id } = req.params;
@@ -228,7 +227,7 @@ const deactivateUser = catchAsync(async (req, res) => {
 
 /**
  * POST /api/employees/:id/activate-user
- * Reactivates the linked User account (e.g., after suspension is lifted).
+ * Reactivates the linked User account.
  */
 const activateUser = catchAsync(async (req, res) => {
   const { id } = req.params;
@@ -245,10 +244,6 @@ const activateUser = catchAsync(async (req, res) => {
 //  EDUCATION
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/employees/:id/education
- * All education records for an employee.
- */
 const getEducation = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -260,10 +255,6 @@ const getEducation = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * POST /api/employees/:id/education
- * Add a qualification record.
- */
 const addEducation = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -275,10 +266,6 @@ const addEducation = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * PATCH /api/employees/:id/education/:recordId
- * Edit an education record (HR only).
- */
 const updateEducation = catchAsync(async (req, res) => {
   const { id, recordId } = req.params;
 
@@ -290,10 +277,6 @@ const updateEducation = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * DELETE /api/employees/:id/education/:recordId
- * Remove an education record.
- */
 const deleteEducation = catchAsync(async (req, res) => {
   const { id, recordId } = req.params;
 
@@ -307,22 +290,10 @@ const deleteEducation = catchAsync(async (req, res) => {
 //  EXTERNAL WORK (previous employment history)
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/employees/:id/external-work
- * Full employment history for an employee.
- */
 const getExternalWork = catchAsync(async (req, res) => {
   const { id } = req.params;
 
-  let records = await employeeService.getExternalWork(id);
-
-  // Strip HR-only fields for non-HR callers
-  if (req.perms && !req.perms.isHR) {
-    records = records.map(r => {
-      const { referenceNotes, referenceChecked, referenceCheckedOn, ...rest } = r.toJSON();
-      return rest;
-    });
-  }
+  const records = await employeeService.getExternalWork(id);
 
   ok(res, {
     message: 'Employment history retrieved',
@@ -330,10 +301,6 @@ const getExternalWork = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * POST /api/employees/:id/external-work
- * Add a work history record.
- */
 const addExternalWork = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -345,10 +312,6 @@ const addExternalWork = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * PATCH /api/employees/:id/external-work/:recordId
- * Edit a work history record (HR only).
- */
 const updateExternalWork = catchAsync(async (req, res) => {
   const { id, recordId } = req.params;
 
@@ -360,10 +323,6 @@ const updateExternalWork = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * DELETE /api/employees/:id/external-work/:recordId
- * Remove a work history record.
- */
 const deleteExternalWork = catchAsync(async (req, res) => {
   const { id, recordId } = req.params;
 
@@ -377,10 +336,6 @@ const deleteExternalWork = catchAsync(async (req, res) => {
 //  EMERGENCY CONTACTS
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/employees/:id/emergency-contacts
- * All emergency contacts for an employee.
- */
 const getEmergencyContacts = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -392,10 +347,6 @@ const getEmergencyContacts = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * POST /api/employees/:id/emergency-contacts
- * Add an emergency contact.
- */
 const addEmergencyContact = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -407,10 +358,6 @@ const addEmergencyContact = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * PATCH /api/employees/:id/emergency-contacts/:recordId
- * Edit an emergency contact.
- */
 const updateEmergencyContact = catchAsync(async (req, res) => {
   const { id, recordId } = req.params;
 
@@ -422,10 +369,6 @@ const updateEmergencyContact = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * DELETE /api/employees/:id/emergency-contacts/:recordId
- * Remove an emergency contact.
- */
 const deleteEmergencyContact = catchAsync(async (req, res) => {
   const { id, recordId } = req.params;
 
@@ -434,30 +377,11 @@ const deleteEmergencyContact = catchAsync(async (req, res) => {
   noContent(res);
 });
 
-/**
- * PATCH /api/employees/:id/emergency-contacts/:recordId/primary
- * Atomically set one contact as primary (unsets all others).
- */
-const setPrimaryContact = catchAsync(async (req, res) => {
-  const { id, recordId } = req.params;
-
-  const contact = await employeeService.setPrimaryContact(id, recordId);
-
-  ok(res, {
-    message: 'Primary emergency contact updated',
-    data: contact,
-  });
-});
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  SKILL MAP
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/employees/:id/skill-map
- * Fetch the skill map record.
- */
 const getSkillMap = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -469,10 +393,6 @@ const getSkillMap = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * PUT /api/employees/:id/skill-map
- * Create or fully replace the skill map.
- */
 const upsertSkillMap = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -484,75 +404,11 @@ const upsertSkillMap = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * POST /api/employees/:id/skill-map/skills
- * Append one skill to the skills array.
- */
-const addSkill = catchAsync(async (req, res) => {
-  const { id } = req.params;
-
-  const map = await employeeService.addSkill(id, req.body);
-
-  created(res, {
-    message: 'Skill added',
-    data: map,
-  });
-});
-
-/**
- * DELETE /api/employees/:id/skill-map/skills/:skillName
- * Remove a skill by name.
- */
-const removeSkill = catchAsync(async (req, res) => {
-  const { id, skillName } = req.params;
-
-  const map = await employeeService.removeSkill(id, decodeURIComponent(skillName));
-
-  ok(res, {
-    message: 'Skill removed',
-    data: map,
-  });
-});
-
-/**
- * POST /api/employees/:id/skill-map/certifications
- * Append a certification.
- */
-const addCertification = catchAsync(async (req, res) => {
-  const { id } = req.params;
-
-  const map = await employeeService.addCertification(id, req.body);
-
-  created(res, {
-    message: 'Certification added',
-    data: map,
-  });
-});
-
-/**
- * POST /api/employees/:id/skill-map/trainings
- * Append a training record.
- */
-const addTraining = catchAsync(async (req, res) => {
-  const { id } = req.params;
-
-  const map = await employeeService.addTraining(id, req.body);
-
-  created(res, {
-    message: 'Training added',
-    data: map,
-  });
-});
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  SEPARATION
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * POST /api/employees/:id/separation
- * HR initiates a separation record (Draft).
- */
 const initiateSeparation = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -564,10 +420,6 @@ const initiateSeparation = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * POST /api/employees/:id/separation/submit
- * HR submits the separation for GM approval.
- */
 const submitSeparation = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -579,10 +431,6 @@ const submitSeparation = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * POST /api/employees/:id/separation/approve
- * GM approves separation → Employee status = Exit, User deactivated.
- */
 const approveSeparation = catchAsync(async (req, res) => {
   const { id } = req.params;
   const approverUserId = req.user.id;
@@ -595,10 +443,6 @@ const approveSeparation = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * POST /api/employees/:id/separation/reject
- * GM rejects separation → back to Draft.
- */
 const rejectSeparation = catchAsync(async (req, res) => {
   const { id } = req.params;
   const approverUserId = req.user.id;
@@ -612,46 +456,11 @@ const rejectSeparation = catchAsync(async (req, res) => {
   });
 });
 
-/**
- * PATCH /api/employees/:id/separation/clearance
- * HR updates the clearance checklist.
- */
-const updateClearanceTasks = catchAsync(async (req, res) => {
-  const { id } = req.params;
-
-  const separation = await employeeService.updateClearanceTasks(id, req.body);
-
-  ok(res, {
-    message: 'Clearance tasks updated',
-    data: separation,
-  });
-});
-
-/**
- * POST /api/employees/:id/separation/settle
- * HR marks full-and-final settlement complete.
- */
-const settleFullAndFinal = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const { encashmentDate } = req.body;
-
-  const separation = await employeeService.settleFullAndFinal(id, encashmentDate);
-
-  ok(res, {
-    message: 'Full and final settlement recorded — Separation completed',
-    data: separation,
-  });
-});
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  PROMOTIONS — READ ONLY
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * GET /api/employees/:id/promotions
- * All promotion/demotion records for an employee (read-only).
- */
 const getPromotionHistory = catchAsync(async (req, res) => {
   const { id } = req.params;
 
@@ -671,40 +480,16 @@ const getPromotionHistory = catchAsync(async (req, res) => {
 
 /**
  * Strips HR-only fields from an employee record for non-HR callers.
- * Called on getEmployeeById when req.perms.isHR is false.
  */
 const stripHRFields = (employee) => {
   const plain = employee.toJSON ? employee.toJSON() : { ...employee };
 
-  // Remove confidential reference-check fields from external work
-  if (plain.EmployeeExternalWorks) {
-    plain.EmployeeExternalWorks = plain.EmployeeExternalWorks.map(w => {
-      const { referenceNotes, referenceChecked, referenceCheckedOn, ...rest } = w;
-      return rest;
-    });
-  }
-
-  // Remove exit interview notes from separation
-  if (plain.EmployeeSeparations) {
-    plain.EmployeeSeparations = plain.EmployeeSeparations.map(s => {
-      const { exitRemarks, wouldRehire, exitInterviewDate, ...rest } = s;
-      return rest;
-    });
-  }
-
-  // Remove financial/strictly-HR fields
-  delete plain.nationalId;
-  delete plain.passportNumber;
-  delete plain.taxId;
-  delete plain.socialSecurityNumber;
-  delete plain.bankName;
+  delete plain.nationalIdNumber;
   delete plain.bankAccountNumber;
-  delete plain.bankBranch;
-  delete plain.bankCode;
   delete plain.mobileMoneyNumber;
-  delete plain.customFields;
+  delete plain.employeeDocuments;
+  delete plain.holidayListId;
   delete plain.leaveApprovedById;
-  delete plain.expenseApprovedById;
 
   return plain;
 };
@@ -717,6 +502,7 @@ const stripHRFields = (employee) => {
 module.exports = {
   // Core profile
   createEmployee,
+  createEmployeeFromExistingUser,
   approveEmployee,
   getEmployees,
   getEmployeeById,
@@ -728,8 +514,6 @@ module.exports = {
   getDirectReports,
   deactivateUser,
   activateUser,
-  createEmployeeFromExistingUser,
-  
 
   // Education
   getEducation,
@@ -748,23 +532,16 @@ module.exports = {
   addEmergencyContact,
   updateEmergencyContact,
   deleteEmergencyContact,
-  setPrimaryContact,
 
   // Skill map
   getSkillMap,
   upsertSkillMap,
-  addSkill,
-  removeSkill,
-  addCertification,
-  addTraining,
 
   // Separation
   initiateSeparation,
   submitSeparation,
   approveSeparation,
   rejectSeparation,
-  updateClearanceTasks,
-  settleFullAndFinal,
 
   // Promotions (read-only)
   getPromotionHistory,

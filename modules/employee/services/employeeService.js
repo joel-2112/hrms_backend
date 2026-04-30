@@ -11,12 +11,14 @@
  *  getEmployeeById         Full profile with all sub-records
  *  getMyProfile            Self-service read-only — employee reads their own record
  *  updateEmployee          HR-only field updates (no status, no promotion fields)
- *  updateEmployeeStatus    Lifecycle transitions: Active ↔ Suspended ↔ On Leave ↔ Exit
+ *  updateEmployeeStatus    Lifecycle transitions: Active ↔ Suspended ↔ onLeave ↔ exited
  *  approveEmployee         GM approval — creates User account + temporary password
  *  searchEmployees         Full-text search across name, number, email
  *  getOrgChart             Self-ref reportsTo tree for org chart rendering
  *  getDirectReports        All employees reporting to a given manager
  *  deactivateUser          Suspends the linked User account without separating
+ *  activateUser            Reactivates a suspended User account
+ *  createEmployeeFromExistingUser  Create Employee record for an existing User
  *
  *  ── EDUCATION ─────────────────────────────────────────────────────────
  *  addEducation            Add a qualification record
@@ -35,34 +37,26 @@
  *  updateEmergencyContact  Edit an emergency contact
  *  deleteEmergencyContact  Remove an emergency contact
  *  getEmergencyContacts    All contacts for an employee
- *  setPrimaryContact       Mark one contact as primary (unsets others atomically)
  *
  *  ── SKILL MAP ─────────────────────────────────────────────────────────
  *  getSkillMap             Fetch the skill map record
- *  upsertSkillMap          Create or fully replace skill map (HR + employee for self)
- *  addSkill                Append one skill to the skills array
- *  removeSkill             Remove one skill by index
- *  addCertification        Append a certification
- *  addTraining             Append a training record
+ *  upsertSkillMap          Create or fully replace skill map
  *
  *  ── SEPARATION ────────────────────────────────────────────────────────
  *  initiateSeparation      HR creates the separation record (Draft)
  *  submitSeparation        HR submits for GM approval
- *  approveSeparation       GM approves → Employee.status = 'Exit', User deactivated
+ *  approveSeparation       GM approves → Employee.status = 'exited', User deactivated
  *  rejectSeparation        GM rejects → back to Draft
- *  updateClearanceTasks    HR updates the clearance checklist
- *  settleFullAndFinal      Mark final payroll settlement complete
  *
  *  ── PROMOTIONS (READ-ONLY) ────────────────────────────────────────────
  *  getPromotionHistory     All promotion/demotion records for an employee
- *                          (write operations live in the performance module)
  *
  * Architecture:
  *   — No req / res — pure data in, data out
  *   — Every mutating operation that touches more than one table uses a transaction
  *   — AppError with correct HTTP status on every business rule violation
  *   — All list functions return { data, meta }
- *   — Sensitive fields (passwordHash, referenceNotes) are explicitly excluded
+ *   — Sensitive fields (passwordHash) are explicitly excluded
  */
 
 const { Op }     = require('sequelize');
@@ -94,36 +88,31 @@ const SALT_ROUNDS = 10;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  SHARED INCLUDE SETS
-//  Defined once so every query is consistent and easy to maintain.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Lightweight org-master includes — used in list queries */
 const ORG_INCLUDES = [
-  { model: Company, as: 'company',      attributes: ['id', 'name', 'abbr'] },
-  { model: Branch, as: 'branch',        attributes: ['id', 'name'], required: false },
-  { model: Department, as: 'department',    attributes: ['id', 'name'], required: false },
-  { model: Designation, as: 'designation',   attributes: ['id', 'name'], required: false },
-  { model: EmploymentType, as: 'employmentType',attributes: ['id', 'name'], required: false },
-  { model: EmployeeGrade, as: 'employeeGrade', attributes: ['id', 'name'], required: false },
+  { model: Company, as: 'company',         attributes: ['id', 'name', 'abbr'] },
+  { model: Branch, as: 'branch',           attributes: ['id', 'name'], required: false },
+  { model: Department, as: 'department',   attributes: ['id', 'name'], required: false },
+  { model: Designation, as: 'designation', attributes: ['id', 'name'], required: false },
+  { model: EmploymentType, as: 'employmentType', attributes: ['id', 'name'], required: false },
+  { model: EmployeeGrade, as: 'employeeGrade',   attributes: ['id', 'name'], required: false },
 ];
 
-/** Manager / self-ref include */
 const MANAGER_INCLUDE = {
   model:      Employee,
   as:         'reportsTo',
-  attributes: ['id', 'firstName', 'middleName', 'employeeNumber', 'image'],
+  attributes: ['id', 'firstName', 'middleName', 'lastName', 'employeeNumber', 'image'],
   required:   false,
 };
 
-/** User account include — excludes passwordHash always */
 const USER_INCLUDE = {
   model:      User,
-    as:         'user',
+  as:         'user',
   attributes: ['id', 'email', 'status', 'lastLogin', 'isSuperUser', 'isSystemManager'],
   required:   false,
 };
 
-/** Full profile includes — used on single-record fetches */
 const FULL_INCLUDES = [
   ...ORG_INCLUDES,
   MANAGER_INCLUDE,
@@ -134,11 +123,6 @@ const FULL_INCLUDES = [
 //  INTERNAL HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Generates EMP-YYYY-NNNN within a transaction.
- * Uses a SELECT COUNT for the sequence — safe because the unique index
- * on employee_number is the final guard against races.
- */
 const generateEmployeeNumber = async (transaction) => {
   const year  = new Date().getFullYear();
   const count = await Employee.count({
@@ -146,15 +130,11 @@ const generateEmployeeNumber = async (transaction) => {
       employeeNumber: { [Op.like]: `EMP-${year}-%` },
     },
     transaction,
-    paranoid: false,   // count soft-deleted too so sequence never reuses
+    paranoid: false,
   });
   return `EMP-${year}-${String(count + 1).padStart(4, '0')}`;
 };
 
-/**
- * Generates a secure temporary password: Tw@XXXXXX
- * (capital T, lowercase w, @ then 6 alphanumeric chars)
- */
 const generateTemporaryPassword = () => {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   let suffix  = '';
@@ -164,10 +144,6 @@ const generateTemporaryPassword = () => {
   return `Tw@${suffix}`;
 };
 
-/**
- * Returns the employee for a given userId.
- * Used by the self-service profile endpoint.
- */
 const getEmployeeByUserId = async (userId) => {
   const emp = await Employee.findOne({
     where:   { userId },
@@ -177,10 +153,6 @@ const getEmployeeByUserId = async (userId) => {
   return emp;
 };
 
-/**
- * Validates that all FK UUIDs in the payload actually exist in their tables.
- * Runs in parallel for performance. Throws on the first missing record.
- */
 const validateOrgFKs = async (data) => {
   const checks = [];
 
@@ -230,6 +202,17 @@ const validateOrgFKs = async (data) => {
   await Promise.all(checks);
 };
 
+const assertEmployeeExists = async (id) => {
+  const exists = await Employee.count({ where: { id } });
+  if (!exists) throw new AppError('Employee not found', 404);
+};
+
+const findSeparation = async (employeeId) => {
+  const sep = await EmployeeSeparation.findOne({ where: { employeeId } });
+  if (!sep) throw new AppError('No separation record found for this employee', 404);
+  return sep;
+};
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  CORE PROFILE
@@ -237,22 +220,10 @@ const validateOrgFKs = async (data) => {
 
 /**
  * HR creates a new employee record — status starts as 'Inactive' pending GM approval.
- *
- * What HR provides:
- *   — All identity, contact, address, statutory, bank fields
- *   — Org FK assignments (company, branch, department, designation, grade, type)
- *   — reportsToId (line manager)
- *   — dateOfJoining
- *
- * What the system sets:
- *   — employeeNumber (auto-generated)
- *   — status = 'Inactive' (locked until GM approves)
- *   — userId = null (set when GM approves and User account is created)
  */
 const createEmployee = async (data) => {
-  // ── 1. Validate required fields ───────────────────────────────────────────
-  if (!data.firstName || !data.lastName || !data.lastName) {
-    throw new AppError('Full name required', 422);
+  if (!data.firstName || !data.lastName) {
+    throw new AppError('firstName and lastName are required', 422);
   }
   if (!data.companyId) {
     throw new AppError('companyId is required', 422);
@@ -261,35 +232,29 @@ const createEmployee = async (data) => {
     throw new AppError('dateOfJoining is required', 422);
   }
 
-  // ── 2. Validate all FK references exist ───────────────────────────────────
   await validateOrgFKs(data);
 
-  // ── 3. Check for duplicate company email if provided ──────────────────────
-  if (data.companyEmail) {
+  if (data.email) {
     const emailTaken = await Employee.findOne({
-      where: { companyEmail: data.companyEmail.toLowerCase().trim() },
+      where: { email: data.email.toLowerCase().trim() },
     });
     if (emailTaken) {
-      throw new AppError('An employee with this company email already exists', 409);
+      throw new AppError('An employee with this email already exists', 409);
     }
   }
 
-  // ── 4. Create within a transaction ────────────────────────────────────────
   const employee = await sequelize.transaction(async (t) => {
     const empNumber = await generateEmployeeNumber(t);
 
     const emp = await Employee.create({
       // Identity
-      firstName:    data.firstName.trim(),
-      middleName:   data.middleName?.trim()  || null,
-      lastName:     data.lastName.trim(),
-      salutation:   data.salutation          || null,
-      gender:       data.gender              || null,
-      dateOfBirth:  data.dateOfBirth         || null,
-      maritalStatus:data.maritalStatus       || null,
-      nationality:  data.nationality         || null,
-      religion:     data.religion            || null,
-      bloodGroup:   data.bloodGroup          || null,
+      firstName:      data.firstName.trim(),
+      middleName:     data.middleName?.trim() || null,
+      lastName:       data.lastName.trim(),
+      salutation:     data.salutation   || null,
+      gender:         data.gender       || null,
+      maritalStatus:  data.maritalStatus || null,
+      image:          data.image        || null,
 
       // Org FKs
       companyId:        data.companyId,
@@ -301,60 +266,42 @@ const createEmployee = async (data) => {
       reportsToId:      data.reportsToId      || null,
 
       // Employment
-      employeeNumber:             empNumber,
-      dateOfJoining:              data.dateOfJoining,
-      scheduledConfirmationDate:  data.scheduledConfirmationDate || null,
-      contractEndDate:            data.contractEndDate           || null,
-      noticeNumberOfDays:         data.noticeNumberOfDays        ?? 30,
-      status:                     'Inactive',     // locked until GM approves
-      userId:                     null,           // provisioned on approval
+      employeeNumber:   empNumber,
+      dateOfJoining:    data.dateOfJoining,
+      contractEndDate:  data.contractEndDate || null,
+      relievingDate:    null,
+      encashmentDate:   null,
+      status:           'Inactive',
+      userId:           null,
+
+      // Professional links
+      portfolioUrl: data.portfolioUrl || null,
+      githubUrl:    data.githubUrl    || null,
 
       // Contact
-      personalEmail:  data.personalEmail?.toLowerCase().trim() || null,
-      companyEmail:   data.companyEmail?.toLowerCase().trim()  || null,
-      cellNumber:     data.cellNumber  || null,
-      phoneNumber:    data.phoneNumber || null,
+      email:       data.email?.toLowerCase().trim() || null,
+      phoneNumber: data.phoneNumber || null,
 
-      // Current address
-      currentAddress:    data.currentAddress    || null,
-      currentCity:       data.currentCity       || null,
-      currentState:      data.currentState      || null,
-      currentCountry:    data.currentCountry    || null,
-      currentPostalCode: data.currentPostalCode || null,
-
-      // Permanent address
-      permanentAddress:    data.permanentAddress    || null,
-      permanentCity:       data.permanentCity       || null,
-      permanentState:      data.permanentState      || null,
-      permanentCountry:    data.permanentCountry    || null,
-      permanentPostalCode: data.permanentPostalCode || null,
-      isSameAddress:       data.isSameAddress       ?? false,
-
-      // Statutory / IDs
-      nationalId:           data.nationalId           || null,
-      passportNumber:       data.passportNumber       || null,
-      passportExpiry:       data.passportExpiry       || null,
-      taxId:                data.taxId                || null,
-      socialSecurityNumber: data.socialSecurityNumber || null,
+      // Address
+      City:               data.City               || null,
+      Region:             data.Region             || null,
+      zone:               data.zone               || null,
+      Country:            data.Country            || null,
+      currentPostalCode:  data.currentPostalCode  || null,
 
       // Bank
       bankName:          data.bankName          || null,
       bankAccountNumber: data.bankAccountNumber || null,
-      bankBranch:        data.bankBranch        || null,
-      bankCode:          data.bankCode          || null,
       mobileMoneyNumber: data.mobileMoneyNumber || null,
       paymentMethod:     data.paymentMethod     || 'Bank Transfer',
 
-      // Leave / attendance defaults
-      holidayListId:       data.holidayListId       || null,
-      defaultShiftId:      data.defaultShiftId      || null,
-      attendanceDeviceId:  data.attendanceDeviceId  || null,
-      leaveApprovedById:   data.leaveApprovedById   || null,
-      expenseApprovedById: data.expenseApprovedById || null,
+      // Leave / Attendance defaults
+      holidayListId:     data.holidayListId     || null,
+      leaveApprovedById: data.leaveApprovedById || null,
 
-      // Misc
-      bio:          data.bio          || null,
-      customFields: data.customFields || null,
+      // Documents & IDs
+      employeeDocuments: data.employeeDocuments || null,
+      nationalIdNumber:  data.nationalIdNumber  || null,
     }, { transaction: t });
 
     return emp;
@@ -371,13 +318,6 @@ const createEmployee = async (data) => {
 
 /**
  * Create an Employee record for an existing User account.
- * 
- * Use case: Super Admin / System Manager already has a User account
- * but needs an Employee record to participate in workflows
- * (requisitions, approvals, etc.).
- *
- * The Employee is created as Active immediately — no GM approval needed
- * because the User account already exists.
  */
 const createEmployeeFromExistingUser = async (userId, data) => {
   const user = await User.findByPk(userId, {
@@ -389,14 +329,9 @@ const createEmployeeFromExistingUser = async (userId, data) => {
     throw new AppError('User account must be Active to create an Employee record', 422);
   }
 
-  const existingEmp = await Employee.findOne({ 
-    where: { userId: user.id } 
-  });
+  const existingEmp = await Employee.findOne({ where: { userId: user.id } });
   if (existingEmp) {
-    throw new AppError(
-      `Employee record already exists for this user (${existingEmp.employeeNumber})`, 
-      409
-    );
+    throw new AppError(`Employee record already exists for this user (${existingEmp.employeeNumber})`, 409);
   }
 
   if (!data.companyId) throw new AppError('companyId is required', 422);
@@ -404,13 +339,12 @@ const createEmployeeFromExistingUser = async (userId, data) => {
   
   await validateOrgFKs(data);
 
-  const companyEmail = data.companyEmail || user.email;
-  
+  const email = data.email || user.email;
   const emailTaken = await Employee.findOne({
-    where: { companyEmail: companyEmail.toLowerCase().trim() }
+    where: { email: email.toLowerCase().trim() }
   });
   if (emailTaken) {
-    throw new AppError('An employee with this company email already exists', 409);
+    throw new AppError('An employee with this email already exists', 409);
   }
 
   const employee = await sequelize.transaction(async (t) => {
@@ -430,51 +364,33 @@ const createEmployeeFromExistingUser = async (userId, data) => {
       employeeGradeId:  data.employeeGradeId  || null,
       reportsToId:      data.reportsToId      || null,
 
-      employeeNumber:             empNumber,
-      dateOfJoining:              data.dateOfJoining,
-      scheduledConfirmationDate:  data.scheduledConfirmationDate || null,
-      contractEndDate:            data.contractEndDate           || null,
-      noticeNumberOfDays:         data.noticeNumberOfDays        ?? 30,
-      status:                     'Active',
+      employeeNumber:   empNumber,
+      dateOfJoining:    data.dateOfJoining,
+      contractEndDate:  data.contractEndDate || null,
+      status:           'Active',
 
-      personalEmail:  data.personalEmail?.toLowerCase().trim() || null,
-      companyEmail:   companyEmail.toLowerCase().trim(),
-      cellNumber:     data.cellNumber  || null,
-      phoneNumber:    data.phoneNumber || null,
+      portfolioUrl: data.portfolioUrl || null,
+      githubUrl:    data.githubUrl    || null,
 
-      currentAddress:    data.currentAddress    || null,
-      currentCity:       data.currentCity       || null,
-      currentState:      data.currentState      || null,
-      currentCountry:    data.currentCountry    || null,
-      currentPostalCode: data.currentPostalCode || null,
-      permanentAddress:    data.permanentAddress    || null,
-      permanentCity:       data.permanentCity       || null,
-      permanentState:      data.permanentState      || null,
-      permanentCountry:    data.permanentCountry    || null,
-      permanentPostalCode: data.permanentPostalCode || null,
-      isSameAddress:       data.isSameAddress       ?? false,
+      email:       email.toLowerCase().trim(),
+      phoneNumber: data.phoneNumber || null,
 
-      nationalId:           data.nationalId           || null,
-      passportNumber:       data.passportNumber       || null,
-      passportExpiry:       data.passportExpiry       || null,
-      taxId:                data.taxId                || null,
-      socialSecurityNumber: data.socialSecurityNumber || null,
+      City:               data.City               || null,
+      Region:             data.Region             || null,
+      zone:               data.zone               || null,
+      Country:            data.Country            || null,
+      currentPostalCode:  data.currentPostalCode  || null,
 
       bankName:          data.bankName          || null,
       bankAccountNumber: data.bankAccountNumber || null,
-      bankBranch:        data.bankBranch        || null,
-      bankCode:          data.bankCode          || null,
       mobileMoneyNumber: data.mobileMoneyNumber || null,
       paymentMethod:     data.paymentMethod     || 'Bank Transfer',
 
-      holidayListId:       data.holidayListId       || null,
-      defaultShiftId:      data.defaultShiftId      || null,
-      attendanceDeviceId:  data.attendanceDeviceId  || null,
-      leaveApprovedById:   data.leaveApprovedById   || null,
-      expenseApprovedById: data.expenseApprovedById || null,
+      holidayListId:     data.holidayListId     || null,
+      leaveApprovedById: data.leaveApprovedById || null,
 
-      bio:          data.bio          || null,
-      customFields: data.customFields || null,
+      employeeDocuments: data.employeeDocuments || null,
+      nationalIdNumber:  data.nationalIdNumber  || null,
     }, { transaction: t });
 
     return emp;
@@ -490,47 +406,28 @@ const createEmployeeFromExistingUser = async (userId, data) => {
 };
 
 /**
- * GM approves a pending employee.
- *
- * On approval the system:
- *   1. Creates a User account (email = companyEmail, temp password)
- *   2. Links User → Employee via userId
- *   3. Sets Employee.status = 'Active'
- *
- * Returns { employee, temporaryPassword } — caller must email the password.
+ * GM approves a pending employee — creates User account + temp password.
  */
 const approveEmployee = async (employeeId, approverUserId) => {
   const employee = await Employee.findByPk(employeeId);
   if (!employee) throw new AppError('Employee not found', 404);
   if (employee.status !== 'Inactive') {
-    throw new AppError(
-      `Employee cannot be approved from status '${employee.status}' — only Inactive employees can be approved`,
-      422,
-    );
+    throw new AppError(`Employee cannot be approved from status '${employee.status}'`, 422);
   }
-  if (!employee.companyEmail) {
-    throw new AppError(
-      'Employee must have a company email before a User account can be created',
-      422,
-    );
+  if (!employee.email) {
+    throw new AppError('Employee must have an email before a User account can be created', 422);
   }
 
-  // Check the approver exists and has authority
   const approver = await User.unscoped().findByPk(approverUserId, { attributes: ['id', 'isSuperUser', 'isSystemManager'] });
   if (!approver) throw new AppError('Approver not found', 404);
 
-  // Check if a User account already exists for this email (edge case: re-hire)
-  const existingUser = await User.unscoped().findOne({
-    where: { email: employee.companyEmail },
-  });
-
+  const existingUser = await User.unscoped().findOne({ where: { email: employee.email } });
   const temporaryPassword = generateTemporaryPassword();
 
   const result = await sequelize.transaction(async (t) => {
     let user;
 
     if (existingUser) {
-      // Re-hire case — reactivate the old account with a fresh password
       const newHash = await bcrypt.hash(temporaryPassword, SALT_ROUNDS);
       await existingUser.update({
         passwordHash: newHash,
@@ -541,51 +438,34 @@ const approveEmployee = async (employeeId, approverUserId) => {
       }, { transaction: t });
       user = existingUser;
     } else {
-      // Fresh hire — create brand new User
-      // The beforeSave hook on User.js hashes passwordHash automatically
       user = await User.create({
         firstName:    employee.firstName,
         middleName:   employee.middleName,
         lastName:     employee.lastName,
-        email:        employee.companyEmail,
-        passwordHash: temporaryPassword,   // hook hashes this
+        email:        employee.email,
+        passwordHash: temporaryPassword,
         status:       'Active',
         language:     'en',
       }, { transaction: t });
     }
 
-    // Link user to employee and activate
-    await employee.update({
-      userId: user.id,
-      status: 'Active',
-    }, { transaction: t });
+    await employee.update({ userId: user.id, status: 'Active' }, { transaction: t });
 
     return { employee, user };
   });
 
   logger.info('Employee approved — User account provisioned', {
     employeeId,
-    userId:         result.user.id,
-    email:          employee.companyEmail,
-    approvedBy:     approverUserId,
+    userId:     result.user.id,
+    email:      employee.email,
+    approvedBy: approverUserId,
   });
 
-  return {
-    employee:          result.employee,
-    temporaryPassword,
-  };
+  return { employee: result.employee, temporaryPassword };
 };
 
 /**
  * Paginated employee list with rich filtering.
- *
- * Filters supported:
- *   companyId, branchId, departmentId, designationId,
- *   employmentTypeId, employeeGradeId, status, reportsToId,
- *   search (matches firstName, lastName, employeeNumber, companyEmail)
- *
- * UserPermission scope is applied via the permFilter argument —
- * the caller (controller) passes the result of getUserPermissionFilter().
  */
 const getEmployees = async (query = {}, permFilter = {}) => {
   const {
@@ -595,7 +475,6 @@ const getEmployees = async (query = {}, permFilter = {}) => {
   } = query;
 
   const { limit, offset, page } = getPaginationOptions(query);
-
   const where = { ...permFilter };
 
   if (companyId)        where.companyId        = companyId;
@@ -607,7 +486,6 @@ const getEmployees = async (query = {}, permFilter = {}) => {
   if (reportsToId)      where.reportsToId      = reportsToId;
 
   if (status) {
-    // Allow comma-separated multi-status e.g. status=Active,Suspended
     const statuses = status.split(',').map(s => s.trim());
     where.status = statuses.length === 1 ? statuses[0] : { [Op.in]: statuses };
   }
@@ -618,7 +496,7 @@ const getEmployees = async (query = {}, permFilter = {}) => {
       { firstName:      like },
       { lastName:       like },
       { employeeNumber: like },
-      { companyEmail:   like },
+      { email:          like },
     ];
   }
 
@@ -626,23 +504,10 @@ const getEmployees = async (query = {}, permFilter = {}) => {
     where,
     limit,
     offset,
-    order: [
-      ['status', 'ASC'],           // Active employees first
-      ['lastName', 'ASC'],
-      ['firstName', 'ASC'],
-    ],
-    include: [
-      ...ORG_INCLUDES,
-      MANAGER_INCLUDE,
-      USER_INCLUDE,
-    ],
-    // Exclude sensitive fields on list view
+    order: [['status', 'ASC'], ['lastName', 'ASC'], ['firstName', 'ASC']],
+    include: [...ORG_INCLUDES, MANAGER_INCLUDE, USER_INCLUDE],
     attributes: {
-      exclude: [
-        'nationalId', 'passportNumber', 'taxId', 'socialSecurityNumber',
-        'bankAccountNumber', 'bankCode', 'mobileMoneyNumber',
-        'customFields',
-      ],
+      exclude: ['nationalIdNumber', 'bankAccountNumber', 'mobileMoneyNumber', 'employeeDocuments'],
     },
   });
 
@@ -651,8 +516,6 @@ const getEmployees = async (query = {}, permFilter = {}) => {
 
 /**
  * Full employee profile — all sub-records included.
- * Sensitive financial fields are included here (HR has access).
- * The employee's own self-service view uses getMyProfile() instead.
  */
 const getEmployeeById = async (id) => {
   const employee = await Employee.findByPk(id, {
@@ -662,18 +525,13 @@ const getEmployeeById = async (id) => {
       { model: EmployeeExternalWork,     required: false },
       { model: EmployeeEmergencyContact, required: false },
       { model: EmployeeSkillMap,         required: false },
-      {
-        model:    EmployeeSeparation,
-        required: false,
-        // Never expose confidential exit interview notes to non-HR scopes
-        // — controller is responsible for stripping this based on req.perms
-      },
+      { model: EmployeeSeparation,       required: false },
       {
         model:    EmployeePromotion,
         required: false,
         order:    [['promotionDate', 'DESC']],
         separate: true,
-        limit:    10,           // last 10 promotions — full history via getPromotionHistory()
+        limit:    10,
       },
     ],
   });
@@ -684,36 +542,20 @@ const getEmployeeById = async (id) => {
 
 /**
  * Self-service profile — employee reads their own record.
- * Strips confidential fields that are HR-only:
- *   — referenceNotes on ExternalWork
- *   — exitRemarks on Separation
- *   — bank account details (visible only to HR and the employee themselves in a secure tab)
  */
 const getMyProfile = async (userId) => {
   const employee = await Employee.findOne({
-    where:   { userId },
+    where: { userId },
     include: [
       USER_INCLUDE,
       ...ORG_INCLUDES,
       MANAGER_INCLUDE,
-    
-      {
-        model:      EmployeeEducation,
-        required:   false,
-      },
-      {
-        model:      EmployeeExternalWork,
-        required:   false,
-        attributes: { exclude: ['referenceNotes', 'referenceChecked', 'referenceCheckedOn'] },
-      },
+      { model: EmployeeEducation,        required: false },
+      { model: EmployeeExternalWork,     required: false },
       { model: EmployeeEmergencyContact, required: false },
       { model: EmployeeSkillMap,         required: false },
     ],
-    attributes: {
-      // Employee CAN see their own bank details and statutory numbers
-      // but NOT customFields (internal HR metadata)
-      exclude: ['customFields'],
-    },
+    attributes: { exclude: ['employeeDocuments'] },
   });
 
   if (!employee) throw new AppError('No employee profile found for this account', 404);
@@ -722,60 +564,40 @@ const getMyProfile = async (userId) => {
 
 /**
  * HR updates a subset of employee fields.
- *
- * Immutable fields (blocked here — they go through dedicated flows):
- *   — status          → use updateEmployeeStatus()
- *   — userId          → set only by approveEmployee()
- *   — employeeNumber  → never changes after creation
- *   — relievingDate   → set by approveSeparation()
- *   — encashmentDate  → set by settleFullAndFinal()
- *
- * Promotion fields (designationId, employeeGradeId, department) CAN be updated
- * here by HR for corrections, but formal promotion records are created by the
- * performance/task module. These are not blocked because HR needs to fix data errors.
  */
 const updateEmployee = async (id, data) => {
   const employee = await Employee.findByPk(id);
   if (!employee) throw new AppError('Employee not found', 404);
-  if (employee.status === 'Exit') {
+  if (employee.status === 'exited') {
     throw new AppError('Cannot edit a separated employee record', 422);
   }
 
-  // Strip fields that must never come through this endpoint
   const blocked = ['status', 'userId', 'employeeNumber', 'relievingDate', 'encashmentDate'];
   blocked.forEach(field => delete data[field]);
 
-  // Validate org FKs if any are being changed
   const fkFields = ['companyId','branchId','departmentId','designationId','employmentTypeId','employeeGradeId','reportsToId'];
   const fkChanges = {};
   fkFields.forEach(f => { if (data[f] !== undefined) fkChanges[f] = data[f]; });
   if (Object.keys(fkChanges).length) await validateOrgFKs(fkChanges);
 
-  // Email uniqueness check if changing companyEmail
-  if (data.companyEmail && data.companyEmail !== employee.companyEmail) {
+  if (data.email && data.email !== employee.email) {
     const taken = await Employee.findOne({
-      where: {
-        companyEmail: data.companyEmail.toLowerCase().trim(),
-        id:           { [Op.ne]: id },
-      },
+      where: { email: data.email.toLowerCase().trim(), id: { [Op.ne]: id } },
     });
-    if (taken) throw new AppError('This company email is already assigned to another employee', 409);
+    if (taken) throw new AppError('This email is already assigned to another employee', 409);
 
-    // Also update the linked User account email if exists
     if (employee.userId) {
       await User.update(
-        { email: data.companyEmail.toLowerCase().trim() },
+        { email: data.email.toLowerCase().trim() },
         { where: { id: employee.userId } },
       );
     }
   }
 
-  // Normalise string fields
-  if (data.firstName)    data.firstName    = data.firstName.trim();
-  if (data.lastName)     data.lastName     = data.lastName.trim();
-  if (data.middleName)   data.middleName   = data.middleName.trim();
-  if (data.companyEmail) data.companyEmail = data.companyEmail.toLowerCase().trim();
-  if (data.personalEmail)data.personalEmail= data.personalEmail.toLowerCase().trim();
+  if (data.firstName)   data.firstName   = data.firstName.trim();
+  if (data.lastName)    data.lastName    = data.lastName.trim();
+  if (data.middleName)  data.middleName  = data.middleName?.trim();
+  if (data.email)       data.email       = data.email.toLowerCase().trim();
 
   await employee.update(data);
 
@@ -785,20 +607,9 @@ const updateEmployee = async (id, data) => {
 
 /**
  * Lifecycle status transitions.
- *
- * Allowed transitions:
- *   Inactive   → Active          (via approveEmployee — not here)
- *   Active     → Suspended       HR can suspend (e.g. disciplinary, prolonged absence)
- *   Active     → On Leave        Attendance module triggers this — but HR can also set manually
- *   Suspended  → Active          HR reinstates
- *   On Leave   → Active          Attendance module or HR on return
- *   Active     → Exit            ONLY via approveSeparation() — blocked here
- *   Suspended  → Exit            ONLY via approveSeparation() — blocked here
- *
- * Reason is required for all transitions except On Leave ↔ Active.
  */
 const updateEmployeeStatus = async (id, newStatus, reason, changedByUserId) => {
-  const VALID_STATUSES = ['Active', 'Inactive', 'Suspended', 'On Leave', 'Exit'];
+  const VALID_STATUSES = ['Active', 'Inactive', 'onLeave', 'Suspended', 'exited'];
   if (!VALID_STATUSES.includes(newStatus)) {
     throw new AppError(`Invalid status: '${newStatus}'`, 422);
   }
@@ -808,33 +619,18 @@ const updateEmployeeStatus = async (id, newStatus, reason, changedByUserId) => {
 
   const current = employee.status;
 
-  // ── Guard: Exit can ONLY be set by approveSeparation ─────────────────────
-  if (newStatus === 'Exit') {
-    throw new AppError(
-      'Employee status cannot be set to Exit directly — initiate a Separation record instead',
-      422,
-    );
+  if (newStatus === 'exited') {
+    throw new AppError('Employee status cannot be set to exited directly — initiate a Separation record instead', 422);
   }
-
-  // ── Guard: Inactive → Active can ONLY be set by approveEmployee ──────────
   if (current === 'Inactive' && newStatus === 'Active') {
-    throw new AppError(
-      'Cannot manually activate an Inactive employee — use the GM Approval flow instead',
-      422,
-    );
+    throw new AppError('Cannot manually activate an Inactive employee — use the GM Approval flow instead', 422);
   }
-
-  // ── Guard: Exit employees cannot be changed ───────────────────────────────
-  if (current === 'Exit') {
+  if (current === 'exited') {
     throw new AppError('Cannot change the status of an already separated employee', 422);
   }
-
-  // ── Guard: no-op ──────────────────────────────────────────────────────────
   if (current === newStatus) {
     throw new AppError(`Employee is already in '${newStatus}' status`, 422);
   }
-
-  // ── Require a reason for suspension ──────────────────────────────────────
   if (newStatus === 'Suspended' && !reason) {
     throw new AppError('A reason is required when suspending an employee', 422);
   }
@@ -842,7 +638,6 @@ const updateEmployeeStatus = async (id, newStatus, reason, changedByUserId) => {
   await sequelize.transaction(async (t) => {
     await employee.update({ status: newStatus }, { transaction: t });
 
-    // Mirror suspension on the User account — suspended employee cannot log in
     if (employee.userId) {
       const userStatus = newStatus === 'Suspended' ? 'Suspended' : 'Active';
       await User.update(
@@ -853,11 +648,7 @@ const updateEmployeeStatus = async (id, newStatus, reason, changedByUserId) => {
   });
 
   logger.info('Employee status changed', {
-    employeeId: id,
-    from:       current,
-    to:         newStatus,
-    reason,
-    changedBy:  changedByUserId,
+    employeeId: id, from: current, to: newStatus, reason, changedBy: changedByUserId,
   });
 
   return employee.reload({ include: FULL_INCLUDES });
@@ -865,8 +656,6 @@ const updateEmployeeStatus = async (id, newStatus, reason, changedByUserId) => {
 
 /**
  * Full-text search across the employee table.
- * Intended for autocomplete / quick-search widgets.
- * Returns a lightweight result set — no sub-record includes.
  */
 const searchEmployees = async (searchTerm, { companyId, status, limit = 20 } = {}) => {
   if (!searchTerm || searchTerm.trim().length < 2) {
@@ -876,60 +665,44 @@ const searchEmployees = async (searchTerm, { companyId, status, limit = 20 } = {
   const like  = { [Op.iLike]: `%${searchTerm.trim()}%` };
   const where = {
     [Op.or]: [
-      { firstName:      like },
-      { lastName:       like },
-      { employeeNumber: like },
-      { companyEmail:   like },
+      { firstName: like }, { lastName: like }, { employeeNumber: like }, { email: like },
     ],
   };
 
   if (companyId) where.companyId = companyId;
   if (status)    where.status    = status;
 
-  const rows = await Employee.findAll({
+  return Employee.findAll({
     where,
-    limit:      Math.min(limit, 50),    // hard cap
-    order:      [['lastName', 'ASC'], ['firstName', 'ASC']],
-    attributes: ['id', 'employeeNumber', 'firstName', 'middleName', 'lastName',
-                 'companyEmail', 'image', 'status', 'designationId'],
-    include:    [{ model: Designation, attributes: ['id', 'name'], required: false }],
+    limit: Math.min(limit, 50),
+    order: [['lastName', 'ASC'], ['firstName', 'ASC']],
+    attributes: ['id', 'employeeNumber', 'firstName', 'middleName', 'lastName', 'email', 'image', 'status', 'designationId'],
+    include: [{ model: Designation, as: 'designation', attributes: ['id', 'name'], required: false }],
   });
-
-  return rows;
 };
 
 /**
  * Returns the org-chart tree rooted at a given employee.
- * Depth is limited to 4 levels to avoid unbounded recursion.
- *
- * Result shape:
- *   { employee, directReports: [ { employee, directReports: [...] }, ... ] }
  */
 const getOrgChart = async (rootEmployeeId, depth = 0, maxDepth = 4) => {
   if (depth >= maxDepth) return null;
 
   const employee = await Employee.findByPk(rootEmployeeId, {
     attributes: ['id', 'employeeNumber', 'firstName', 'middleName', 'lastName', 'image', 'status'],
-    include:    [{ model: Designation, as: 'designation', attributes: ['id', 'name'], required: false }],
+    include: [{ model: Designation, as: 'designation', attributes: ['id', 'name'], required: false }],
   });
-
   if (!employee) throw new AppError('Employee not found', 404);
 
   const reports = await Employee.findAll({
-    where:      { reportsToId: rootEmployeeId, status: { [Op.ne]: 'Exit' } },
+    where: { reportsToId: rootEmployeeId, status: { [Op.ne]: 'exited' } },
     attributes: ['id', 'employeeNumber', 'firstName', 'middleName', 'lastName', 'image', 'status'],
-    include:    [{ model: Designation, as: 'designation', attributes: ['id', 'name'], required: false }],
-    order:      [['lastName', 'ASC']],
+    include: [{ model: Designation, as: 'designation', attributes: ['id', 'name'], required: false }],
+    order: [['lastName', 'ASC']],
   });
 
-  const directReports = await Promise.all(
-    reports.map(r => getOrgChart(r.id, depth + 1, maxDepth))
-  );
+  const directReports = await Promise.all(reports.map(r => getOrgChart(r.id, depth + 1, maxDepth)));
 
-  return {
-    employee,
-    directReports: directReports.filter(Boolean),
-  };
+  return { employee, directReports: directReports.filter(Boolean) };
 };
 
 /**
@@ -937,15 +710,13 @@ const getOrgChart = async (rootEmployeeId, depth = 0, maxDepth = 4) => {
  */
 const getDirectReports = async (managerId, query = {}) => {
   const { limit, offset, page } = getPaginationOptions(query);
-
   const manager = await Employee.findByPk(managerId, { attributes: ['id'] });
   if (!manager) throw new AppError('Manager not found', 404);
 
   const { count, rows } = await Employee.findAndCountAll({
-    where:   { reportsToId: managerId },
-    limit,
-    offset,
-    order:   [['lastName', 'ASC'], ['firstName', 'ASC']],
+    where: { reportsToId: managerId },
+    limit, offset,
+    order: [['lastName', 'ASC'], ['firstName', 'ASC']],
     include: [...ORG_INCLUDES],
   });
 
@@ -954,40 +725,33 @@ const getDirectReports = async (managerId, query = {}) => {
 
 /**
  * Suspends the linked User account without changing the employee's status.
- * Used when an account is locked due to security concerns while HR
- * investigates — the employee record stays Active for HR purposes.
  */
 const deactivateUser = async (employeeId) => {
   const employee = await Employee.findByPk(employeeId, { attributes: ['id', 'userId', 'status'] });
-  if (!employee)        throw new AppError('Employee not found', 404);
+  if (!employee) throw new AppError('Employee not found', 404);
   if (!employee.userId) throw new AppError('This employee has no linked User account', 422);
 
   await User.update({ status: 'Suspended' }, { where: { id: employee.userId } });
-
   logger.info('User account suspended independently', { employeeId, userId: employee.userId });
   return { message: 'User account suspended — employee record unchanged' };
 };
+
 /**
- * Reactivates the linked User account (e.g., after suspension is lifted).
- * Does NOT change employee status — that's a separate HR decision.
+ * Reactivates the linked User account.
  */
 const activateUser = async (employeeId) => {
-  const employee = await Employee.findByPk(employeeId, { 
-    attributes: ['id', 'userId', 'status'] 
-  });
+  const employee = await Employee.findByPk(employeeId, { attributes: ['id', 'userId', 'status'] });
   if (!employee) throw new AppError('Employee not found', 404);
   if (!employee.userId) throw new AppError('This employee has no linked User account', 422);
 
   const user = await User.findByPk(employee.userId, { attributes: ['id', 'status'] });
-  if (user.status === 'Active') {
-    throw new AppError('User account is already active', 422);
-  }
+  if (user.status === 'Active') throw new AppError('User account is already active', 422);
 
   await User.update({ status: 'Active' }, { where: { id: employee.userId } });
-
   logger.info('User account reactivated', { employeeId, userId: employee.userId });
   return { message: 'User account reactivated — employee record unchanged' };
 };
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EDUCATION
@@ -1007,23 +771,17 @@ const addEducation = async (employeeId, data) => {
   if (!data.level || !data.qualification || !data.institution) {
     throw new AppError('level, qualification and institution are required', 422);
   }
-  if (data.isCurrentlyEnrolled && data.toDate) {
-    throw new AppError('toDate must be empty when isCurrentlyEnrolled is true', 422);
-  }
 
   const record = await EmployeeEducation.create({
     employeeId,
-    level:               data.level,
-    qualification:       data.qualification.trim(),
-    majorOrField:        data.majorOrField?.trim()  || null,
-    institution:         data.institution.trim(),
-    country:             data.country               || null,
-    fromDate:            data.fromDate              || null,
-    toDate:              data.isCurrentlyEnrolled ? null : (data.toDate || null),
-    isCurrentlyEnrolled: data.isCurrentlyEnrolled   ?? false,
-    grade:               data.grade?.trim()         || null,
-    certificateAttached: data.certificateAttached    ?? false,
-    notes:               data.notes                 || null,
+    level:         data.level,
+    qualification: data.qualification.trim(),
+    majorOrField:  data.majorOrField?.trim() || null,
+    institution:   data.institution.trim(),
+    fromDate:      data.fromDate || null,
+    toDate:        data.toDate   || null,
+    grade:         data.grade?.trim() || null,
+    certificateUrl: data.certificateUrl || null,
   });
 
   logger.info('Education added', { employeeId, recordId: record.id });
@@ -1033,11 +791,6 @@ const addEducation = async (employeeId, data) => {
 const updateEducation = async (employeeId, recordId, data) => {
   const record = await EmployeeEducation.findOne({ where: { id: recordId, employeeId } });
   if (!record) throw new AppError('Education record not found', 404);
-
-  if (data.isCurrentlyEnrolled && data.toDate) {
-    throw new AppError('toDate must be empty when isCurrentlyEnrolled is true', 422);
-  }
-
   await record.update(data);
   return record;
 };
@@ -1057,10 +810,8 @@ const deleteEducation = async (employeeId, recordId) => {
 const getExternalWork = async (employeeId) => {
   await assertEmployeeExists(employeeId);
   return EmployeeExternalWork.findAll({
-    where:      { employeeId },
-    order:      [['fromDate', 'DESC']],
-    // referenceNotes is confidential — excluded on the model-level query
-    // controller strips it for non-HR scopes using req.perms
+    where: { employeeId },
+    order: [['fromDate', 'DESC']],
   });
 };
 
@@ -1070,31 +821,21 @@ const addExternalWork = async (employeeId, data) => {
   if (!data.companyName || !data.fromDate) {
     throw new AppError('companyName and fromDate are required', 422);
   }
-  if (data.toDate && data.fromDate > data.toDate) {
-    throw new AppError('fromDate must be before toDate', 422);
-  }
 
   const record = await EmployeeExternalWork.create({
     employeeId,
-    companyName:              data.companyName.trim(),
-    industry:                 data.industry              || null,
-    country:                  data.country               || null,
-    designation:              data.designation?.trim()   || null,
-    department:               data.department?.trim()    || null,
-    employmentType:           data.employmentType        || null,
-    fromDate:                 data.fromDate,
-    toDate:                   data.isCurrentEmployer ? null : (data.toDate || null),
-    isCurrentEmployer:        data.isCurrentEmployer     ?? false,
-    supervisorName:           data.supervisorName?.trim() || null,
-    supervisorContact:        data.supervisorContact     || null,
-    referenceChecked:         data.referenceChecked      ?? false,
-    referenceCheckedOn:       data.referenceCheckedOn    || null,
-    referenceNotes:           data.referenceNotes        || null,   // HR-only field
-    reasonForLeaving:         data.reasonForLeaving      || null,
-    lastDrawnSalary:          data.lastDrawnSalary       ?? null,
-    lastDrawnSalaryCurrency:  data.lastDrawnSalaryCurrency || 'ETB',
-    responsibilities:         data.responsibilities      || null,
-    notes:                    data.notes                 || null,
+    companyName:    data.companyName.trim(),
+    industry:       data.industry    || null,
+    country:        data.country     || null,
+    region:         data.region      || null,
+    zone:           data.zone        || null,
+    city:           data.city        || null,
+    designation:    data.designation?.trim() || null,
+    department:     data.department?.trim()  || null,
+    employmentType: data.employmentType || null,
+    fromDate:       data.fromDate,
+    toDate:         data.toDate || null,
+    exitReason:     data.exitReason || null,
   });
 
   logger.info('External work added', { employeeId, recordId: record.id });
@@ -1104,11 +845,6 @@ const addExternalWork = async (employeeId, data) => {
 const updateExternalWork = async (employeeId, recordId, data) => {
   const record = await EmployeeExternalWork.findOne({ where: { id: recordId, employeeId } });
   if (!record) throw new AppError('Work history record not found', 404);
-
-  if (data.toDate && data.fromDate && data.fromDate > data.toDate) {
-    throw new AppError('fromDate must be before toDate', 422);
-  }
-
   await record.update(data);
   return record;
 };
@@ -1129,7 +865,7 @@ const getEmergencyContacts = async (employeeId) => {
   await assertEmployeeExists(employeeId);
   return EmployeeEmergencyContact.findAll({
     where: { employeeId },
-    order: [['isPrimary', 'DESC'], ['createdAt', 'ASC']],
+    order: [['createdAt', 'ASC']],
   });
 };
 
@@ -1140,43 +876,21 @@ const addEmergencyContact = async (employeeId, data) => {
     throw new AppError('fullName, relationship and phone are required', 422);
   }
 
-  const record = await EmployeeEmergencyContact.create({
+  return EmployeeEmergencyContact.create({
     employeeId,
     fullName:          data.fullName.trim(),
     relationship:      data.relationship,
     relationshipOther: data.relationshipOther || null,
     phone:             data.phone,
-    alternatePhone:    data.alternatePhone    || null,
-    email:             data.email             || null,
-    address:           data.address           || null,
-    isPrimary:         data.isPrimary         ?? false,
+    alternatePhone:    data.alternatePhone || null,
+    email:             data.email          || null,
   });
-
-  // If this new contact is primary, unset all others
-  if (record.isPrimary) {
-    await EmployeeEmergencyContact.update(
-      { isPrimary: false },
-      { where: { employeeId, id: { [Op.ne]: record.id } } },
-    );
-  }
-
-  logger.info('Emergency contact added', { employeeId, recordId: record.id });
-  return record;
 };
 
 const updateEmergencyContact = async (employeeId, recordId, data) => {
   const record = await EmployeeEmergencyContact.findOne({ where: { id: recordId, employeeId } });
   if (!record) throw new AppError('Emergency contact not found', 404);
-
   await record.update(data);
-
-  if (data.isPrimary === true) {
-    await EmployeeEmergencyContact.update(
-      { isPrimary: false },
-      { where: { employeeId, id: { [Op.ne]: record.id } } },
-    );
-  }
-
   return record;
 };
 
@@ -1187,27 +901,6 @@ const deleteEmergencyContact = async (employeeId, recordId) => {
   logger.info('Emergency contact deleted', { employeeId, recordId });
 };
 
-/**
- * Atomically sets one contact as primary and clears all others.
- * More explicit than patching isPrimary through updateEmergencyContact.
- */
-const setPrimaryContact = async (employeeId, recordId) => {
-  await assertEmployeeExists(employeeId);
-
-  const record = await EmployeeEmergencyContact.findOne({ where: { id: recordId, employeeId } });
-  if (!record) throw new AppError('Emergency contact not found', 404);
-
-  await sequelize.transaction(async (t) => {
-    await EmployeeEmergencyContact.update(
-      { isPrimary: false },
-      { where: { employeeId }, transaction: t },
-    );
-    await record.update({ isPrimary: true }, { transaction: t });
-  });
-
-  return record.reload();
-};
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  SKILL MAP
@@ -1216,105 +909,25 @@ const setPrimaryContact = async (employeeId, recordId) => {
 const getSkillMap = async (employeeId) => {
   await assertEmployeeExists(employeeId);
   const map = await EmployeeSkillMap.findOne({ where: { employeeId } });
-  // Return an empty structure if none exists yet — avoids 404 on first load
-  return map || { employeeId, skills: [], certifications: [], trainings: [], languages: [] };
+  return map || { employeeId, skills: [], certifications: [], certificateUrls: [], languages: [] };
 };
 
-/**
- * Full upsert — replaces the entire skill map.
- * Used when the frontend sends a complete updated profile.
- */
 const upsertSkillMap = async (employeeId, data) => {
   await assertEmployeeExists(employeeId);
 
-  const [map, created] = await EmployeeSkillMap.findOrCreate({
+  const [map] = await EmployeeSkillMap.findOrCreate({
     where:    { employeeId },
-    defaults: { employeeId, skills: [], certifications: [], trainings: [], languages: [] },
+    defaults: { employeeId, skills: [], certifications: [], certificateUrls: [], languages: [] },
   });
 
   await map.update({
-    skills:         data.skills         ?? map.skills,
-    certifications: data.certifications ?? map.certifications,
-    trainings:      data.trainings      ?? map.trainings,
-    languages:      data.languages      ?? map.languages,
+    skills:          data.skills          ?? map.skills,
+    certifications:  data.certifications  ?? map.certifications,
+    certificateUrls: data.certificateUrls ?? map.certificateUrls,
+    languages:       data.languages       ?? map.languages,
   });
 
-  logger.info(`SkillMap ${created ? 'created' : 'updated'}`, { employeeId });
-  return map;
-};
-
-/**
- * Appends a single skill without replacing the whole array.
- * Prevents duplicates by skillName (case-insensitive).
- */
-const addSkill = async (employeeId, skill) => {
-  if (!skill.skillName) throw new AppError('skillName is required', 422);
-
-  const [map] = await EmployeeSkillMap.findOrCreate({
-    where:    { employeeId },
-    defaults: { employeeId, skills: [], certifications: [], trainings: [], languages: [] },
-  });
-
-  const exists = map.skills.some(
-    s => s.skillName.toLowerCase() === skill.skillName.toLowerCase()
-  );
-  if (exists) throw new AppError(`Skill '${skill.skillName}' already exists on this profile`, 409);
-
-  await map.update({ skills: [...map.skills, skill] });
-  return map;
-};
-
-/**
- * Removes a skill by its skillName.
- */
-const removeSkill = async (employeeId, skillName) => {
-  const map = await EmployeeSkillMap.findOne({ where: { employeeId } });
-  if (!map) throw new AppError('Skill map not found', 404);
-
-  const filtered = map.skills.filter(
-    s => s.skillName.toLowerCase() !== skillName.toLowerCase()
-  );
-
-  if (filtered.length === map.skills.length) {
-    throw new AppError(`Skill '${skillName}' not found on this profile`, 404);
-  }
-
-  await map.update({ skills: filtered });
-  return map;
-};
-
-/**
- * Appends a certification. Prevents duplicate by certificationName.
- */
-const addCertification = async (employeeId, cert) => {
-  if (!cert.certificationName) throw new AppError('certificationName is required', 422);
-
-  const [map] = await EmployeeSkillMap.findOrCreate({
-    where:    { employeeId },
-    defaults: { employeeId, skills: [], certifications: [], trainings: [], languages: [] },
-  });
-
-  const exists = map.certifications.some(
-    c => c.certificationName.toLowerCase() === cert.certificationName.toLowerCase()
-  );
-  if (exists) throw new AppError(`Certification '${cert.certificationName}' already exists`, 409);
-
-  await map.update({ certifications: [...map.certifications, cert] });
-  return map;
-};
-
-/**
- * Appends a training record.
- */
-const addTraining = async (employeeId, training) => {
-  if (!training.trainingName) throw new AppError('trainingName is required', 422);
-
-  const [map] = await EmployeeSkillMap.findOrCreate({
-    where:    { employeeId },
-    defaults: { employeeId, skills: [], certifications: [], trainings: [], languages: [] },
-  });
-
-  await map.update({ trainings: [...map.trainings, training] });
+  logger.info('SkillMap saved', { employeeId });
   return map;
 };
 
@@ -1323,20 +936,12 @@ const addTraining = async (employeeId, training) => {
 //  SEPARATION
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * HR initiates an employee separation — status = Draft.
- * The employee's status does NOT change until GM approves.
- * Only one separation record per employee (unique constraint on employeeId).
- */
 const initiateSeparation = async (employeeId, data) => {
   const employee = await Employee.findByPk(employeeId, { attributes: ['id', 'status'] });
   if (!employee) throw new AppError('Employee not found', 404);
 
   if (!['Active', 'Suspended'].includes(employee.status)) {
-    throw new AppError(
-      `Cannot initiate separation for an employee in '${employee.status}' status`,
-      422,
-    );
+    throw new AppError(`Cannot initiate separation for an employee in '${employee.status}' status`, 422);
   }
 
   const existing = await EmployeeSeparation.findOne({ where: { employeeId } });
@@ -1347,91 +952,57 @@ const initiateSeparation = async (employeeId, data) => {
   if (!data.separationType) throw new AppError('separationType is required', 422);
   if (!data.initiatedBy)    throw new AppError('initiatedBy is required', 422);
 
+  const defaults = {
+    separationType:   data.separationType,
+    initiatedBy:      data.initiatedBy,
+    resignationDate:  data.resignationDate  || null,
+    lastWorkingDay:   data.lastWorkingDay   || null,
+    reasonForLeaving: data.reasonForLeaving || null,
+    additionalNotes:  data.additionalNotes  || null,
+    status:           'Draft',
+  };
+
   if (existing) {
-    // Re-use the rejected/draft record
-    await existing.update({
-      ...separationDefaults(data),
-      status: 'Draft',
-    });
+    await existing.update(defaults);
     return existing;
   }
 
-  const separation = await EmployeeSeparation.create({
-    employeeId,
-    ...separationDefaults(data),
-    status: 'Draft',
-  });
-
+  const separation = await EmployeeSeparation.create({ employeeId, ...defaults });
   logger.info('Separation initiated', { employeeId, separationType: data.separationType });
   return separation;
 };
-
-/** Builds the safe field set for creation and re-drafting */
-const separationDefaults = (data) => ({
-  separationType:    data.separationType,
-  initiatedBy:       data.initiatedBy,
-  resignationDate:   data.resignationDate   || null,
-  lastWorkingDay:    data.lastWorkingDay     || null,
-  reasonForLeaving:  data.reasonForLeaving  || null,
-  noticePeriodServed:data.noticePeriodServed ?? false,
-  noticePeriodWaived:data.noticePeriodWaived ?? false,
-  noticeShortfallDays: data.noticeShortfallDays ?? null,
-  additionalNotes:   data.additionalNotes   || null,
-  clearanceTasks:    data.clearanceTasks    || [],
-  equipmentReturned: [],
-  systemAccessRevoked:[],
-  fullAndFinalSettled: false,
-  fullAndFinalDate:  null,
-});
 
 const submitSeparation = async (employeeId) => {
   const separation = await findSeparation(employeeId);
   if (separation.status !== 'Draft') {
     throw new AppError('Only Draft separations can be submitted for approval', 422);
   }
-  await separation.update({ status: 'Pending Approval' });
+  await separation.update({ status: 'Pending' });
   return separation;
 };
 
-const approveSeparation = async (employeeId, approverUserId, {
-  exitInterviewDate,
-  exitRemarks,
-  wouldRehire,
-  relievingDate,
-} = {}) => {
+const approveSeparation = async (employeeId, approverUserId, { relievingDate } = {}) => {
   const separation = await findSeparation(employeeId);
-  if (separation.status !== 'Pending Approval') {
-    throw new AppError('Only separations pending approval can be approved', 422);
+  if (separation.status !== 'Pending') {
+    throw new AppError('Only pending separations can be approved', 422);
   }
 
-  const employee = await Employee.findByPk(employeeId, {
-    include: [USER_INCLUDE],
-  });
-
-  const approver = await Employee.findOne({
-    where:   { userId: approverUserId },
-    attributes: ['id'],
-  });
+  const employee = await Employee.findByPk(employeeId, { include: [USER_INCLUDE] });
+  const approver = await Employee.findOne({ where: { userId: approverUserId }, attributes: ['id'] });
 
   await sequelize.transaction(async (t) => {
-    // 1. Finalize separation record
     await separation.update({
-      status:                       'Approved',
-      approvedById:                 approver?.id || null,
-      approvedOn:                   new Date(),
-      exitInterviewDate:            exitInterviewDate || null,
-      exitRemarks:                  exitRemarks       || null,
-      wouldRehire:                  wouldRehire       ?? null,
-      relievingDate:                relievingDate      || separation.lastWorkingDay || null,
+      status:         'Approved',
+      approvedById:   approver?.id || null,
+      approvedOn:     new Date(),
+      relievingDate:  relievingDate || separation.lastWorkingDay || null,
     }, { transaction: t });
 
-    // 2. Set employee status to Exit
     await employee.update({
-      status:       'Exit',
+      status:        'exited',
       relievingDate: relievingDate || separation.lastWorkingDay || null,
     }, { transaction: t });
 
-    // 3. Deactivate User account — separated employees cannot log in
     if (employee.userId) {
       await User.update(
         { status: 'Inactive' },
@@ -1440,12 +1011,7 @@ const approveSeparation = async (employeeId, approverUserId, {
     }
   });
 
-  logger.info('Separation approved — employee exited', {
-    employeeId,
-    relievingDate: relievingDate || separation.lastWorkingDay,
-    approvedBy:    approverUserId,
-  });
-
+  logger.info('Separation approved — employee exited', { employeeId, approvedBy: approverUserId });
   return separation.reload();
 };
 
@@ -1453,16 +1019,16 @@ const rejectSeparation = async (employeeId, approverUserId, reason) => {
   if (!reason) throw new AppError('Rejection reason is required', 422);
 
   const separation = await findSeparation(employeeId);
-  if (separation.status !== 'Pending Approval') {
-    throw new AppError('Only separations pending approval can be rejected', 422);
+  if (separation.status !== 'Pending') {
+    throw new AppError('Only pending separations can be rejected', 422);
   }
 
   const approver = await Employee.findOne({ where: { userId: approverUserId }, attributes: ['id'] });
 
   await separation.update({
-    status:       'Rejected',
-    approvedById: approver?.id || null,
-    approvedOn:   new Date(),
+    status:          'Rejected',
+    approvedById:    approver?.id || null,
+    approvedOn:      new Date(),
     additionalNotes: reason,
   });
 
@@ -1470,58 +1036,9 @@ const rejectSeparation = async (employeeId, approverUserId, reason) => {
   return separation;
 };
 
-/**
- * HR updates the clearance checklist as tasks are completed.
- * Each task: { task, assignedTo (employeeId), dueDate, completedOn, status }
- */
-const updateClearanceTasks = async (employeeId, {
-  clearanceTasks,
-  equipmentReturned,
-  systemAccessRevoked,
-}) => {
-  const separation = await findSeparation(employeeId);
-
-  const updates = {};
-  if (clearanceTasks    !== undefined) updates.clearanceTasks    = clearanceTasks;
-  if (equipmentReturned !== undefined) updates.equipmentReturned = equipmentReturned;
-  if (systemAccessRevoked !== undefined) updates.systemAccessRevoked = systemAccessRevoked;
-
-  await separation.update(updates);
-  logger.info('Clearance tasks updated', { employeeId });
-  return separation;
-};
-
-/**
- * HR marks full-and-final settlement complete once payroll has processed the exit.
- */
-const settleFullAndFinal = async (employeeId, encashmentDate) => {
-  const separation = await findSeparation(employeeId);
-  if (!['Approved', 'Completed'].includes(separation.status)) {
-    throw new AppError('Separation must be Approved before settlement can be recorded', 422);
-  }
-
-  await sequelize.transaction(async (t) => {
-    await separation.update({
-      fullAndFinalSettled: true,
-      fullAndFinalDate:    encashmentDate || new Date().toISOString().split('T')[0],
-      status:              'Completed',
-    }, { transaction: t });
-
-    // Record the encashment date on the Employee record
-    await Employee.update(
-      { encashmentDate: encashmentDate || new Date().toISOString().split('T')[0] },
-      { where: { id: employeeId }, transaction: t },
-    );
-  });
-
-  logger.info('Full and final settlement recorded', { employeeId });
-  return separation.reload();
-};
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  PROMOTIONS — READ ONLY
-//  (Write operations are in the performance / task module)
 // ═════════════════════════════════════════════════════════════════════════════
 
 const getPromotionHistory = async (employeeId, query = {}) => {
@@ -1530,37 +1047,20 @@ const getPromotionHistory = async (employeeId, query = {}) => {
   const { limit, offset, page } = getPaginationOptions(query);
 
   const { count, rows } = await EmployeePromotion.findAndCountAll({
-    where:   { employeeId },
-    limit,
-    offset,
-    order:   [['promotionDate', 'DESC']],
+    where: { employeeId },
+    limit, offset,
+    order: [['promotionDate', 'DESC']],
     include: [
-      { model: Designation, as: 'previousDesignation', foreignKey: 'previousDesignationId', required: false },
-      { model: Designation, as: 'newDesignation',      foreignKey: 'newDesignationId',      required: false },
       { model: Department,  as: 'previousDepartment',  foreignKey: 'previousDepartmentId',  required: false },
       { model: Department,  as: 'newDepartment',       foreignKey: 'newDepartmentId',       required: false },
+      { model: Designation, as: 'previousDesignation', foreignKey: 'previousDesignationId', required: false },
+      { model: Designation, as: 'newDesignation',      foreignKey: 'newDesignationId',      required: false },
+      { model: EmployeeGrade, as: 'previousGrade',     foreignKey: 'previousGradeId',       required: false },
+      { model: EmployeeGrade, as: 'newGrade',          foreignKey: 'newGradeId',            required: false },
     ],
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
-};
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  SMALL INTERNAL UTILITIES
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Asserts the employee exists — throws 404 if not. Lightweight. */
-const assertEmployeeExists = async (id) => {
-  const exists = await Employee.count({ where: { id } });
-  if (!exists) throw new AppError('Employee not found', 404);
-};
-
-/** Finds the separation record for an employee or throws 404. */
-const findSeparation = async (employeeId) => {
-  const sep = await EmployeeSeparation.findOne({ where: { employeeId } });
-  if (!sep) throw new AppError('No separation record found for this employee', 404);
-  return sep;
 };
 
 
@@ -1571,6 +1071,7 @@ const findSeparation = async (employeeId) => {
 module.exports = {
   // Core profile
   createEmployee,
+  createEmployeeFromExistingUser,
   approveEmployee,
   getEmployees,
   getEmployeeById,
@@ -1582,7 +1083,7 @@ module.exports = {
   getDirectReports,
   deactivateUser,
   activateUser,
-  getEmployeeByUserId,    
+  getEmployeeByUserId,
 
   // Education
   getEducation,
@@ -1601,25 +1102,17 @@ module.exports = {
   addEmergencyContact,
   updateEmergencyContact,
   deleteEmergencyContact,
-  setPrimaryContact,
 
   // Skill map
   getSkillMap,
   upsertSkillMap,
-  addSkill,
-  removeSkill,
-  addCertification,
-  addTraining,
 
   // Separation
   initiateSeparation,
   submitSeparation,
   approveSeparation,
   rejectSeparation,
-  updateClearanceTasks,
-  settleFullAndFinal,
 
   // Promotions (read-only)
   getPromotionHistory,
-  createEmployeeFromExistingUser,
 };

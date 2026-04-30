@@ -9,8 +9,6 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       // ── Parent FKs ─────────────────────────────────────────────
-      // Document.belongsTo(DocumentType, { foreignKey: 'documentTypeId', allowNull: false })
-      // Document.belongsTo(Employee, { as: 'uploadedBy', foreignKey: 'uploadedById' })
       documentTypeId: {
         type: DataTypes.UUID,
         allowNull: false,
@@ -121,8 +119,5 @@ module.exports = (sequelize, DataTypes) => {
       ],
     },
   );
-
-  Document.associate = () => {};
-
   return Document;
 };
