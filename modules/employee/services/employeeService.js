@@ -521,13 +521,14 @@ const getEmployeeById = async (id) => {
   const employee = await Employee.findByPk(id, {
     include: [
       ...FULL_INCLUDES,
-      { model: EmployeeEducation,        required: false },
-      { model: EmployeeExternalWork,     required: false },
-      { model: EmployeeEmergencyContact, required: false },
-      { model: EmployeeSkillMap,         required: false },
-      { model: EmployeeSeparation,       required: false },
+      { model: EmployeeEducation, as: 'educationHistory', required: false },
+      { model: EmployeeExternalWork, as: 'externalWorkHistory', required: false },
+      { model: EmployeeEmergencyContact, as: 'emergencyContacts', required: false },
+      { model: EmployeeSkillMap, as: 'skillMaps', required: false },
+      { model: EmployeeSeparation, as: 'separations', required: false },
       {
         model:    EmployeePromotion,
+        as:       'promotions',
         required: false,
         order:    [['promotionDate', 'DESC']],
         separate: true,
