@@ -71,7 +71,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       certificateUrl: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
         defaultValue: false,
         comment:
           "True when a document has been uploaded to verify this qualification",
