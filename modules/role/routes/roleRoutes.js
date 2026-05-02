@@ -1696,7 +1696,7 @@ router.delete(
  */
 router.get(
   "/users/:userId/effective-permissions",
-  authorize("UserPermission", action.READ),
+  // authorize("UserPermission", action.READ),
   userPermissionController.getUserEffectivePermissions,
 );
 

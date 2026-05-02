@@ -1264,26 +1264,27 @@ const getUserEffectivePermissions = async (userId) => {
     "canSetPermissions",
   ];
 
-  (user.roles || []).forEach((role) => {
-    (role.permissions || []).forEach((perm) => {
-      const key = `${perm.moduleName}:${perm.resourceName}:${perm.permLevel}`;
+(user.roles || []).forEach((role) => {
+  (role.permissions || []).forEach((perm) => {
+    // Merge by resourceName + permLevel only — ignore moduleName
+    const key = `${perm.resourceName}:${perm.permLevel}`;
 
-      if (!permMap.has(key)) {
-        // First time we see this resource at this level — seed with a plain object
-        permMap.set(key, {
-          moduleName: perm.moduleName,
-          resourceName: perm.resourceName,
-          permLevel: perm.permLevel,
-          ...Object.fromEntries(boolFields.map((f) => [f, perm[f] ?? false])),
-        });
-      } else {
-        const existing = permMap.get(key);
-        boolFields.forEach((f) => {
-          existing[f] = existing[f] || (perm[f] ?? false);
-        });
-      }
-    });
+    if (!permMap.has(key)) {
+      permMap.set(key, {
+        moduleName: perm.moduleName,
+        resourceName: perm.resourceName,
+        permLevel: perm.permLevel,
+        ...Object.fromEntries(boolFields.map((f) => [f, perm[f] ?? false])),
+      });
+    } else {
+      const existing = permMap.get(key);
+      // OR logic — true from ANY module wins
+      boolFields.forEach((f) => {
+        existing[f] = existing[f] || (perm[f] ?? false);
+      });
+    }
   });
+});
 
   // ── 5. Load record-level UserPermissions ───────────────────────────
   const userPermissions = await UserPermission.findAll({
