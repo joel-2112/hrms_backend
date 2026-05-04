@@ -1,49 +1,4 @@
-/**
- * utils/response.js
- *
- * Single source of truth for every JSON response the API sends.
- * Controllers never call res.json() directly — they go through
- * sendSuccess or sendError so the envelope is always consistent.
- *
- * Envelope shape:
- *
- *   Success
- *   {
- *     "success": true,
- *     "message": "Employees fetched successfully",
- *     "data":    { ... } | [ ... ] | null,
- *     "meta":    { "page": 1, "limit": 20, "total": 143 }  ← optional
- *   }
- *
- *   Error
- *   {
- *     "success": false,
- *     "message": "Validation failed",
- *     "errors":  [ { "field": "email", "message": "must be a valid email" } ]  ← optional
- *     "stack":   "..."   ← development only
- *   }
- */
 
-'use strict';
-
-// ─────────────────────────────────────────────
-//  SUCCESS
-// ─────────────────────────────────────────────
-
-/**
- * sendSuccess(res, data, message, statusCode, meta)
- *
- * @param {import('express').Response} res
- * @param {*}      data        - payload (object, array, or null)
- * @param {string} message     - human-readable description
- * @param {number} statusCode  - HTTP status (default 200)
- * @param {object} meta        - optional pagination / extra metadata
- *
- * Usage examples:
- *   sendSuccess(res, employee, 'Employee fetched successfully');
- *   sendSuccess(res, employees, 'Employees fetched', 200, { page, limit, total });
- *   sendSuccess(res, null, 'Employee deleted successfully', 204);  // No Content
- */
 const sendSuccess = (res, data = null, message = 'Success', statusCode = 200, meta = null) => {
   const body = {
     success: true,
@@ -60,19 +15,6 @@ const sendSuccess = (res, data = null, message = 'Success', statusCode = 200, me
 //  ERROR
 // ─────────────────────────────────────────────
 
-/**
- * sendError(res, message, statusCode, errors, stack)
- *
- * @param {import('express').Response} res
- * @param {string}   message     - human-readable error summary
- * @param {number}   statusCode  - HTTP status (default 500)
- * @param {Array}    errors      - optional field-level error list
- * @param {string}   stack       - optional stack trace (dev only)
- *
- * Usage examples:
- *   sendError(res, 'Employee not found', 404);
- *   sendError(res, 'Validation failed', 422, [{ field: 'email', message: 'Invalid' }]);
- */
 const sendError = (res, message = 'Internal server error', statusCode = 500, errors = null, stack = null) => {
   const body = {
     success: false,
@@ -86,12 +28,6 @@ const sendError = (res, message = 'Internal server error', statusCode = 500, err
 
   return res.status(statusCode).json(body);
 };
-
-// ─────────────────────────────────────────────
-//  CONVENIENCE WRAPPERS
-//  These cover the most common HTTP semantics
-//  so controllers read like plain English.
-// ─────────────────────────────────────────────
 
 /** 200 OK — generic fetch */
 const ok = (res, data, message = 'Success', meta = null) =>

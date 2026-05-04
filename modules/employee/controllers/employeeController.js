@@ -113,11 +113,6 @@ const getEmployeeById = catchAsync(async (req, res) => {
   const { id } = req.params;
 
   let employee = await employeeService.getEmployeeById(id);
-
-  if (req.perms && !req.perms.isHR) {
-    employee = stripHRFields(employee);
-  }
-
   ok(res, {
     message: 'Employee retrieved successfully',
     data: employee,
@@ -497,21 +492,6 @@ const getPromotionHistory = catchAsync(async (req, res) => {
 //  INTERNAL HELPERS
 // ═════════════════════════════════════════════════════════════════════════════
 
-/**
- * Strips HR-only fields from an employee record for non-HR callers.
- */
-const stripHRFields = (employee) => {
-  const plain = employee.toJSON ? employee.toJSON() : { ...employee };
-
-  delete plain.nationalIdNumber;
-  delete plain.bankAccountNumber;
-  delete plain.mobileMoneyNumber;
-  delete plain.employeeDocuments;
-  delete plain.holidayListId;
-  delete plain.leaveApprovedById;
-
-  return plain;
-};
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD & STATISTICS

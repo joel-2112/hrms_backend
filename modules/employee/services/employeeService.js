@@ -102,7 +102,7 @@ const ORG_INCLUDES = [
 const MANAGER_INCLUDE = {
   model:      Employee,
   as:         'reportsTo',
-  attributes: ['id', 'firstName', 'middleName', 'lastName', 'employeeNumber', 'image'],
+  attributes: ['id', 'firstName', 'middleName', 'lastName', 'employeeNumber', 'image', 'nationalIdNumber'],
   required:   false,
 };
 
@@ -507,9 +507,6 @@ const getEmployees = async (query = {}, permFilter = {}) => {
     offset,
     order: [['createdAt', 'DESC'], ],
     include: [...ORG_INCLUDES, MANAGER_INCLUDE, USER_INCLUDE],
-    attributes: {
-      exclude: ['nationalIdNumber', 'bankAccountNumber', 'mobileMoneyNumber', 'employeeDocuments'],
-    },
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
