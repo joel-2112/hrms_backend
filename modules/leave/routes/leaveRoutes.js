@@ -18,6 +18,11 @@ const { authorize, action } = require('../../../middlewares/rbacMiddleware');
 // All routes require authentication
 router.use(authenticate);
 
+
+
+
+
+
 /**
  * @swagger
  * tags:
@@ -46,6 +51,147 @@ router.use(authenticate);
  *   - name: LeaveCompliance
  *     description: Compliance utilities — date checks, balance validation, expiry
  */
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LEAVE DASHBOARD
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /leaves/dashboard/stats:
+ *   get:
+ *     summary: Get leave dashboard statistics
+ *     tags: [LeaveDashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *         description: Period year (e.g., "2026")
+ *     responses:
+ *       200:
+ *         description: Dashboard stats fetched successfully
+ */
+router.get('/dashboard/stats',
+  authorize('LeaveApplication', action.READ),
+  leaveController.getDashboardStats
+);
+
+/**
+ * @swagger
+ * /leaves/dashboard/balances:
+ *   get:
+ *     summary: Get company-wide leave balance snapshot
+ *     tags: [LeaveDashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard balances fetched successfully
+ */
+router.get('/dashboard/balances',
+  authorize('LeaveAllocation', action.READ),
+  leaveController.getDashboardBalances
+);
+
+/**
+ * @swagger
+ * /leaves/dashboard/pending-approvals:
+ *   get:
+ *     summary: Get pending leave approvals for dashboard
+ *     tags: [LeaveDashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 4
+ *     responses:
+ *       200:
+ *         description: Pending approvals fetched successfully
+ */
+router.get('/dashboard/pending-approvals',
+  authorize('LeaveApplication', action.READ),
+  leaveController.getDashboardPendingApprovals
+);
+
+/**
+ * @swagger
+ * /leaves/dashboard/on-leave-this-week:
+ *   get:
+ *     summary: Get employees on leave this week
+ *     tags: [LeaveDashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: On-leave employees fetched successfully
+ */
+router.get('/dashboard/on-leave-this-week',
+  authorize('LeaveApplication', action.READ),
+  leaveController.getOnLeaveThisWeek
+);
+
+/**
+ * @swagger
+ * /leaves/dashboard/by-type:
+ *   get:
+ *     summary: Get leave distribution by type for dashboard
+ *     tags: [LeaveDashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Leave by type fetched successfully
+ */
+router.get('/dashboard/by-type',
+  authorize('LeaveApplication', action.READ),
+  leaveController.getDashboardLeaveByType
+);
+
+/**
+ * @swagger
+ * /leaves/dashboard/next-holiday:
+ *   get:
+ *     summary: Get next upcoming public holiday
+ *     tags: [LeaveDashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Next holiday fetched successfully
+ */
+router.get('/dashboard/next-holiday',
+  authorize('HolidayList', action.READ),
+  leaveController.getNextHoliday
+);
+
+/**
+ * @swagger
+ * /leaves/dashboard/export:
+ *   get:
+ *     summary: Export leave dashboard data
+ *     tags: [LeaveDashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard data exported successfully
+ */
+router.get('/dashboard/export',
+  authorize('LeaveApplication', action.READ),
+  leaveController.exportDashboard
+);
 
 
 // ═════════════════════════════════════════════════════════════════════════════

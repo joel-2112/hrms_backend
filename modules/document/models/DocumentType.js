@@ -26,7 +26,8 @@ module.exports = (sequelize, DataTypes) => {
       allowNull:    false,
       validate: {
         isIn: {
-          args: [[ 'Identity',
+          args: [
+        [ 'Identity',
         'Academic',
         'Employment',
         'Medical',

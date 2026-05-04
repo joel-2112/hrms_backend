@@ -13,6 +13,7 @@ const { catchAsync } = require('../../../utils/catchAsync');
 const { ok, created, noContent } = require('../../../utils/response');
 const { AppError } = require('../../../middlewares/errorMiddleware');
 const leaveService = require('../services/leaveService');
+const { Employee } = require('../../../models');
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -973,7 +974,174 @@ const expireOverdueLedgerEntries = catchAsync(async (req, res) => {
     data: result,
   });
 });
+// ═════════════════════════════════════════════════════════════════════════════
+//  LEAVE DASHBOARD — fixed controllers with Employee lookup for companyId
+// ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Helper: fetch employee context (companyId, branchId, departmentId) from userId
+ * Caches result on req.employeeContext for subsequent calls in same request
+ */
+const getEmployeeContext = async (req) => {
+  if (req._employeeContext) return req._employeeContext;
+
+  const userId = req.user?.id;
+  if (!userId) return null;
+
+  const employee = await Employee.findOne({
+    where: { userId },
+    attributes: ['id', 'companyId', 'branchId', 'departmentId'],
+  });
+
+  if (!employee) return null;
+
+  req._employeeContext = {
+    employeeId: employee.id,
+    companyId: employee.companyId,
+    branchId: employee.branchId,
+    departmentId: employee.departmentId,
+  };
+
+  return req._employeeContext;
+};
+
+/**
+ * GET /api/leaves/dashboard/stats
+ * Get dashboard statistics
+ */
+const getDashboardStats = catchAsync(async (req, res) => {
+  const context = await getEmployeeContext(req);
+  if (!context?.companyId) {
+    throw new AppError('Employee record not found. Please ensure your account is linked to an employee.', 400);
+  }
+
+  const { period } = req.query;
+
+  const stats = await leaveService.getDashboardStats(
+    context.companyId,
+    period || new Date().getFullYear().toString(),
+    context.branchId || null,
+    context.departmentId || null,
+  );
+
+  ok(res, { message: 'Dashboard stats fetched successfully', data: stats });
+});
+
+/**
+ * GET /api/leaves/dashboard/balances
+ * Get leave balance snapshot
+ */
+const getDashboardBalances = catchAsync(async (req, res) => {
+  const context = await getEmployeeContext(req);
+  if (!context?.companyId) {
+    throw new AppError('Employee record not found.', 400);
+  }
+
+  const balances = await leaveService.getDashboardBalances(
+    context.companyId,
+    context.branchId || null,
+  );
+
+  ok(res, { message: 'Dashboard balances fetched successfully', data: balances });
+});
+
+/**
+ * GET /api/leaves/dashboard/pending-approvals
+ * Get pending leave approvals
+ */
+const getDashboardPendingApprovals = catchAsync(async (req, res) => {
+  const context = await getEmployeeContext(req);
+  if (!context?.companyId) {
+    throw new AppError('Employee record not found.', 400);
+  }
+
+  const { limit } = req.query;
+
+  const approvals = await leaveService.getDashboardPendingApprovals(
+    context.companyId,
+    {
+      limit: parseInt(limit) || 4,
+      branchId: context.branchId || null,
+      departmentId: context.departmentId || null,
+    },
+  );
+
+  ok(res, { message: 'Pending approvals fetched successfully', data: approvals });
+});
+
+/**
+ * GET /api/leaves/dashboard/on-leave-this-week
+ * Get employees currently on leave this week
+ */
+const getOnLeaveThisWeek = catchAsync(async (req, res) => {
+  const context = await getEmployeeContext(req);
+  if (!context?.companyId) {
+    throw new AppError('Employee record not found.', 400);
+  }
+
+  const employees = await leaveService.getOnLeaveThisWeek(
+    context.companyId,
+    context.branchId || null,
+  );
+
+  ok(res, { message: 'On-leave employees fetched successfully', data: employees });
+});
+
+/**
+ * GET /api/leaves/dashboard/by-type
+ * Get leave distribution by type
+ */
+const getDashboardLeaveByType = catchAsync(async (req, res) => {
+  const context = await getEmployeeContext(req);
+  if (!context?.companyId) {
+    throw new AppError('Employee record not found.', 400);
+  }
+
+  const { period } = req.query;
+
+  const byType = await leaveService.getDashboardLeaveByType(
+    context.companyId,
+    period || new Date().getFullYear().toString(),
+    context.branchId || null,
+  );
+
+  ok(res, { message: 'Leave by type fetched successfully', data: byType });
+});
+
+/**
+ * GET /api/leaves/dashboard/next-holiday
+ * Get next upcoming public holiday
+ */
+const getNextHoliday = catchAsync(async (req, res) => {
+  const context = await getEmployeeContext(req);
+  if (!context?.companyId) {
+    throw new AppError('Employee record not found.', 400);
+  }
+
+  const holiday = await leaveService.getNextHoliday(context.companyId);
+
+  ok(res, { message: 'Next holiday fetched successfully', data: holiday });
+});
+
+/**
+ * GET /api/leaves/dashboard/export
+ * Export dashboard data
+ */
+const exportDashboard = catchAsync(async (req, res) => {
+  const context = await getEmployeeContext(req);
+  if (!context?.companyId) {
+    throw new AppError('Employee record not found.', 400);
+  }
+
+  const { period } = req.query;
+
+  const data = await leaveService.exportDashboardData(
+    context.companyId,
+    period || new Date().getFullYear().toString(),
+  );
+
+  ok(res, { message: 'Dashboard data exported successfully', data });
+});
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
@@ -1065,4 +1233,13 @@ module.exports = {
   validateLeaveBalance,
   calculateWorkingDays,
   expireOverdueLedgerEntries,
+
+  // Dashboard
+  getDashboardStats,
+  getDashboardBalances,
+  getDashboardPendingApprovals,
+  getOnLeaveThisWeek,
+  getDashboardLeaveByType,
+  getNextHoliday,
+  exportDashboard,
 };
