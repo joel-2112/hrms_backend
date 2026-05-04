@@ -34,12 +34,12 @@
  * Query params recognised:
  *   ?page=2&limit=25
  *
- * Defaults:  page = 1, limit = 20
+ * Defaults:  page = 1, limit = 10
  * Hard cap:  limit ≤ 100  (prevents accidental full-table fetches)
  */
 
 const DEFAULT_PAGE  = 1;
-const DEFAULT_LIMIT = 20;
+const DEFAULT_LIMIT = 10;
 const MAX_LIMIT     = 100;
 
 // ─────────────────────────────────────────────

@@ -14,6 +14,7 @@ const router = require("express").Router();
 const employeeController = require("../controllers/employeeController");
 const { authenticate } = require("../../../middlewares/authMiddleware");
 const { authorize, action } = require("../../../middlewares/rbacMiddleware");
+const { uploadAvatar } = require("../../../middlewares/uploadMiddleware");
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  All routes require authentication
@@ -331,6 +332,7 @@ router.post(
   employeeController.approveEmployee,
 );
 
+
 /**
  * @swagger
  * /employees:
@@ -429,7 +431,41 @@ router.get(
   authorize("Employee", action.READ),
   employeeController.getEmployees,
 );
-
+/**
+ * @swagger
+ * /employees/{id}/avatar:
+ *   put:
+ *     summary: Upload employee avatar/profile photo
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [avatar]
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Avatar uploaded successfully
+ */
+router.put('/:id/avatar',
+  authorize('Employee', action.WRITE),
+  uploadAvatar.single('avatar'),
+  employeeController.updateAvatar
+);
 // ═════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD & STATISTICS (static routes — must be before /:id)
 // ═════════════════════════════════════════════════════════════════════════════

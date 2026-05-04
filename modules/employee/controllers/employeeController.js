@@ -35,7 +35,26 @@ const createEmployee = catchAsync(async (req, res) => {
     data: employee,
   });
 });
+/**
+ * PUT /api/employees/:id/avatar
+ * Upload employee profile photo
+ */
+const updateAvatar = catchAsync(async (req, res) => {
+  if (!req.file) {
+    throw new AppError('No image file uploaded', 422);
+  }
 
+  const { id } = req.params;
+  const { getRelativePath } = require('../../../middlewares/uploadMiddleware');
+  const filePath = getRelativePath(req.file);
+
+  const employee = await employeeService.updateAvatar(id, filePath);
+
+  ok(res, {
+    message: 'Profile photo updated successfully',
+    data: employee,
+  });
+});
 /**
  * POST /api/employees/from-user/:userId
  * Create Employee from existing User account.
@@ -661,7 +680,7 @@ module.exports = {
 
   // Filters
   getFilterOptions,
-
+updateAvatar,
   // Timeline
   getEmployeeTimeline,
 };

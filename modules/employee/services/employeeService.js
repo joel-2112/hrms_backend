@@ -494,6 +494,7 @@ const getEmployees = async (query = {}, permFilter = {}) => {
     const like = { [Op.iLike]: `%${search}%` };
     where[Op.or] = [
       { firstName:      like },
+      {middleName:     like },
       { lastName:       like },
       { employeeNumber: like },
       { email:          like },
@@ -504,7 +505,7 @@ const getEmployees = async (query = {}, permFilter = {}) => {
     where,
     limit,
     offset,
-    order: [['status', 'ASC'], ['lastName', 'ASC'], ['firstName', 'ASC']],
+    order: [['createdAt', 'DESC'], ],
     include: [...ORG_INCLUDES, MANAGER_INCLUDE, USER_INCLUDE],
     attributes: {
       exclude: ['nationalIdNumber', 'bankAccountNumber', 'mobileMoneyNumber', 'employeeDocuments'],
@@ -512,6 +513,27 @@ const getEmployees = async (query = {}, permFilter = {}) => {
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
+};
+
+/**
+ * Update employee avatar path
+ */
+const updateAvatar = async (employeeId, filePath) => {
+  const employee = await Employee.findByPk(employeeId);
+  if (!employee) throw new AppError('Employee not found', 404);
+
+  // Delete old avatar if exists
+  if (employee.image) {
+    const { deleteFile } = require('../../../middlewares/uploadMiddleware');
+    await deleteFile(employee.image);
+  }
+
+  await employee.update({ image: filePath });
+
+  return Employee.findByPk(employeeId, {
+    include: [...FULL_INCLUDES],
+    attributes: { exclude: ['nationalIdNumber', 'bankAccountNumber', 'mobileMoneyNumber'] },
+  });
 };
 
 /**
@@ -1498,6 +1520,7 @@ module.exports = {
   deactivateUser,
   activateUser,
   getEmployeeByUserId,
+  updateAvatar,
 
   // Education
   getEducation,
