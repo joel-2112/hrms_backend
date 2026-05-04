@@ -43,15 +43,15 @@ const DOCUMENT_INCLUDES = [
   {
     model:      Employee,
     as:         'uploadedBy',
-    attributes: ['id', 'firstName', 'lastName', 'employeeNumber'],
+    attributes: ['id', 'firstName', 'middleName', 'lastName', 'employeeNumber'],
   },
   {
     model:      DocumentVersion,
     as:         'versions',
     include: [{
       model:      Employee,
-      as:         'replacedBy',
-      attributes: ['id', 'firstName', 'lastName'],
+      as:         'uploadedBy',
+      attributes: ['id', 'firstName', 'middleName', 'lastName'],
     }],
     order:      [['versionNumber', 'DESC']],
     separate:   true,
@@ -68,7 +68,7 @@ const DOCUMENT_LIST_INCLUDES = [
   {
     model:      Employee,
     as:         'uploadedBy',
-    attributes: ['id', 'firstName', 'lastName', 'employeeNumber'],
+    attributes: ['id', 'firstName', 'middleName', 'lastName', 'employeeNumber'],
   },
 ];
 
@@ -289,9 +289,14 @@ const attachDocument = async (data) => {
   }
 
   // Validate uploader if provided
-  if (uploadedById) {
+if (uploadedById) {
+  try {
     await assertEmployeeExists(uploadedById);
+  } catch (err) {
+    // If employee not found, just set uploadedById to null
+    uploadedById = null;
   }
+}
 
   // ── Create document ────────────────────────────────────────
   const document = await Document.create({

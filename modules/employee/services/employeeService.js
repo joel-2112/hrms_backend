@@ -222,8 +222,8 @@ const findSeparation = async (employeeId) => {
  * HR creates a new employee record — status starts as 'Inactive' pending GM approval.
  */
 const createEmployee = async (data) => {
-  if (!data.firstName || !data.lastName) {
-    throw new AppError('firstName and lastName are required', 422);
+  if (!data.firstName || !data.middleName || !data.lastName) {
+    throw new AppError('firstName, middleName, and lastName are required', 422);
   }
   if (!data.companyId) {
     throw new AppError('companyId is required', 422);

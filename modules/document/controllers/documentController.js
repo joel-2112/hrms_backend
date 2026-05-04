@@ -1,5 +1,6 @@
 'use strict';
 
+const { AppError } = require('../../../middlewares/errorMiddleware');
 /**
  * modules/document/controllers/documentController.js
  *
@@ -12,6 +13,8 @@
 const { catchAsync } = require('../../../utils/catchAsync');
 const { ok, created, noContent } = require('../../../utils/response');
 const documentService = require('../services/documentService');
+const path = require('path');
+const fs = require('fs');
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT TYPES  (the shelves)
@@ -107,7 +110,17 @@ const deleteDocumentType = catchAsync(async (req, res) => {
  *   - isConfidential:   (optional) Hide from self-service
  *   - notes:            (optional) Internal notes
  */
+// In documentController.js — attachDocument function
+
+// In documentController.js — attachDocument
+
 const attachDocument = catchAsync(async (req, res) => {
+  const uploadedFile = req.file;
+
+  if (!uploadedFile) {
+    throw new AppError('No file uploaded', 422);
+  }
+
   const {
     documentTypeId,
     voucherType,
@@ -120,15 +133,48 @@ const attachDocument = catchAsync(async (req, res) => {
     notes,
   } = req.body;
 
-  // uploadedById resolved from the authenticated session's employee record
-  const uploadedById = req.employee?.id || null;
+  if (!documentTypeId) throw new AppError('documentTypeId is required', 422);
+  if (!voucherType) throw new AppError('voucherType is required', 422);
+  if (!voucherNo) throw new AppError('voucherNo is required', 422);
 
-  // File from multer middleware
-  const uploadedFile = req.file;
+  // Look up document type name for readable folder
+  const { LeaveType, DocumentType } = require('../../../models');
+  // Actually use the DocumentType model
+  const DocumentTypeModel = require('../../../models').DocumentType;
+  let documentTypeName = 'Document';
+  try {
+    const docType = await DocumentTypeModel.findByPk(documentTypeId, { attributes: ['name'] });
+    if (docType) documentTypeName = docType.name;
+  } catch (err) {
+    // Fallback to UUID if lookup fails
+    documentTypeName = documentTypeId.substring(0, 8);
+  }
 
-  // Build file path relative to uploads/ root
-  const { getRelativePath } = require('../../../middlewares/uploadMiddleware');
-  const filePath = getRelativePath(uploadedFile);
+  // Move file from _staging to readable shelf
+  const { moveToShelf, getRelativePath } = require('../../../middlewares/uploadMiddleware');
+  
+  // First get the current relative path
+  const stagingPath = getRelativePath(uploadedFile);
+  
+  // Move to: documents/Employee/National-ID/EMP-2026-0006/eyuel-1714806119579.png
+  const filePath = moveToShelf(
+    uploadedFile.path,
+    voucherType,
+    documentTypeName,
+    voucherNo,
+    uploadedFile.originalname
+  );
+
+  // Uploader
+  let uploadedById = null;
+  if (req.user?.id) {
+    const { Employee } = require('../../../models');
+    const employee = await Employee.findOne({
+      where: { userId: req.user.id },
+      attributes: ['id'],
+    });
+    uploadedById = employee?.id || null;
+  }
 
   const document = await documentService.attachDocument({
     documentTypeId,
@@ -139,13 +185,17 @@ const attachDocument = catchAsync(async (req, res) => {
     filePath,
     mimeType: uploadedFile.mimetype,
     fileSize: uploadedFile.size,
-    title,
-    documentNumber,
-    issueDate,
-    expiryDate,
+    title: title || null,
+    documentNumber: documentNumber || null,
+    issueDate: issueDate || null,
+    expiryDate: expiryDate || null,
     isConfidential: isConfidential === 'true' || isConfidential === true,
-    notes,
+    notes: notes || null,
   });
+
+  // Cleanup staging folder if empty
+  const { cleanupEmptyFolders } = require('../../../middlewares/uploadMiddleware');
+  await cleanupEmptyFolders(stagingPath).catch(() => {});
 
   created(res, {
     message: 'Document attached successfully',
@@ -153,6 +203,33 @@ const attachDocument = catchAsync(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/documents/:id/file
+ * Stream the physical file for preview or download
+ */
+const downloadDocumentFile = catchAsync(async (req, res) => {
+  const document = await documentService.getDocumentById(req.params.id);
+  
+  if (!document) {
+    throw new AppError('Document not found', 404);
+  }
+
+  const { getFullPath } = require('../../../middlewares/uploadMiddleware');
+  const fullPath = getFullPath(document.filePath);
+
+  if (!fullPath || !fs.existsSync(fullPath)) {
+    throw new AppError('File not found on disk', 404);
+  }
+
+  // Set headers
+  res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
+  res.setHeader('Content-Disposition', `inline; filename="${document.fileName}"`);
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+
+  // Stream the file
+  const stream = fs.createReadStream(fullPath);
+  stream.pipe(res);
+});
 /**
  * GET /api/documents/:id
  * Single document — full shelf view (type + uploader + all versions).
@@ -443,6 +520,7 @@ module.exports = {
   updateDocument,
   replaceDocument,
   deleteDocument,
+  downloadDocumentFile,
 
   // Verification
   verifyDocument,

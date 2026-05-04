@@ -392,7 +392,35 @@ router.get('/owner/:voucherType/:voucherNo',
   documentController.getDocumentsByOwner
 );
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  DOWNLOAD / PREVIEW DOCUMENT FILE
+// ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /documents/{id}/file:
+ *   get:
+ *     summary: Download/preview a document file
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: File streamed successfully
+ *       404:
+ *         description: Document or file not found
+ */
+router.get('/:id/file',
+  authorize('Document', action.READ),
+  documentController.downloadDocumentFile
+);
 // ═════════════════════════════════════════════════════════════════════════════
 //  DOCUMENTS BY TYPE (static route — must be before /:id)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -541,6 +569,14 @@ router.get('/versions/:versionId',
  */
 router.post('/',
   authorize('Document', action.CREATE),
+    (req, res, next) => {
+    console.log('=== BEFORE MULTER ===');
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('req.body:', req.body);
+    console.log('req.body keys:', Object.keys(req.body || {}));
+    console.log('======================');
+    next();
+  },
   uploadDocument.single('file'),
   documentController.attachDocument
 );
