@@ -1561,6 +1561,7 @@ router.post('/applications/:id/submit',
  *         description: Only Open applications can be approved, or insufficient balance
  */
 router.post('/applications/:id/approve',
+  authenticate,
   authorize('LeaveApplication', action.SUBMIT),
   leaveController.approveLeaveApplication
 );

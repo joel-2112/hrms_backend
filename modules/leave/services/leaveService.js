@@ -1036,13 +1036,68 @@ const getLeaveApplications = async (query = {}) => {
     limit,
     offset,
     order: [["createdAt", "DESC"]],
+    include: [
+      {
+        model: Employee,
+        as: "applicant",
+        attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber", "image"],
+        include: [
+          { model: Department, as: "department", attributes: ["id", "name"] },
+          { model: Branch, as: "branch", attributes: ["id", "name"] },
+        ],
+      },
+      {
+        model: Employee,
+        as: "approver",
+        attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber"],
+      },
+      {
+        model: LeaveType,
+        as: "leaveType",
+        attributes: ["id", "name"],
+      },
+      {
+        model: HolidayList,
+        as: "holidayList",
+        attributes: ["id", "name"],
+        required: false,
+      },
+    ],
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
 };
 
 const getLeaveApplicationById = async (id) => {
-  const app = await LeaveApplication.findByPk(id);
+  const app = await LeaveApplication.findByPk(id, {
+    include: [
+      {
+        model: Employee,
+        as: "applicant",
+        attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber", "image"],
+        include: [
+          { model: Department, as: "department", attributes: ["id", "name"] },
+          { model: Branch, as: "branch", attributes: ["id", "name"] },
+        ],
+      },
+      {
+        model: Employee,
+        as: "approver",
+        attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber"],
+      },
+      {
+        model: LeaveType,
+        as: "leaveType",
+        attributes: ["id", "name"],
+      },
+      {
+        model: HolidayList,
+        as: "holidayList",
+        attributes: ["id", "name"],
+        required: false,
+      },
+    ],
+  });
   if (!app) throw new AppError("Leave application not found", 404);
   return app;
 };
@@ -1063,9 +1118,16 @@ const approveLeaveApplication = async (id, approverUserId) => {
   if (app.status !== "Open")
     throw new AppError("Only Open applications can be approved", 422);
 
+  // DEBUG
+  console.log('=== APPROVE DEBUG ===');
+  console.log('Application ID:', id);
+  console.log('Approver User ID passed:', approverUserId);
+  console.log('Application employeeId:', app.employeeId);
+  console.log('Application status:', app.status);
+  console.log('======================');
+
   const leaveType = await LeaveType.findByPk(app.leaveTypeId);
 
-  // Re-validate balance for safety
   if (!leaveType.allowNegativeBalance) {
     const balance = await computeBalance(app.employeeId, app.leaveTypeId);
     if (balance < parseFloat(app.totalLeaveDays)) {
@@ -1077,27 +1139,25 @@ const approveLeaveApplication = async (id, approverUserId) => {
   }
 
   await sequelize.transaction(async (t) => {
-    // Debit the ledger
-    await createLedgerEntry(
-      {
-        employeeId: app.employeeId,
-        leaveTypeId: app.leaveTypeId,
-        voucherType: "LeaveApplication",
-        voucherNo: app.id,
-        leaves: -Math.abs(parseFloat(app.totalLeaveDays)), // negative = debit
-        fromDate: app.fromDate,
-        toDate: app.toDate,
-      },
-      t,
-    );
+    await createLedgerEntry({
+      employeeId: app.employeeId,
+      leaveTypeId: app.leaveTypeId,
+      voucherType: "LeaveApplication",
+      voucherNo: app.id,
+      leaves: -Math.abs(parseFloat(app.totalLeaveDays)),
+      fromDate: app.fromDate,
+      toDate: app.toDate,
+    }, t);
 
-    await app.update(
-      {
-        status: "Approved",
-        approverId: approverUserId,
-      },
-      { transaction: t },
-    );
+    // If approverUserId is null, don't set it
+    const updateData = {
+      status: "Approved",
+    };
+    if (approverUserId) {
+      updateData.approverId = approverUserId;
+    }
+
+    await app.update(updateData, { transaction: t });
   });
 
   logger.info("LeaveApplication approved", { id, employeeId: app.employeeId });

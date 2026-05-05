@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
         comment:
-          "FK → users.id — the login account for this employee (nullable for non-system users)",
+          "FK → users.id — the login account for this employee",
       },
       companyId: {
         type: DataTypes.UUID,

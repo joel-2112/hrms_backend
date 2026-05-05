@@ -696,14 +696,42 @@ const submitLeaveApplication = catchAsync(async (req, res) => {
   });
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  LEAVE APPLICATION — FIXED APPROVE/REJECT WITH EMPLOYEE LOOKUP
+// ═════════════════════════════════════════════════════════════════════════════
+
 /**
- * POST /api/leave/applications/:id/approve
+ * POST /api/leaves/applications/:id/approve
  * Approver approves leave application — debits ledger.
  */
 const approveLeaveApplication = catchAsync(async (req, res) => {
-  const approverUserId = req.employee?.id || req.user?.id;
+  // Look up the Employee record associated with the authenticated User
+  const { Employee } = require('../../../models');
+  let approverEmployeeId = null;
 
-  const application = await leaveService.approveLeaveApplication(req.params.id, approverUserId);
+  if (req.user?.id) {
+    const employee = await Employee.findOne({
+      where: { userId: req.user.id },
+      attributes: ['id'],
+    });
+    approverEmployeeId = employee?.id || null;
+  }
+
+  // Also check req.employee if your auth middleware attaches it
+  if (!approverEmployeeId && req.employee?.id) {
+    approverEmployeeId = req.employee.id;
+  }
+
+  // Fallback: if the user IS an employee (userId on employee = same UUID pattern)
+  if (!approverEmployeeId) {
+    const employee = await Employee.findByPk(req.user?.id, { attributes: ['id'] });
+    approverEmployeeId = employee?.id || null;
+  }
+
+  const application = await leaveService.approveLeaveApplication(
+    req.params.id,
+    approverEmployeeId,
+  );
 
   ok(res, {
     message: 'Leave application approved — Balance updated',
@@ -712,15 +740,37 @@ const approveLeaveApplication = catchAsync(async (req, res) => {
 });
 
 /**
- * POST /api/leave/applications/:id/reject
+ * POST /api/leaves/applications/:id/reject
  * Approver rejects leave application.
  */
 const rejectLeaveApplication = catchAsync(async (req, res) => {
-  const approverUserId = req.employee?.id || req.user?.id;
+  // Look up the Employee record associated with the authenticated User
+  const { Employee } = require('../../../models');
+  let approverEmployeeId = null;
+
+  if (req.user?.id) {
+    const employee = await Employee.findOne({
+      where: { userId: req.user.id },
+      attributes: ['id'],
+    });
+    approverEmployeeId = employee?.id || null;
+  }
+
+  if (!approverEmployeeId && req.employee?.id) {
+    approverEmployeeId = req.employee.id;
+  }
+
+  if (!approverEmployeeId) {
+    const employee = await Employee.findByPk(req.user?.id, { attributes: ['id'] });
+    approverEmployeeId = employee?.id || null;
+  }
+
   const { rejectionReason } = req.body;
 
   const application = await leaveService.rejectLeaveApplication(
-    req.params.id, approverUserId, rejectionReason,
+    req.params.id,
+    approverEmployeeId,
+    rejectionReason,
   );
 
   ok(res, {
