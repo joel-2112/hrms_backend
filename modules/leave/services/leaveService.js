@@ -372,7 +372,7 @@ const deleteLeavePeriod = async (id) => {
     );
   }
 
-  await period.destroy();
+  await period.destroy({ force: true });
   logger.info("LeavePeriod deleted", { id });
 };
 

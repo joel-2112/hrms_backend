@@ -28,6 +28,7 @@ const {
 const { AppError }     = require('../../../middlewares/errorMiddleware');
 const { getPaginationOptions, buildMeta } = require('../../../utils/pagination');
 const logger           = require('../../../utils/logger');
+const fs = require('fs');
 
 // ─────────────────────────────────────────────────────────────
 //  SHARED INCLUDES
@@ -173,6 +174,76 @@ const getAllDocumentTypes = async ({ category, includeDisabled = false } = {}) =
     where,
     order: [['category', 'ASC'], ['name', 'ASC']],
   });
+};
+
+/**
+ * Build a recursive file explorer tree from the uploads folder
+ * @param {string} relativePath - Path relative to uploads root (empty for root)
+ * @returns {object} Tree structure with folders and files
+ */
+const getFileExplorerTree = async (relativePath = '') => {
+  const { getFullPath, UPLOAD_ROOT } = require('../../../middlewares/uploadMiddleware');
+  const absPath = relativePath ? getFullPath(relativePath) : UPLOAD_ROOT;
+  
+  if (!absPath || !fs.existsSync(absPath)) {
+    throw new AppError('Directory not found', 404);
+  }
+
+  const entries = await fs.promises.readdir(absPath, { withFileTypes: true });
+  
+  const tree = {
+    path: relativePath || '/',
+    name: relativePath ? path.basename(relativePath) : 'uploads',
+    type: 'folder',
+    children: [],
+  };
+
+  for (const entry of entries) {
+    // Skip hidden files, _staging, temp folders
+    if (entry.name.startsWith('.') || entry.name === '_staging' || entry.name === 'temp') {
+      continue;
+    }
+
+    const entryRelativePath = relativePath 
+      ? path.join(relativePath, entry.name).replace(/\\/g, '/')
+      : entry.name;
+
+    if (entry.isDirectory()) {
+      // Only go one level deep for performance — client can expand on click
+      tree.children.push({
+        path: entryRelativePath,
+        name: entry.name,
+        type: 'folder',
+        hasChildren: true, // Indicates this can be expanded
+      });
+    } else {
+      const stats = await fs.promises.stat(path.join(absPath, entry.name));
+      tree.children.push({
+        path: entryRelativePath,
+        name: entry.name,
+        type: 'file',
+        ext: path.extname(entry.name).toLowerCase(),
+        sizeKb: Math.ceil(stats.size / 1024),
+        size: stats.size,
+        modifiedAt: stats.mtime,
+      });
+    }
+  }
+
+  // Sort: folders first, then files, both alphabetically
+  tree.children.sort((a, b) => {
+    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return tree;
+};
+
+/**
+ * Get contents of a specific directory (for lazy loading)
+ */
+const getDirectoryContents = async (relativePath) => {
+  return getFileExplorerTree(relativePath);
 };
 
 /**
@@ -851,6 +922,8 @@ module.exports = {
   updateDocument,
   replaceDocument,
   deleteDocument,
+  getFileExplorerTree,
+  getDirectoryContents,
 
   // Verification workflow
   verifyDocument,

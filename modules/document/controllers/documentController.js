@@ -52,7 +52,40 @@ const getAllDocumentTypes = catchAsync(async (req, res) => {
     data: types,
   });
 });
+/**
+ * GET /api/documents/explorer
+ * Get the file explorer tree structure
+ * Query: ?path=documents/Employee (optional — defaults to root)
+ */
+const getFileExplorer = catchAsync(async (req, res) => {
+  const { path: relativePath } = req.query;
+  const tree = await documentService.getFileExplorerTree(relativePath || '');
+  
+  ok(res, {
+    message: 'File explorer tree fetched successfully',
+    data: tree,
+  });
+});
 
+/**
+ * GET /api/documents/explorer/directory
+ * Get contents of a specific directory
+ * Query: ?path=documents/Employee/National-ID
+ */
+const getDirectoryContents = catchAsync(async (req, res) => {
+  const { path: relativePath } = req.query;
+  
+  if (!relativePath) {
+    throw new AppError('path query parameter is required', 422);
+  }
+  
+  const contents = await documentService.getDirectoryContents(relativePath);
+  
+  ok(res, {
+    message: 'Directory contents fetched successfully',
+    data: contents,
+  });
+});
 /**
  * GET /api/documents/types/:id
  * Fetch a single document type by ID.
@@ -521,6 +554,8 @@ module.exports = {
   replaceDocument,
   deleteDocument,
   downloadDocumentFile,
+  getFileExplorer,
+  getDirectoryContents,
 
   // Verification
   verifyDocument,

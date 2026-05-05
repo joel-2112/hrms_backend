@@ -34,7 +34,56 @@ router.use(authenticate);
 // ═════════════════════════════════════════════════════════════════════════════
 //  DOCUMENT TYPES  (the shelves)
 // ═════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+//  FILE EXPLORER
+// ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /documents/explorer:
+ *   get:
+ *     summary: Get file explorer tree structure
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: path
+ *         schema:
+ *           type: string
+ *         description: Relative path from uploads root (empty for root)
+ *     responses:
+ *       200:
+ *         description: File explorer tree fetched successfully
+ */
+router.get('/explorer',
+  authorize('Document', action.READ),
+  documentController.getFileExplorer
+);
+
+/**
+ * @swagger
+ * /documents/explorer/directory:
+ *   get:
+ *     summary: Get contents of a specific directory
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Relative path from uploads root
+ *     responses:
+ *       200:
+ *         description: Directory contents fetched successfully
+ */
+router.get('/explorer/directory',
+  authorize('Document', action.READ),
+  documentController.getDirectoryContents
+);
 /**
  * @swagger
  * /documents/types:
