@@ -13,7 +13,7 @@ const { catchAsync } = require('../../../utils/catchAsync');
 const { ok, created, noContent } = require('../../../utils/response');
 const { AppError } = require('../../../middlewares/errorMiddleware');
 const leaveService = require('../services/leaveService');
-const { Employee } = require('../../../models');
+const { Employee, Department, Branch } = require('../../../models');
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1193,6 +1193,191 @@ const exportDashboard = catchAsync(async (req, res) => {
   ok(res, { message: 'Dashboard data exported successfully', data });
 });
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  EMPLOYEE SELF-SERVICE — MY LEAVE
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Helper: Get the employee record for the authenticated user
+ */
+const getMyEmployee = async (req) => {
+  
+  // Try req.employee first (if auth middleware attaches it)
+  if (req.employee?.id) {
+    return Employee.findByPk(req.employee.id, {
+      attributes: ['id', 'employeeNumber', 'firstName','middleName', 'lastName', 'reportsToId', 'dateOfJoining', 'departmentId', 'branchId', 'companyId'],
+      include: [
+        { model: Department, as: 'department', attributes: ['id', 'name'] },
+        { model: Branch, as: 'branch', attributes: ['id', 'name'] },
+        { model: Employee, as: 'reportsTo', attributes: ['id', 'firstName', 'middleName', 'lastName', 'employeeNumber', 'dateOfJoining'] },
+      ],
+    });
+  }
+
+  // Look up by userId
+  if (req.user?.id) {
+    return Employee.findOne({
+      where: { userId: req.user.id },
+      attributes: ['id', 'employeeNumber', 'firstName','middleName', 'lastName', 'reportsToId', 'dateOfJoining', 'departmentId', 'branchId', 'companyId'],
+      include: [
+        { model: Department, as: 'department', attributes: ['id', 'name'] },
+        { model: Branch, as: 'branch', attributes: ['id', 'name'] },
+        { model: Employee, as: 'reportsTo', attributes: ['id', 'firstName', 'middleName', 'lastName', 'employeeNumber', 'dateOfJoining'] },
+      ],
+    });
+  }
+
+  return null;
+};
+
+/**
+ * GET /api/leaves/my-leave/summary
+ * Get current employee's leave summary
+ */
+const getMyLeaveSummary = catchAsync(async (req, res) => {
+  const employee = await getMyEmployee(req);
+  if (!employee) throw new AppError('Employee record not found. Contact HR.', 404);
+
+  // Get all leave balances
+  const balances = await leaveService.getLeaveBalances(employee.id);
+
+  // Get active leave period
+  let activePeriod = null;
+  try {
+    const periodRes = await leaveService.getActiveLeavePeriod(employee.companyId);
+    activePeriod = periodRes;
+  } catch { /* no active period */ }
+
+  // Get pending applications count
+  const pendingApps = await leaveService.getLeaveApplications({
+    employeeId: employee.id,
+    status: 'Open',
+    limit: 100,
+  });
+
+  // Get approved applications this period
+  let approvedThisPeriod = 0;
+  if (activePeriod) {
+    const approvedRes = await leaveService.getLeaveApplications({
+      employeeId: employee.id,
+      status: 'Approved',
+      limit: 100,
+    });
+    approvedThisPeriod = (approvedRes.data || []).reduce(
+      (sum, app) => sum + parseFloat(app.totalLeaveDays || 0), 0
+    );
+  }
+
+  ok(res, {
+    message: 'My leave summary fetched successfully',
+    data: {
+      employee: {
+        id: employee.id,
+        employeeNumber: employee.employeeNumber,
+        name: `${employee.firstName} ${employee.middleName} ${employee.lastName}`,
+        dateOfJoining: employee.dateOfJoining,
+        department: employee.department?.name,
+        branch: employee.branch?.name,
+        reportsTo: employee.reportsTo ? {
+          id: employee.reportsTo.id,
+          name: `${employee.reportsTo.firstName} ${employee.reportsTo.middleName} ${employee.reportsTo.lastName}`,
+          dateOfJoining: employee.reportsTo.dateOfJoining,
+        } : null,
+      },
+      activePeriod: activePeriod ? {
+        id: activePeriod.id,
+        name: activePeriod.name,
+        startDate: activePeriod.startDate,
+        endDate: activePeriod.endDate,
+      } : null,
+      balances: balances || [],
+      pendingApplications: (pendingApps.data || []).length,
+      daysTakenThisPeriod: approvedThisPeriod,
+      draftCount: (await leaveService.getLeaveApplications({
+        employeeId: employee.id,
+        status: 'Draft',
+        limit: 100,
+      })).data?.length || 0,
+    },
+  });
+});
+
+/**
+ * GET /api/leaves/my-leave/applications
+ * Get current employee's leave applications
+ */
+const getMyLeaveApplications = catchAsync(async (req, res) => {
+  const employee = await getMyEmployee(req);
+  if (!employee) throw new AppError('Employee record not found. Contact HR.', 404);
+
+  const { status, page, limit } = req.query;
+
+  const result = await leaveService.getLeaveApplications({
+    employeeId: employee.id,
+    status: status || undefined,
+    page: page || 1,
+    limit: limit || 20,
+  });
+
+  ok(res, {
+    message: 'My leave applications fetched successfully',
+    data: result.data,
+    meta: result.meta,
+  });
+});
+
+/**
+ * GET /api/leaves/my-leave/calendar
+ * Get current employee's leave calendar for a year
+ */
+const getMyLeaveCalendar = catchAsync(async (req, res) => {
+  const employee = await getMyEmployee(req);
+  if (!employee) throw new AppError('Employee record not found. Contact HR.', 404);
+
+  const year = parseInt(req.query.year) || new Date().getFullYear();
+  const fromDate = `${year}-01-01`;
+  const toDate = `${year}-12-31`;
+
+  // Get all approved applications for this year
+  const result = await leaveService.getLeaveApplications({
+    employeeId: employee.id,
+    status: 'Approved',
+    limit: 200,
+  });
+
+  // Filter by year client-side (since service doesn't support date range)
+  const yearApps = (result.data || []).filter(
+    app => app.fromDate >= fromDate && app.toDate <= toDate
+  );
+
+  // Group by month
+  const byMonth = {};
+  yearApps.forEach(app => {
+    const month = new Date(app.fromDate).getMonth();
+    if (!byMonth[month]) byMonth[month] = [];
+    byMonth[month].push({
+      id: app.id,
+      fromDate: app.fromDate,
+      toDate: app.toDate,
+      totalLeaveDays: app.totalLeaveDays,
+      leaveType: app.leaveType?.name || 'Unknown',
+      status: app.status,
+    });
+  });
+
+  ok(res, {
+    message: 'My leave calendar fetched successfully',
+    data: {
+      year,
+      totalDays: yearApps.reduce((sum, app) => sum + parseFloat(app.totalLeaveDays || 0), 0),
+      applications: yearApps.length,
+      byMonth,
+    },
+  });
+});
+
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1292,4 +1477,9 @@ module.exports = {
   getDashboardLeaveByType,
   getNextHoliday,
   exportDashboard,
+
+  // Employee Self-Service
+  getMyLeaveSummary,
+  getMyLeaveApplications,
+  getMyLeaveCalendar,
 };

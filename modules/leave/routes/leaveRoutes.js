@@ -51,7 +51,78 @@ router.use(authenticate);
  *   - name: LeaveCompliance
  *     description: Compliance utilities — date checks, balance validation, expiry
  */
+// ═════════════════════════════════════════════════════════════════════════════
+//  EMPLOYEE SELF-SERVICE — MY LEAVE
+// ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /leaves/my-leave/summary:
+ *   get:
+ *     summary: Get current employee's leave summary (balances, allocations, pending apps)
+ *     tags: [LeaveApplications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Employee leave summary fetched successfully
+ */
+router.get('/my-leave/summary',
+  authenticate,
+  leaveController.getMyLeaveSummary
+);
+
+/**
+ * @swagger
+ * /leaves/my-leave/applications:
+ *   get:
+ *     summary: Get current employee's leave applications
+ *     tags: [LeaveApplications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Employee applications fetched successfully
+ */
+router.get('/my-leave/applications',
+  authenticate,
+  leaveController.getMyLeaveApplications
+);
+
+/**
+ * @swagger
+ * /leaves/my-leave/calendar:
+ *   get:
+ *     summary: Get current employee's leave calendar (upcoming + history)
+ *     tags: [LeaveApplications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Employee leave calendar fetched successfully
+ */
+router.get('/my-leave/calendar',
+  authenticate,
+  leaveController.getMyLeaveCalendar
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE DASHBOARD
@@ -1483,8 +1554,8 @@ router.post('/compensatory-requests/:id/cancel',
  *         description: Leave applications fetched successfully
  */
 router.route('/applications')
-  .post(authorize('LeaveApplication', action.CREATE), leaveController.createLeaveApplication)
-  .get(authorize('LeaveApplication', action.READ), leaveController.getLeaveApplications);
+  .post(authenticate, authorize('LeaveApplication', action.CREATE), leaveController.createLeaveApplication)
+  .get(authenticate, authorize('LeaveApplication', action.READ), leaveController.getLeaveApplications);
 
 /**
  * @swagger
