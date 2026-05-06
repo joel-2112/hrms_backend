@@ -134,7 +134,76 @@ const assertEmployeeActive = async (employeeId) => {
   }
   return emp;
 };
+// ═════════════════════════════════════════════════════════════════════════════
+//  MY LEDGER — Authenticated Employee's Ledger
+// ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Get leave ledger for the authenticated employee
+ * @param {string} employeeId - Employee UUID
+ * @param {object} query - Filters (leaveTypeId, voucherType, page, limit)
+ */
+const getMyLedger = async (employeeId, query = {}) => {
+  const { leaveTypeId, voucherType } = query;
+  const { limit, offset, page } = getPaginationOptions(query);
+
+  // If no specific leave type, get all leave types for this employee
+  let where = { employeeId };
+
+  if (leaveTypeId) {
+    where.leaveTypeId = leaveTypeId;
+  }
+
+  if (voucherType) {
+    where.voucherType = voucherType;
+  }
+
+  const { count, rows } = await LeaveLedgerEntry.findAndCountAll({
+    where,
+    limit,
+    offset,
+    order: [['createdAt', 'DESC']],
+    include: [
+      {
+        model: LeaveType,
+        as: 'leaveType',
+        attributes: ['id', 'name'],
+      },
+    ],
+  });
+
+  // Calculate current balance per leave type
+  const allEntries = await LeaveLedgerEntry.findAll({
+    where: { employeeId, isExpired: false },
+    attributes: ['leaveTypeId', 'leaves'],
+  });
+
+  // Group balance by leave type
+  const balanceByType = {};
+  allEntries.forEach(entry => {
+    const ltId = entry.leaveTypeId;
+    balanceByType[ltId] = (balanceByType[ltId] || 0) + parseFloat(entry.leaves || 0);
+  });
+
+  // Get leave type names
+  const typeIds = Object.keys(balanceByType);
+  const leaveTypes = await LeaveType.findAll({
+    where: { id: { [Op.in]: typeIds } },
+    attributes: ['id', 'name'],
+  });
+
+  const balanceSummary = typeIds.map(id => ({
+    leaveTypeId: id,
+    leaveTypeName: leaveTypes.find(lt => lt.id === id)?.name || 'Unknown',
+    balance: parseFloat(balanceByType[id].toFixed(2)),
+  }));
+
+  return {
+    data: rows,
+    meta: buildMeta(count, page, limit),
+    balances: balanceSummary,
+  };
+};
 /**
  * Asserts leave type exists and is not disabled.
  */
@@ -2063,6 +2132,7 @@ module.exports = {
   // Leave Ledger
   getLeaveLedger,
   getLeaveLedgerEntryById,
+  getMyLedger,
 
   // Leave Encashment
   createLeaveEncashment,

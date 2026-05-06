@@ -1376,7 +1376,19 @@ const getMyLeaveCalendar = catchAsync(async (req, res) => {
     },
   });
 });
+const getMyLedger = catchAsync(async (req, res) => {
+  const employee = await getMyEmployee(req);
+  if (!employee) throw new AppError('Employee record not found', 404);
 
+  const result = await leaveService.getMyLedger(employee.id, req.query);
+
+  ok(res, {
+    message: 'My ledger fetched successfully',
+    data: result.data,
+    meta: result.meta,
+    balances: result.balances,
+  });
+});
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
@@ -1482,4 +1494,5 @@ module.exports = {
   getMyLeaveSummary,
   getMyLeaveApplications,
   getMyLeaveCalendar,
+  getMyLedger,
 };

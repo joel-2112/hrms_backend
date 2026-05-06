@@ -264,7 +264,49 @@ router.get('/dashboard/export',
   leaveController.exportDashboard
 );
 
+// ═════════════════════════════════════════════════════════════════════════════
+//  MY LEDGER — Authenticated Employee
+// ═════════════════════════════════════════════════════════════════════════════
 
+/**
+ * @swagger
+ * /leaves/my-ledger:
+ *   get:
+ *     summary: Get leave ledger for the authenticated employee
+ *     tags: [LeaveLedger]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: leaveTypeId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter by leave type
+ *       - in: query
+ *         name: voucherType
+ *         schema:
+ *           type: string
+ *           enum: [LeaveAllocation, LeaveApplication, LeaveEncashment, CompensatoryLeaveRequest]
+ *         description: Filter by voucher type
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: My ledger fetched successfully
+ */
+router.get('/my-ledger',
+  authenticate,
+  leaveController.getMyLedger
+);
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE TYPES
 // ═════════════════════════════════════════════════════════════════════════════
