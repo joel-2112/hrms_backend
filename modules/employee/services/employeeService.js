@@ -275,6 +275,7 @@ const createEmployee = async (data) => {
       userId:           null,
 
       // Professional links
+      salary:       data.salary || null,
       portfolioUrl: data.portfolioUrl || null,
       githubUrl:    data.githubUrl    || null,
 
@@ -310,7 +311,7 @@ const createEmployee = async (data) => {
   logger.info('Employee created (pending GM approval)', {
     employeeId:     employee.id,
     employeeNumber: employee.employeeNumber,
-    name:           `${employee.firstName} ${employee.lastName}`,
+    name:           `${employee.firstName} ${employee.middleName} ${employee.lastName}`,
   });
 
   return employee;
@@ -371,6 +372,7 @@ const createEmployeeFromExistingUser = async (userId, data) => {
 
       portfolioUrl: data.portfolioUrl || null,
       githubUrl:    data.githubUrl    || null,
+      salary:       data.salary || null,
 
       email:       email.toLowerCase().trim(),
       phoneNumber: data.phoneNumber || null,

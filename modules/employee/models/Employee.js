@@ -131,6 +131,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
         allowNull: false,
       },
+      salary: {
+        type: DataTypes.DECIMAL(15, 2),
+        allowNull: true,
+        comment: "Current gross salary for payroll processing",
+      },
       portfolioUrl: {
         type: DataTypes.STRING(512),
         allowNull: true,
