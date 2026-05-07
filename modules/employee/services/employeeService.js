@@ -83,6 +83,7 @@ const {
 const { AppError }                           = require('../../../middlewares/errorMiddleware');
 const { getPaginationOptions, buildMeta }    = require('../../../utils/pagination');
 const logger                                 = require('../../../utils/logger');
+const emailService = require('../../../utils/emailService');
 
 const SALT_ROUNDS = 10;
 
@@ -433,21 +434,21 @@ const approveEmployee = async (employeeId, approverUserId) => {
       const newHash = await bcrypt.hash(temporaryPassword, SALT_ROUNDS);
       await existingUser.update({
         passwordHash: newHash,
-        status:       'Active',
-        firstName:    employee.firstName,
-        middleName:   employee.middleName,
-        lastName:     employee.lastName,
+        status: 'Active',
+        firstName: employee.firstName,
+        middleName: employee.middleName,
+        lastName: employee.lastName,
       }, { transaction: t });
       user = existingUser;
     } else {
       user = await User.create({
-        firstName:    employee.firstName,
-        middleName:   employee.middleName,
-        lastName:     employee.lastName,
-        email:        employee.email,
+        firstName: employee.firstName,
+        middleName: employee.middleName,
+        lastName: employee.lastName,
+        email: employee.email,
         passwordHash: temporaryPassword,
-        status:       'Active',
-        language:     'en',
+        status: 'Active',
+        language: 'en',
       }, { transaction: t });
     }
 
@@ -456,12 +457,20 @@ const approveEmployee = async (employeeId, approverUserId) => {
     return { employee, user };
   });
 
-  logger.info('Employee approved — User account provisioned', {
-    employeeId,
-    userId:     result.user.id,
-    email:      employee.email,
-    approvedBy: approverUserId,
-  });
+  // ═══════════════════════════════════════════════════════════════
+  //  SEND CREDENTIALS EMAIL (non-blocking)
+  // ═══════════════════════════════════════════════════════════════
+  emailService.sendEmployeeCredentials(result.employee, temporaryPassword)
+    .then(res => {
+      if (res.success) {
+        logger.info('Credentials email sent', { employeeId, email: result.employee.email });
+      } else {
+        logger.warn('Credentials email failed', { employeeId, error: res.error });
+      }
+    })
+    .catch(err => {
+      logger.error('Credentials email error', { employeeId, error: err.message });
+    });
 
   return { employee: result.employee, temporaryPassword };
 };
