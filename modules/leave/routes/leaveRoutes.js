@@ -382,7 +382,7 @@ router.get('/my-ledger',
  */
 router.route('/leave-types')
   .post(authorize('LeaveType', action.CREATE), leaveController.createLeaveType)
-  .get(authorize('LeaveType', action.READ), leaveController.getLeaveTypes);
+  .get(authorize('LeaveType', [action.READ, action.READ_SELF]), leaveController.getLeaveTypes);
 
 /**
  * @swagger
@@ -935,7 +935,7 @@ router.post('/policy-assignments/:id/cancel',
  *         description: Leave allocations fetched successfully
  */
 router.get('/allocations',
-  authorize('LeaveAllocation', action.READ),
+  authorize('LeaveAllocation', [action.READ, action.READ_SELF]),
   leaveController.getLeaveAllocations
 );
 
@@ -1093,7 +1093,7 @@ router.get('/balances/:employeeId/:leaveTypeId',
  */
 router.route('/holiday-lists')
   .post(authorize('HolidayList', action.CREATE), leaveController.createHolidayList)
-  .get(authorize('HolidayList', action.READ), leaveController.getHolidayLists);
+  .get(authorize('HolidayList', [action.READ, action.READ_SELF]), leaveController.getHolidayLists);
 
 /**
  * @swagger

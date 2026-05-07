@@ -437,7 +437,7 @@ router.get('/search',
  *         description: Documents fetched successfully
  */
 router.get('/owner/:voucherType/:voucherNo',
-  authorize('Document', action.READ),
+  authorize('Document',[action.READ, action.READ_SELF]),
   documentController.getDocumentsByOwner
 );
 

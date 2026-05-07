@@ -114,6 +114,15 @@ const getAllResourceNames = catchAsync(async (req, res) => {
   });
 });
 
+const getAvailableResources = catchAsync(async (req, res) => {
+  const resources = await roleService.getAvailableResources();
+  ok(res, {
+    message: 'Available resources fetched successfully',
+    data: resources,
+    meta: { total: resources.length },
+  });
+});
+
 
 /**
  * GET /api/roles/permissions
@@ -245,6 +254,7 @@ module.exports = {
   getRole,
   updateRole,
   deleteRole,
+  getAvailableResources,
   getRolePermissions,
   upsertPermission,
   deletePermission,

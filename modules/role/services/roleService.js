@@ -110,6 +110,7 @@ const ACTION_FIELD_MAP = {
   import: "canImport",
   export: "canExport",
   report: "canReport",
+  readSelf: "canReadSelf",
   setPermissions: "canSetPermissions",
 };
 
@@ -135,72 +136,23 @@ const createRole = async ({ name, isSystemRole = false }) => {
   const exists = await Role.findOne({ where: { name: trimmed } });
   if (exists) throw new AppError(`Role "${trimmed}" already exists`, 409);
 
-  // ── All resource names — master list ───────────────────────
-  const ALL_RESOURCES = [
-    "Employee",
-    "EmployeeEducation",
-    "EmployeeExternalWork",
-    "EmployeeEmergencyContact",
-    "EmployeeSkillMap",
-    "EmployeeSeparation",
-    "EmployeePromotion",
-    "LeaveApplication",
-    "LeaveType",
-    "LeavePeriod",
-    "LeaveAllocation",
-    "LeavePolicy",
-    "LeavePolicyAssignment",
-    "LeaveEncashment",
-    "LeaveLedgerEntry",
-    "CompensatoryLeaveRequest",
-    "LeaveBlockList",
-    "HolidayList",
-    "SalarySlip",
-    "SalaryStructure",
-    "SalaryComponent",
-    "PayrollEntry",
-    "PayrollPeriod",
-    "IncomeTaxSlab",
-    "AdditionalSalary",
-    "RetentionBonus",
-    "EmployeeIncentive",
-    "StaffingPlan",
-    "JobRequisition",
-    "Appraisal",
-    "AppraisalTemplate",
-    "AppraisalCycle",
-    "Goal",
-    "EmployeePerformanceFeedback",
-    "Role",
-    "RoleProfile",
-    "RolePermission",
-    "UserRole",
-    "UserPermission",
-    "Company",
-    "Branch",
-    "Department",
-    "Designation",
-    "EmploymentType",
-    "EmployeeGrade",
-    "Document",
-    "DocumentType",
-    "DocumentVersion",
-  ];
+  // Get all available resources from the database models
+  const ALL_RESOURCES = await getAvailableResources();
 
   const role = await sequelize.transaction(async (t) => {
-    // 1. Create the role
     const newRole = await Role.create(
       { name: trimmed, isSystemRole, disabled: false },
       { transaction: t },
     );
 
-    // 2. Seed all resources with default (all false) permissions
+    // Seed all resources with default (all false) permissions
     const permissionRows = ALL_RESOURCES.map((resourceName) => ({
       roleId: newRole.id,
       moduleName: "hr",
       resourceName,
       permLevel: 0,
       canRead: false,
+      canReadSelf: false,
       canWrite: false,
       canCreate: false,
       canDelete: false,
@@ -537,6 +489,7 @@ const upsertRolePermission = async (
     canImport = false,
     canExport = false,
     canReport = false,
+    canReadSelf = false,
     canSetPermissions = false,
   },
 ) => {
@@ -564,6 +517,7 @@ const upsertRolePermission = async (
     canImport,
     canExport,
     canReport,
+    canReadSelf,
     canSetPermissions,
   });
 
@@ -609,6 +563,7 @@ const batchUpsertRolePermissions = async (roleId, permissions) => {
     canImport: p.canImport ?? false,
     canExport: p.canExport ?? false,
     canReport: p.canReport ?? false,
+    canReadSelf: p.canReadSelf ?? false,
     canSetPermissions: p.canSetPermissions ?? false,
   }));
 
@@ -625,6 +580,7 @@ const batchUpsertRolePermissions = async (roleId, permissions) => {
     "canImport",
     "canExport",
     "canReport",
+    "canReadSelf",
     "canSetPermissions",
   ];
 
@@ -672,7 +628,29 @@ const getAllResourceNames = async () => {
 
   return resources.map((r) => r.resourceName);
 };
-
+/**
+ * Get all available resource names from the database models.
+ * These are the tables that can have permissions assigned to them.
+ */
+const getAvailableResources = async () => {
+  // Get all Sequelize models (each one is a potential resource)
+  const allModels = Object.keys(sequelize.models);
+  
+  // Filter out junction tables and system tables
+  const excludedTables = [
+    'RoleProfileRole',  // Junction table
+    'UserRole',         // Junction table
+    'UserSession',      // System table
+    'LoginAttempt',     // System table
+    'SequelizeMeta',    // Sequelize migration table
+  ];
+  
+  const resources = allModels
+    .filter(name => !excludedTables.includes(name))
+    .sort();
+  
+  return resources;
+};
 /**
  * Get permissions with combined resource and role filters.
  * Used by the frontend permission matrix table.
@@ -732,6 +710,7 @@ const getFilteredPermissions = async ({
         roleId: role.id,
         level: perm.permLevel,
         canRead: perm.canRead,
+        canReadSelf: perm.canReadSelf,
         canWrite: perm.canWrite,
         canCreate: perm.canCreate,
         canDelete: perm.canDelete,
@@ -811,6 +790,7 @@ const getPermissionsByResource = async (resourceName) => {
     canImport: perm.canImport,
     canExport: perm.canExport,
     canSetPermissions: perm.canSetPermissions,
+    canReadSelf: perm.canReadSelf,
     permissionId: perm.id,
   }));
 };
@@ -1261,30 +1241,31 @@ const getUserEffectivePermissions = async (userId) => {
     "canImport",
     "canExport",
     "canReport",
+    "canReadSelf",
     "canSetPermissions",
   ];
 
-(user.roles || []).forEach((role) => {
-  (role.permissions || []).forEach((perm) => {
-    // Merge by resourceName + permLevel only — ignore moduleName
-    const key = `${perm.resourceName}:${perm.permLevel}`;
+  (user.roles || []).forEach((role) => {
+    (role.permissions || []).forEach((perm) => {
+      // Merge by resourceName + permLevel only — ignore moduleName
+      const key = `${perm.resourceName}:${perm.permLevel}`;
 
-    if (!permMap.has(key)) {
-      permMap.set(key, {
-        moduleName: perm.moduleName,
-        resourceName: perm.resourceName,
-        permLevel: perm.permLevel,
-        ...Object.fromEntries(boolFields.map((f) => [f, perm[f] ?? false])),
-      });
-    } else {
-      const existing = permMap.get(key);
-      // OR logic — true from ANY module wins
-      boolFields.forEach((f) => {
-        existing[f] = existing[f] || (perm[f] ?? false);
-      });
-    }
+      if (!permMap.has(key)) {
+        permMap.set(key, {
+          moduleName: perm.moduleName,
+          resourceName: perm.resourceName,
+          permLevel: perm.permLevel,
+          ...Object.fromEntries(boolFields.map((f) => [f, perm[f] ?? false])),
+        });
+      } else {
+        const existing = permMap.get(key);
+        // OR logic — true from ANY module wins
+        boolFields.forEach((f) => {
+          existing[f] = existing[f] || (perm[f] ?? false);
+        });
+      }
+    });
   });
-});
 
   // ── 5. Load record-level UserPermissions ───────────────────────────
   const userPermissions = await UserPermission.findAll({
@@ -1350,9 +1331,17 @@ const checkPermission = async (userId, resourceName, action, permLevel = 0) => {
   const effective = await getUserEffectivePermissions(userId);
 
   if (effective.isSuperUser) return true;
+
+  // For readSelf, only need canReadSelf permission (no system manager bypass)
+  if (action === 'readSelf') {
+    const matchingRule = effective.permissions.find(
+      (p) => p.resourceName === resourceName && p.permLevel <= permLevel,
+    );
+    return matchingRule?.canReadSelf === true;
+  }
+
   if (effective.isSystemManager && action === "read") return true;
 
-  // ← moduleName removed from find — resourceName is the unique key per role
   const matchingRule = effective.permissions.find(
     (p) => p.resourceName === resourceName && p.permLevel <= permLevel,
   );
@@ -1388,6 +1377,7 @@ module.exports = {
   updateRoleProfile,
   deleteRoleProfile,
   setRoleProfileRoles,
+  getAvailableResources,
 
   // RolePermission
   upsertRolePermission,

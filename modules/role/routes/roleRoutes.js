@@ -127,6 +127,47 @@ router.get(
 
 /**
  * @swagger
+ * /roles/permissions/available-resources:
+ *   get:
+ *     summary: Get all available resource names from database models
+ *     description: >
+ *       Returns all Sequelize model names that can have permissions assigned.
+ *       These are dynamically discovered from the database — no hardcoded list.
+ *       Used by the frontend for resource dropdowns in permission management.
+ *     tags: [RolePermissions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Available resources fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: ["Employee", "LeaveApplication", "LeaveType", "SalarySlip"]
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ */
+router.get(
+  '/permissions/available-resources',
+  authorize('RolePermission', action.READ),
+  roleController.getAvailableResources
+);
+
+/**
+ * @swagger
  * /roles/permissions:
  *   get:
  *     summary: Get filtered permissions for the permission matrix table

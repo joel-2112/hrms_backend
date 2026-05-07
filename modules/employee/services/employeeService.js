@@ -84,6 +84,7 @@ const { AppError }                           = require('../../../middlewares/err
 const { getPaginationOptions, buildMeta }    = require('../../../utils/pagination');
 const logger                                 = require('../../../utils/logger');
 const emailService = require('../../../utils/emailService');
+const roleService  = require('../../role/services/roleService');
 
 const SALT_ROUNDS = 10;
 
@@ -410,6 +411,7 @@ const createEmployeeFromExistingUser = async (userId, data) => {
 
 /**
  * GM approves a pending employee — creates User account + temp password.
+ * Auto-assigns a role that has canReadSelf permissions configured by admin.
  */
 const approveEmployee = async (employeeId, approverUserId) => {
   const employee = await Employee.findByPk(employeeId);
@@ -421,7 +423,9 @@ const approveEmployee = async (employeeId, approverUserId) => {
     throw new AppError('Employee must have an email before a User account can be created', 422);
   }
 
-  const approver = await User.unscoped().findByPk(approverUserId, { attributes: ['id', 'isSuperUser', 'isSystemManager'] });
+  const approver = await User.unscoped().findByPk(approverUserId, { 
+    attributes: ['id', 'isSuperUser', 'isSystemManager'] 
+  });
   if (!approver) throw new AppError('Approver not found', 404);
 
   const existingUser = await User.unscoped().findOne({ where: { email: employee.email } });
@@ -454,7 +458,48 @@ const approveEmployee = async (employeeId, approverUserId) => {
 
     await employee.update({ userId: user.id, status: 'Active' }, { transaction: t });
 
-    return { employee, user };
+    // ═══════════════════════════════════════════════════════════════
+    //  AUTO-ASSIGN SELF-SERVICE ROLE (no hardcoded resources)
+    //  Finds ANY role that has canReadSelf permissions configured.
+    //  Admin configures permissions via UI — code just assigns the role.
+    // ═══════════════════════════════════════════════════════════════
+    
+    const { Role, RolePermission, UserRole } = require('../../../models');
+    
+    // Find a role that has canReadSelf permissions configured
+    // This role is created and configured by admin via the UI
+    const selfServiceRole = await Role.findOne({
+      where: { disabled: false },
+      include: [{
+        model: RolePermission,
+        as: 'permissions',
+        where: { canReadSelf: true },
+        required: true, // Only find role that actually has canReadSelf permissions
+        attributes: [], // Don't need permission data, just checking existence
+      }],
+      transaction: t,
+    });
+
+    if (selfServiceRole) {
+      await UserRole.findOrCreate({
+        where: { userId: user.id, roleId: selfServiceRole.id },
+        defaults: { userId: user.id, roleId: selfServiceRole.id },
+        transaction: t,
+      });
+      
+      logger.info('Self-service role assigned', {
+        employeeId,
+        userId: user.id,
+        roleName: selfServiceRole.name,
+      });
+    } else {
+      logger.warn('No role with canReadSelf permissions found — employee will have no access until admin configures one', {
+        employeeId,
+        userId: user.id,
+      });
+    }
+
+    return { employee, user, role: selfServiceRole };
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -463,16 +508,32 @@ const approveEmployee = async (employeeId, approverUserId) => {
   emailService.sendEmployeeCredentials(result.employee, temporaryPassword)
     .then(res => {
       if (res.success) {
-        logger.info('Credentials email sent', { employeeId, email: result.employee.email });
+        logger.info('Credentials email sent', { 
+          employeeId, 
+          email: result.employee.email 
+        });
       } else {
-        logger.warn('Credentials email failed', { employeeId, error: res.error });
+        logger.warn('Credentials email failed', { 
+          employeeId, 
+          error: res.error 
+        });
       }
     })
     .catch(err => {
-      logger.error('Credentials email error', { employeeId, error: err.message });
+      logger.error('Credentials email error', { 
+        employeeId, 
+        error: err.message 
+      });
     });
 
-  return { employee: result.employee, temporaryPassword };
+  // Invalidate the user's permission cache so new permissions take effect immediately
+  roleService.invalidateUserCache(result.user.id);
+
+  return { 
+    employee: result.employee, 
+    temporaryPassword,
+    role: result.role?.name || 'None',
+  };
 };
 
 /**

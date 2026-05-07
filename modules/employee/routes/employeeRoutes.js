@@ -680,7 +680,7 @@ router.get(
  */
 router.get(
   "/:id",
-  authorize("Employee", action.READ),
+  authorize("Employee", [action.READ, action.READ_SELF]),
   employeeController.getEmployeeById,
 );
 
