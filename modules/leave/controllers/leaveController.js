@@ -657,11 +657,14 @@ const createLeaveApplication = catchAsync(async (req, res) => {
 
 /**
  * GET /api/leave/applications
- * List leave applications with filters.
+ * List leave applications with filters + RBAC data scope.
  * Query: ?employeeId=uuid&status=Approved&leaveTypeId=uuid&page=1&limit=20
  */
 const getLeaveApplications = catchAsync(async (req, res) => {
-  const { data, meta } = await leaveService.getLeaveApplications(req.query);
+  // Get data filter from RBAC middleware (e.g., { branchId: "uuid" })
+  const permFilter = req.perms?.dataFilter || {};
+
+  const { data, meta } = await leaveService.getLeaveApplications(req.query, permFilter);
 
   ok(res, {
     message: 'Leave applications fetched successfully',

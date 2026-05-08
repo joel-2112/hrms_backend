@@ -1090,7 +1090,7 @@ const createLeaveApplication = async (data, userId) => {
   return application;
 };
 
-const getLeaveApplications = async (query = {}) => {
+const getLeaveApplications = async (query = {}, permFilter = {}) => {
   const { employeeId, leaveTypeId, status, approverId } = query;
   const { limit, offset, page } = getPaginationOptions(query);
 
@@ -1100,38 +1100,51 @@ const getLeaveApplications = async (query = {}) => {
   if (status) where.status = status;
   if (approverId) where.approverId = approverId;
 
+  // Build Employee-level filter from permFilter
+  // permFilter contains: { branchId: "uuid", departmentId: "uuid", companyId: "uuid" }
+  // These need to be applied to the associated Employee (applicant)
+  const employeeWhere = {};
+  if (permFilter.branchId) employeeWhere.branchId = permFilter.branchId;
+  if (permFilter.departmentId) employeeWhere.departmentId = permFilter.departmentId;
+  if (permFilter.companyId) employeeWhere.companyId = permFilter.companyId;
+  
+  // If we have employee-level filters, we need to filter through the association
+  const includeOptions = [
+    {
+      model: Employee,
+      as: "applicant",
+      attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber", "image"],
+      // Apply the org filters to the applicant employee
+      where: Object.keys(employeeWhere).length > 0 ? employeeWhere : undefined,
+      include: [
+        { model: Department, as: "department", attributes: ["id", "name"] },
+        { model: Branch, as: "branch", attributes: ["id", "name"] },
+      ],
+    },
+    {
+      model: Employee,
+      as: "approver",
+      attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber"],
+    },
+    {
+      model: LeaveType,
+      as: "leaveType",
+      attributes: ["id", "name"],
+    },
+    {
+      model: HolidayList,
+      as: "holidayList",
+      attributes: ["id", "name"],
+      required: false,
+    },
+  ];
+
   const { count, rows } = await LeaveApplication.findAndCountAll({
     where,
     limit,
     offset,
     order: [["createdAt", "DESC"]],
-    include: [
-      {
-        model: Employee,
-        as: "applicant",
-        attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber", "image"],
-        include: [
-          { model: Department, as: "department", attributes: ["id", "name"] },
-          { model: Branch, as: "branch", attributes: ["id", "name"] },
-        ],
-      },
-      {
-        model: Employee,
-        as: "approver",
-        attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber"],
-      },
-      {
-        model: LeaveType,
-        as: "leaveType",
-        attributes: ["id", "name"],
-      },
-      {
-        model: HolidayList,
-        as: "holidayList",
-        attributes: ["id", "name"],
-        required: false,
-      },
-    ],
+    include: includeOptions,
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
