@@ -335,8 +335,31 @@ const cancelLeavePolicyAssignment = catchAsync(async (req, res) => {
  * List all leave allocations with filters.
  * Query: ?employeeId=uuid&leaveTypeId=uuid&leavePeriodId=uuid&page=1&limit=20
  */
+/**
+ * GET /api/leave/allocations
+ * List leave allocations with RBAC scope.
+ * - canRead: sees all allocations (within data filter)
+ * - canReadSelf: sees only their own allocations
+ */
 const getLeaveAllocations = catchAsync(async (req, res) => {
-  const { data, meta } = await leaveService.getLeaveAllocations(req.query);
+  const permFilter = req.perms?.dataFilter || {};
+  const userId = req.user.id;
+  
+  // Check if user only has readSelf (not full read)
+  const effectivePerms = req.perms;
+  const leaveAllocPerm = effectivePerms?.permissions?.find(
+    p => p.resourceName === "LeaveAllocation"
+  );
+  
+  const canRead = leaveAllocPerm?.canRead === true;
+  const canReadSelf = leaveAllocPerm?.canReadSelf === true;
+  
+  const { data, meta } = await leaveService.getLeaveAllocations(
+    req.query, 
+    permFilter, 
+    userId,
+    { canRead, canReadSelf }
+  );
 
   ok(res, {
     message: 'Leave allocations fetched successfully',

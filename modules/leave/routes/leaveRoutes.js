@@ -985,7 +985,7 @@ router.get('/allocations/:id',
  *         description: Leave balances fetched successfully
  */
 router.get('/balances/:employeeId',
-  authorize('LeaveAllocation', action.READ),
+  authorize('LeaveAllocation',[ action.READ, action.READ_SELF ]),
   leaveController.getLeaveBalances
 );
 
@@ -1015,7 +1015,7 @@ router.get('/balances/:employeeId',
  *         description: Leave balance fetched successfully
  */
 router.get('/balances/:employeeId/:leaveTypeId',
-  authorize('LeaveAllocation', action.READ),
+  authorize('LeaveAllocation', [ action.READ, action.READ_SELF]),
   leaveController.getLeaveBalance
 );
 
@@ -1675,7 +1675,7 @@ router.post('/applications/:id/submit',
  */
 router.post('/applications/:id/approve',
   authenticate,
-  authorize('LeaveApplication', action.SUBMIT),
+  authorize('LeaveApplication', action.WRITE),
   leaveController.approveLeaveApplication
 );
 
@@ -1711,7 +1711,7 @@ router.post('/applications/:id/approve',
  *         description: Only Open applications can be rejected
  */
 router.post('/applications/:id/reject',
-  authorize('LeaveApplication', action.SUBMIT),
+  authorize('LeaveApplication', action.WRITE),
   leaveController.rejectLeaveApplication
 );
 

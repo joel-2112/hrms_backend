@@ -671,21 +671,80 @@ const cancelLeavePolicyAssignment = async (id) => {
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE ALLOCATION (read-heavy)
 // ═════════════════════════════════════════════════════════════════════════════
-
-const getLeaveAllocations = async (query = {}) => {
+/**
+ * Get paginated leave allocations.
+ * 
+ * @param {Object} query - Query params (employeeId, leaveTypeId, leavePeriodId, page, limit)
+ * @param {Object} permFilter - Data filter from userPermissions (e.g., { branchId: "uuid" })
+ * @param {string} userId - Current user ID for self-scoping
+ * @param {Object} scope - { canRead, canReadSelf } permission flags
+ */
+const getLeaveAllocations = async (query = {}, permFilter = {}, userId, scope = {}) => {
   const { employeeId, leaveTypeId, leavePeriodId } = query;
   const { limit, offset, page } = getPaginationOptions(query);
 
   const where = {};
+
+  // Apply user-supplied filters
   if (employeeId) where.employeeId = employeeId;
   if (leaveTypeId) where.leaveTypeId = leaveTypeId;
   if (leavePeriodId) where.leavePeriodId = leavePeriodId;
+
+  // ═══════════════════════════════════════════════════════════
+  //  RBAC SCOPE: canReadSelf only → restrict to own allocations
+  // ═══════════════════════════════════════════════════════════
+  if (scope.canReadSelf && !scope.canRead) {
+    // User only has readSelf — must see only their own
+    const employee = await Employee.findOne({ 
+      where: { userId },
+      attributes: ['id'] 
+    });
+    
+    if (!employee) {
+      throw new AppError("No employee record linked to your account", 404);
+    }
+    
+    where.employeeId = employee.id;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  DATA FILTER: Apply org-level restrictions through Employee
+  // ═══════════════════════════════════════════════════════════
+  const employeeWhere = {};
+  if (permFilter.branchId) employeeWhere.branchId = permFilter.branchId;
+  if (permFilter.departmentId) employeeWhere.departmentId = permFilter.departmentId;
+  if (permFilter.companyId) employeeWhere.companyId = permFilter.companyId;
+  
+  const includeOptions = [
+    {
+      model: Employee,
+      as: "employee",
+      attributes: ["id", "firstName", "middleName", "lastName", "employeeNumber", "image"],
+      // Apply org filter to employee if exists
+      ...(Object.keys(employeeWhere).length > 0 && { where: employeeWhere }),
+      include: [
+        { model: Department, as: "department", attributes: ["id", "name"] },
+        { model: Branch, as: "branch", attributes: ["id", "name"] },
+      ],
+    },
+    {
+      model: LeaveType,
+      as: "leaveType",
+      attributes: ["id", "name", "isEncashable", "isCompensatory"],
+    },
+    {
+      model: LeavePeriod,
+      as: "leavePeriod",
+      attributes: ["id", "name", "startDate", "endDate", "isActive"],
+    },
+  ];
 
   const { count, rows } = await LeaveAllocation.findAndCountAll({
     where,
     limit,
     offset,
     order: [["createdAt", "DESC"]],
+    include: includeOptions,
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
