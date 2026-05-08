@@ -94,7 +94,7 @@ const approveEmployee = catchAsync(async (req, res) => {
  * Paginated list with rich filters + RBAC scope.
  */
 const getEmployees = catchAsync(async (req, res) => {
-  const permFilter = req.perms?.employeeFilter || {};
+  const permFilter = req.perms?.dataFilter || {};
 
   const { data, meta } = await employeeService.getEmployees(req.query, permFilter);
 

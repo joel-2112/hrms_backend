@@ -539,6 +539,10 @@ const approveEmployee = async (employeeId, approverUserId) => {
 /**
  * Paginated employee list with rich filtering.
  */
+/**
+ * Paginated employee list with rich filtering.
+ * Permission filter overrides user-supplied filters for security.
+ */
 const getEmployees = async (query = {}, permFilter = {}) => {
   const {
     companyId, branchId, departmentId, designationId,
@@ -547,8 +551,9 @@ const getEmployees = async (query = {}, permFilter = {}) => {
   } = query;
 
   const { limit, offset, page } = getPaginationOptions(query);
-  const where = { ...permFilter };
+  const where = {};
 
+  // Apply user-supplied filters first
   if (companyId)        where.companyId        = companyId;
   if (branchId)         where.branchId         = branchId;
   if (departmentId)     where.departmentId     = departmentId;
@@ -556,6 +561,9 @@ const getEmployees = async (query = {}, permFilter = {}) => {
   if (employmentTypeId) where.employmentTypeId = employmentTypeId;
   if (employeeGradeId)  where.employeeGradeId  = employeeGradeId;
   if (reportsToId)      where.reportsToId      = reportsToId;
+
+  // Apply permission filter LAST — overrides user filters for security
+  Object.assign(where, permFilter);
 
   if (status) {
     const statuses = status.split(',').map(s => s.trim());
@@ -566,7 +574,7 @@ const getEmployees = async (query = {}, permFilter = {}) => {
     const like = { [Op.iLike]: `%${search}%` };
     where[Op.or] = [
       { firstName:      like },
-      {middleName:     like },
+      { middleName:     like },
       { lastName:       like },
       { employeeNumber: like },
       { email:          like },
@@ -577,7 +585,7 @@ const getEmployees = async (query = {}, permFilter = {}) => {
     where,
     limit,
     offset,
-    order: [['createdAt', 'DESC'], ],
+    order: [['createdAt', 'DESC']],
     include: [...ORG_INCLUDES, MANAGER_INCLUDE, USER_INCLUDE],
   });
 

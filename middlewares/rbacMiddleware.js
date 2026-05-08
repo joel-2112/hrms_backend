@@ -5,6 +5,7 @@ const logger = require("../utils/logger");
 const {
   hasPermission,
   getUserEffectivePermissions,
+  getUserPermissionFilter,
 } = require("../modules/role/helpers/permissionResolver");
 
 const action = Object.freeze({
@@ -25,16 +26,37 @@ const action = Object.freeze({
 });
 
 /**
- * authorize(resourceName, actions)
- *
- * @param {string} resourceName - e.g. 'Employee', 'LeaveApplication'
- * @param {string|string[]} actions - Single action or array of actions.
- *   If array is provided, user needs ANY ONE of the actions (OR logic).
- *
- * Usage:
- *   authorize('LeaveType', action.READ)                    // Single action
- *   authorize('LeaveType', [action.READ, action.READ_SELF]) // Multiple (OR)
+ * Build data filter from effective permissions' userPermissions array.
+ * Automatically converts allowDocType -> fieldName by lowercasing first char + "Id".
+ * 
+ * Example: 
+ *   allowDocType: "Branch" -> branchId
+ *   allowDocType: "Department" -> departmentId
+ *   allowDocType: "Company" -> companyId
  */
+const buildDataFilter = (userPermissions) => {
+  if (!userPermissions || !Array.isArray(userPermissions) || userPermissions.length === 0) {
+    return {};
+  }
+
+  const filter = {};
+
+  for (const perm of userPermissions) {
+    if (!perm.allowDocType || !perm.allowValue) continue;
+
+    // Convert DocType to camelCase field name + "Id"
+    // Branch -> branchId, Department -> departmentId, etc.
+    const fieldName = perm.allowDocType.charAt(0).toLowerCase() + 
+                      perm.allowDocType.slice(1) + 'Id';
+
+    // If multiple permissions for same docType, we'll use the last one
+    // For multiple values support, we could collect them in an array
+    filter[fieldName] = perm.allowValue;
+  }
+
+  return filter;
+};
+
 const authorize = (resourceName, actions) => {
   const requiredActions = Array.isArray(actions) ? actions : [actions];
 
@@ -52,13 +74,13 @@ const authorize = (resourceName, actions) => {
           canWrite: true,
           canCreate: true,
           canDelete: true,
+          canSubmit: true,
+          dataFilter: {}, // No restrictions for superusers
+          userPermissions: [],
         };
         return next();
       }
 
-      // ═══════════════════════════════════════════════════════════
-      //  OR LOGIC: User needs ANY ONE of the required actions
-      // ═══════════════════════════════════════════════════════════
       let hasAccess = false;
       let deniedAction = null;
 
@@ -83,8 +105,17 @@ const authorize = (resourceName, actions) => {
         );
       }
 
-      // Attach effective permissions for controllers (optional but useful)
-      req.perms = await getUserEffectivePermissions(user.id);
+      // Get effective permissions including userPermissions
+      const effectivePerms = await getUserEffectivePermissions(user.id);
+      
+      // Build data filter from userPermissions dynamically
+      const dataFilter = buildDataFilter(effectivePerms.userPermissions || []);
+      
+      // Attach everything to req.perms for controllers to use
+      req.perms = {
+        ...effectivePerms,
+        dataFilter,
+      };
 
       return next();
     } catch (err) {
