@@ -499,27 +499,28 @@ const getPromotionHistory = catchAsync(async (req, res) => {
 
 /**
  * GET /api/employees/stats
- * Dashboard statistics.
+ * Dashboard statistics with RBAC data scope.
  */
 const getEmployeeStats = catchAsync(async (req, res) => {
   const { companyId } = req.query;
+  const permFilter = req.perms?.dataFilter || {};
 
-  const stats = await employeeService.getEmployeeStats(companyId);
+  const stats = await employeeService.getEmployeeStats(companyId, permFilter);
 
   ok(res, {
     message: 'Employee statistics retrieved',
     data: stats,
   });
 });
-
 /**
  * GET /api/employees/birthdays
  * Upcoming birthdays this month.
  */
 const getUpcomingBirthdays = catchAsync(async (req, res) => {
   const { companyId } = req.query;
+  const permFilter = req.perms?.dataFilter || {};
 
-  const birthdays = await employeeService.getUpcomingBirthdays(companyId);
+  const birthdays = await employeeService.getUpcomingBirthdays(companyId, permFilter);
 
   ok(res, {
     message: 'Upcoming birthdays retrieved',
@@ -529,12 +530,13 @@ const getUpcomingBirthdays = catchAsync(async (req, res) => {
 
 /**
  * GET /api/employees/anniversaries
- * Work anniversaries this month.
+ * Work anniversaries this month with RBAC data scope.
  */
 const getWorkAnniversaries = catchAsync(async (req, res) => {
   const { companyId } = req.query;
+  const permFilter = req.perms?.dataFilter || {};
 
-  const anniversaries = await employeeService.getWorkAnniversaries(companyId);
+  const anniversaries = await employeeService.getWorkAnniversaries(companyId, permFilter);
 
   ok(res, {
     message: 'Work anniversaries retrieved',
@@ -544,14 +546,16 @@ const getWorkAnniversaries = catchAsync(async (req, res) => {
 
 /**
  * GET /api/employees/recently-joined
- * Recently joined employees (last 30 days).
+ * Recently joined employees (last 30 days) with RBAC data scope.
  */
 const getRecentlyJoined = catchAsync(async (req, res) => {
   const { companyId, limit } = req.query;
+  const permFilter = req.perms?.dataFilter || {};
 
   const employees = await employeeService.getRecentlyJoined(
     companyId,
     limit ? parseInt(limit, 10) : 10,
+    permFilter,
   );
 
   ok(res, {

@@ -131,6 +131,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
         allowNull: false,
       },
+      dateOfBirth: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+      },
       salary: {
         type: DataTypes.DECIMAL(15, 2),
         allowNull: true,

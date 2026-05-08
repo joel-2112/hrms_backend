@@ -1167,12 +1167,15 @@ const getPromotionHistory = async (employeeId, query = {}) => {
 // ═════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD & STATISTICS
 // ═════════════════════════════════════════════════════════════════════════════
-
 /**
  * Get employee statistics for dashboard cards.
  */
-const getEmployeeStats = async (companyId) => {
-  const where = {};
+/**
+ * Get employee statistics for dashboard cards.
+ * Respects data-level permissions (branch, department, etc.)
+ */
+const getEmployeeStats = async (companyId, permFilter = {}) => {
+  const where = { ...permFilter };
   if (companyId) where.companyId = companyId;
 
   const [total, active, onLeave, suspended, inactive, exited] = await Promise.all([
@@ -1201,28 +1204,38 @@ const getEmployeeStats = async (companyId) => {
     }),
   ]);
 
-// Branch distribution — show "Not Assigned" instead of null
-const branchRows = await sequelize.query(
-  `SELECT e.branch_id, COALESCE(b.name, 'Not Assigned') as branch_name, COUNT(e.id) as count
-   FROM employees e
-   LEFT JOIN branches b ON b.id = e.branch_id
-   WHERE e.status = 'Active'
-   ${companyId ? `AND e.company_id = '${companyId}'` : ''}
-   AND e.deleted_at IS NULL
-   GROUP BY e.branch_id, b.name
-   ORDER BY count DESC
-   LIMIT 15`,
-  { type: sequelize.QueryTypes.SELECT }
-);
+  // Build additional SQL conditions from permFilter
+  const permConditions = [];
+  if (permFilter.branchId) permConditions.push(`e.branch_id = '${permFilter.branchId}'`);
+  if (permFilter.departmentId) permConditions.push(`e.department_id = '${permFilter.departmentId}'`);
+  if (permFilter.designationId) permConditions.push(`e.designation_id = '${permFilter.designationId}'`);
+  if (permFilter.employmentTypeId) permConditions.push(`e.employment_type_id = '${permFilter.employmentTypeId}'`);
+  if (permFilter.employeeGradeId) permConditions.push(`e.employee_grade_id = '${permFilter.employeeGradeId}'`);
+  const permSqlConditions = permConditions.length > 0 ? 'AND ' + permConditions.join(' AND ') : '';
 
+  // Branch distribution — show "Not Assigned" instead of null
+  const branchRows = await sequelize.query(
+    `SELECT e.branch_id, COALESCE(b.name, 'Not Assigned') as branch_name, COUNT(e.id) as count
+     FROM employees e
+     LEFT JOIN branches b ON b.id = e.branch_id
+     WHERE e.status = 'Active'
+     ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     ${permSqlConditions}
+     AND e.deleted_at IS NULL
+     GROUP BY e.branch_id, b.name
+     ORDER BY count DESC
+     LIMIT 15`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
 
-  // ── Department distribution ───────────────────────────────────────────────
+  // Department distribution
   const deptRows = await sequelize.query(
     `SELECT e.department_id, d.name as department_name, COUNT(e.id) as count
      FROM employees e
      LEFT JOIN departments d ON d.id = e.department_id
      WHERE e.status = 'Active'
      ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     ${permSqlConditions}
      AND e.deleted_at IS NULL
      GROUP BY e.department_id, d.name
      ORDER BY count DESC
@@ -1230,13 +1243,14 @@ const branchRows = await sequelize.query(
     { type: sequelize.QueryTypes.SELECT }
   );
 
-  // ── Designation distribution ──────────────────────────────────────────────
+  // Designation distribution
   const desigRows = await sequelize.query(
     `SELECT e.designation_id, d.name as designation_name, COUNT(e.id) as count
      FROM employees e
      LEFT JOIN designations d ON d.id = e.designation_id
      WHERE e.status = 'Active'
      ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     ${permSqlConditions}
      AND e.deleted_at IS NULL
      GROUP BY e.designation_id, d.name
      ORDER BY count DESC
@@ -1244,78 +1258,92 @@ const branchRows = await sequelize.query(
     { type: sequelize.QueryTypes.SELECT }
   );
 
-  // ── Employment type distribution ──────────────────────────────────────────
+  // Employment type distribution
   const empTypeRows = await sequelize.query(
     `SELECT e.employment_type_id, et.name as type_name, COUNT(e.id) as count
      FROM employees e
      LEFT JOIN employment_types et ON et.id = e.employment_type_id
      WHERE e.status = 'Active'
      ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     ${permSqlConditions}
      AND e.deleted_at IS NULL
      GROUP BY e.employment_type_id, et.name
      ORDER BY count DESC`,
     { type: sequelize.QueryTypes.SELECT }
   );
 
-// Gender distribution — show "Not Specified" for null
-const genderRows = await sequelize.query(
-  `SELECT COALESCE(e.gender, 'Not Specified') as gender, COUNT(e.id) as count
-   FROM employees e
-   WHERE e.status = 'Active'
-   ${companyId ? `AND e.company_id = '${companyId}'` : ''}
-   AND e.deleted_at IS NULL
-   GROUP BY COALESCE(e.gender, 'Not Specified')`,
-  { type: sequelize.QueryTypes.SELECT }
-);
+  // Gender distribution — show "Not Specified" for null
+  const genderRows = await sequelize.query(
+    `SELECT COALESCE(e.gender, 'Not Specified') as gender, COUNT(e.id) as count
+     FROM employees e
+     WHERE e.status = 'Active'
+     ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     ${permSqlConditions}
+     AND e.deleted_at IS NULL
+     GROUP BY COALESCE(e.gender, 'Not Specified')`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
 
-// Grade distribution
-const gradeRows = await sequelize.query(
-  `SELECT e.employee_grade_id, COALESCE(eg.name, 'Not Assigned') as grade_name, COUNT(e.id) as count
-   FROM employees e
-   LEFT JOIN employee_grades eg ON eg.id = e.employee_grade_id
-   WHERE e.status = 'Active'
-   ${companyId ? `AND e.company_id = '${companyId}'` : ''}
-   AND e.deleted_at IS NULL
-   GROUP BY e.employee_grade_id, eg.name
-   ORDER BY count DESC`,
-  { type: sequelize.QueryTypes.SELECT }
-);
+  // Grade distribution
+  const gradeRows = await sequelize.query(
+    `SELECT e.employee_grade_id, COALESCE(eg.name, 'Not Assigned') as grade_name, COUNT(e.id) as count
+     FROM employees e
+     LEFT JOIN employee_grades eg ON eg.id = e.employee_grade_id
+     WHERE e.status = 'Active'
+     ${companyId ? `AND e.company_id = '${companyId}'` : ''}
+     ${permSqlConditions}
+     AND e.deleted_at IS NULL
+     GROUP BY e.employee_grade_id, eg.name
+     ORDER BY count DESC`,
+    { type: sequelize.QueryTypes.SELECT }
+  );
 
-  // ── Monthly joiners (last 12 months) ──────────────────────────────────────
+  // Monthly joiners (last 12 months)
   const twelveMonthsAgo = new Date();
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
   const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split('T')[0];
+
+  // Build perm conditions without table alias for these queries
+  const permConditionsNoAlias = [];
+  if (permFilter.branchId) permConditionsNoAlias.push(`branch_id = '${permFilter.branchId}'`);
+  if (permFilter.departmentId) permConditionsNoAlias.push(`department_id = '${permFilter.departmentId}'`);
+  if (permFilter.designationId) permConditionsNoAlias.push(`designation_id = '${permFilter.designationId}'`);
+  if (permFilter.employmentTypeId) permConditionsNoAlias.push(`employment_type_id = '${permFilter.employmentTypeId}'`);
+  if (permFilter.employeeGradeId) permConditionsNoAlias.push(`employee_grade_id = '${permFilter.employeeGradeId}'`);
+  const permSqlConditionsNoAlias = permConditionsNoAlias.length > 0 ? 'AND ' + permConditionsNoAlias.join(' AND ') : '';
 
   const monthlyJoiners = await sequelize.query(
     `SELECT TO_CHAR(date_of_joining, 'YYYY-MM') as month, COUNT(id) as count
      FROM employees
      WHERE date_of_joining >= '${twelveMonthsAgoStr}'
      ${companyId ? `AND company_id = '${companyId}'` : ''}
+     ${permSqlConditionsNoAlias}
      AND deleted_at IS NULL
      GROUP BY TO_CHAR(date_of_joining, 'YYYY-MM')
      ORDER BY month ASC`,
     { type: sequelize.QueryTypes.SELECT }
   );
 
-  // ── Monthly exits (last 12 months) ────────────────────────────────────────
+  // Monthly exits (last 12 months)
   const monthlyExits = await sequelize.query(
     `SELECT TO_CHAR(relieving_date, 'YYYY-MM') as month, COUNT(id) as count
      FROM employees
      WHERE relieving_date >= '${twelveMonthsAgoStr}'
      AND status = 'exited'
      ${companyId ? `AND company_id = '${companyId}'` : ''}
+     ${permSqlConditionsNoAlias}
      AND deleted_at IS NULL
      GROUP BY TO_CHAR(relieving_date, 'YYYY-MM')
      ORDER BY month ASC`,
     { type: sequelize.QueryTypes.SELECT }
   );
 
-  // ── Turnover rate = (exits ÷ avg headcount) × 100 ────────────────────────
+  // Turnover rate = (exits ÷ avg headcount) × 100
   const turnoverRate = total > 0
     ? parseFloat(((exitsThisMonth / total) * 100).toFixed(2))
     : 0;
 
-  // ── Growth rate = ((newHires - exits) ÷ previous total) × 100 ────────────
+  // Growth rate = ((newHires - exits) ÷ previous total) × 100
   const growthRate = total > 0
     ? parseFloat((((newHiresThisMonth - exitsThisMonth) / total) * 100).toFixed(2))
     : 0;
@@ -1376,23 +1404,26 @@ const gradeRows = await sequelize.query(
   };
 };
 
-
 // ═════════════════════════════════════════════════════════════════════════════
 //  BIRTHDAYS & WORK ANNIVERSARIES
 // ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * Get upcoming birthdays (current month).
+ * Respects data-level permissions (branch, department, etc.)
  */
-const getUpcomingBirthdays = async (companyId) => {
-  const where = { status: 'Active' };
+const getUpcomingBirthdays = async (companyId, permFilter = {}) => {
+  const where = { 
+    status: 'Active',
+    ...permFilter, // Apply data filter from user permissions
+  };
   if (companyId) where.companyId = companyId;
 
   const currentMonth = new Date().getMonth() + 1;
 
   const employees = await Employee.findAll({
     where,
-    attributes: ['id', 'firstName', 'lastName', 'dateOfBirth', 'image', 'departmentId', 'designationId'],
+    attributes: ['id', 'firstName', 'middleName', 'lastName', 'dateOfBirth', 'image', 'departmentId', 'designationId'],
     include: [
       { model: Department, as: 'department', attributes: ['name'] },
       { model: Designation, as: 'designation', attributes: ['name'] },
@@ -1404,7 +1435,7 @@ const getUpcomingBirthdays = async (companyId) => {
     .filter(e => e.dateOfBirth && new Date(e.dateOfBirth).getMonth() + 1 === currentMonth)
     .map(e => ({
       id: e.id,
-      name: `${e.firstName} ${e.lastName}`,
+      name: `${e.firstName} ${e.middleName || ''} ${e.lastName}`.trim().replace(/\s+/g, ' '),
       dateOfBirth: e.dateOfBirth,
       department: e.department?.name,
       designation: e.designation?.name,
@@ -1416,16 +1447,20 @@ const getUpcomingBirthdays = async (companyId) => {
 
 /**
  * Get work anniversaries (current month).
+ * Respects data-level permissions (branch, department, etc.)
  */
-const getWorkAnniversaries = async (companyId) => {
-  const where = { status: 'Active' };
+const getWorkAnniversaries = async (companyId, permFilter = {}) => {
+  const where = { 
+    status: 'Active',
+    ...permFilter, // Apply data filter from user permissions
+  };
   if (companyId) where.companyId = companyId;
 
   const currentMonth = new Date().getMonth() + 1;
 
   const employees = await Employee.findAll({
     where,
-    attributes: ['id', 'firstName', 'lastName', 'dateOfJoining', 'image', 'departmentId'],
+    attributes: ['id', 'firstName', 'middleName', 'lastName', 'dateOfJoining', 'image', 'departmentId'],
     include: [
       { model: Department, as: 'department', attributes: ['name'] },
     ],
@@ -1435,7 +1470,7 @@ const getWorkAnniversaries = async (companyId) => {
     .filter(e => e.dateOfJoining && new Date(e.dateOfJoining).getMonth() + 1 === currentMonth)
     .map(e => ({
       id: e.id,
-      name: `${e.firstName} ${e.lastName}`,
+      name: `${e.firstName} ${e.middleName || ''} ${e.lastName}`.trim().replace(/\s+/g, ' '),
       dateOfJoining: e.dateOfJoining,
       department: e.department?.name,
       image: e.image,
@@ -1445,16 +1480,20 @@ const getWorkAnniversaries = async (companyId) => {
     .sort((a, b) => a.day - b.day);
 };
 
-
 // ═════════════════════════════════════════════════════════════════════════════
 //  RECENTLY JOINED
 // ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * Get recently joined employees (last 30 days).
+ * Respects data-level permissions (branch, department, etc.)
  */
-const getRecentlyJoined = async (companyId, limit = 10) => {
-  const where = { status: { [Op.in]: ['Active', 'onLeave'] } };
+const getRecentlyJoined = async (companyId, limit = 10, permFilter = {}) => {
+  const where = { 
+    status: { [Op.in]: ['Active', 'onLeave'] },
+    ...permFilter, // Apply data filter from user permissions
+  };
+  
   if (companyId) where.companyId = companyId;
 
   const thirtyDaysAgo = new Date();
