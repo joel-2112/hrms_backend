@@ -458,48 +458,7 @@ const approveEmployee = async (employeeId, approverUserId) => {
 
     await employee.update({ userId: user.id, status: 'Active' }, { transaction: t });
 
-    // ═══════════════════════════════════════════════════════════════
-    //  AUTO-ASSIGN SELF-SERVICE ROLE (no hardcoded resources)
-    //  Finds ANY role that has canReadSelf permissions configured.
-    //  Admin configures permissions via UI — code just assigns the role.
-    // ═══════════════════════════════════════════════════════════════
-    
-    const { Role, RolePermission, UserRole } = require('../../../models');
-    
-    // Find a role that has canReadSelf permissions configured
-    // This role is created and configured by admin via the UI
-    const selfServiceRole = await Role.findOne({
-      where: { disabled: false },
-      include: [{
-        model: RolePermission,
-        as: 'permissions',
-        where: { canReadSelf: true },
-        required: true, // Only find role that actually has canReadSelf permissions
-        attributes: [], // Don't need permission data, just checking existence
-      }],
-      transaction: t,
-    });
-
-    if (selfServiceRole) {
-      await UserRole.findOrCreate({
-        where: { userId: user.id, roleId: selfServiceRole.id },
-        defaults: { userId: user.id, roleId: selfServiceRole.id },
-        transaction: t,
-      });
-      
-      logger.info('Self-service role assigned', {
-        employeeId,
-        userId: user.id,
-        roleName: selfServiceRole.name,
-      });
-    } else {
-      logger.warn('No role with canReadSelf permissions found — employee will have no access until admin configures one', {
-        employeeId,
-        userId: user.id,
-      });
-    }
-
-    return { employee, user, role: selfServiceRole };
+    return { employee, user };
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -532,7 +491,6 @@ const approveEmployee = async (employeeId, approverUserId) => {
   return { 
     employee: result.employee, 
     temporaryPassword,
-    role: result.role?.name || 'None',
   };
 };
 

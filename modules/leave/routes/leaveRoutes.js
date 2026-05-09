@@ -1621,7 +1621,7 @@ router.route('/applications')
  *         description: Leave application not found
  */
 router.get('/applications/:id',
-  authorize('LeaveApplication', action.READ),
+  authorize('LeaveApplication', [ action.READ, action.READ_SELF ]),
   leaveController.getLeaveApplicationById
 );
 
