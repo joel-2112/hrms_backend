@@ -563,7 +563,7 @@ const getEmployees = async (query = {}, permFilter = {}) => {
   const { limit, offset, page } = getPaginationOptions(query);
   const where = {};
 
-  // Apply user-supplied filters first
+  // Apply user-supplied filters 
   if (companyId)        where.companyId        = companyId;
   if (branchId)         where.branchId         = branchId;
   if (departmentId)     where.departmentId     = departmentId;
