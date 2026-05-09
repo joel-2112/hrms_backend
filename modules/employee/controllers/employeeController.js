@@ -95,7 +95,6 @@ const approveEmployee = catchAsync(async (req, res) => {
  */
 const getEmployees = catchAsync(async (req, res) => {
   const permFilter = req.perms?.dataFilter || {};
-
   const { data, meta } = await employeeService.getEmployees(req.query, permFilter);
 
   ok(res, {
