@@ -89,7 +89,7 @@ const sendEmail = async ({ to, subject, title, content }) => {
     const html = wrapTemplate(title, content);
 
     const info = await transporter.sendMail({
-      from: "Teamwork ERP",
+      from: `"${process.env.SMTP_FROM}" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
