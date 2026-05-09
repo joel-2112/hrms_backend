@@ -126,7 +126,7 @@ const logger = require("../../../utils/logger");
  */
 const assertEmployeeActive = async (employeeId) => {
   const emp = await Employee.findByPk(employeeId, {
-    attributes: ["id", "status"],
+    attributes: ["id", "status", "companyId", "departmentId", "branchId"],
   });
   if (!emp) throw new AppError("Employee not found", 404);
   if (emp.status !== "Active") {
@@ -1100,13 +1100,47 @@ const createLeaveApplication = async (data, userId) => {
     throw new AppError("fromDate must be before or equal to toDate", 422);
   }
 
-  await assertEmployeeActive(employeeId);
+  const employee = await assertEmployeeActive(employeeId);
   const leaveType = await assertLeaveTypeValid(leaveTypeId);
 
-  // Calculate total leave days
+  // Get holiday list
   const holidayList = holidayListId
     ? await HolidayList.findByPk(holidayListId)
     : null;
+
+  // ═══════════════════════════════════════════════════════════
+  //  VALIDATE BLOCKED DATES IN RANGE
+  // ═══════════════════════════════════════════════════════════
+  const blockedDates = [];
+
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().split("T")[0];
+
+    const blockCheck = await isDateBlocked(
+      dateStr,
+      employee.companyId,
+      employee.departmentId,
+    );
+    if (blockCheck.blocked) {
+      blockedDates.push({ date: dateStr, blockListName: blockCheck.blockListName });
+    }
+  }
+
+  if (blockedDates.length > 0) {
+    const dates = blockedDates.map((b) => b.date).join(", ");
+    const names = [...new Set(blockedDates.map((b) => b.blockListName))].join(", ");
+    throw new AppError(
+      `Blocked dates found: ${dates} (${names}). Leave is restricted on these dates.`,
+      422,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  CALCULATE WORKING DAYS
+  // ═══════════════════════════════════════════════════════════
   const totalLeaveDays = await calculateWorkingDays(
     fromDate,
     toDate,
@@ -1115,7 +1149,16 @@ const createLeaveApplication = async (data, userId) => {
     holidayList?.holidays || [],
   );
 
-  // Validate balance
+  if (totalLeaveDays <= 0) {
+    throw new AppError(
+      "No working days found in the selected date range after excluding holidays and weekends.",
+      422,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  VALIDATE BALANCE
+  // ═══════════════════════════════════════════════════════════
   if (!leaveType.allowNegativeBalance) {
     const balance = await computeBalance(employeeId, leaveTypeId);
     if (balance < totalLeaveDays) {
@@ -1126,6 +1169,9 @@ const createLeaveApplication = async (data, userId) => {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  CREATE APPLICATION
+  // ═══════════════════════════════════════════════════════════
   const application = await LeaveApplication.create({
     employeeId,
     leaveTypeId,
