@@ -68,6 +68,10 @@ module.exports = (sequelize, DataTypes) => {
         comment:
           "Government-issued national ID number (e.g. 1222223333344444) for identity verification",
       },
+      nationality: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       firstName: {
         type: DataTypes.STRING(100),
         allowNull: false,
@@ -101,6 +105,7 @@ module.exports = (sequelize, DataTypes) => {
           isIn: [["Single", "Married", "Divorced", "Widowed"]],
         },
       },
+
       // ─────────────────────────────────────────────
       //  SECTION 3 — PHOTO and docuuments
       // ─────────────────────────────────────────────

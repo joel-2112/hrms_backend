@@ -801,7 +801,7 @@ const getPermissionsByResource = async (resourceName) => {
 const deleteRolePermission = async (permissionId) => {
   const perm = await RolePermission.findByPk(permissionId);
   if (!perm) throw new AppError("Permission rule not found", 404);
-  await perm.destroy();
+  await perm.destroy({force: true});
   invalidateAllCache();
 };
 
