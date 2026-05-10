@@ -501,17 +501,69 @@ const approveEmployee = async (employeeId, approverUserId) => {
  * Paginated employee list with rich filtering.
  * Permission filter overrides user-supplied filters for security.
  */
+// const getEmployees = async (query = {}, permFilter = {}) => {
+//   const {
+//     companyId, branchId, departmentId, designationId,
+//     employmentTypeId, employeeGradeId, status, reportsToId,
+//     search,
+//   } = query;
+
+//   const { limit, offset, page } = getPaginationOptions(query);
+//   const where = {};
+
+//   // Apply user-supplied filters first
+//   if (companyId)        where.companyId        = companyId;
+//   if (branchId)         where.branchId         = branchId;
+//   if (departmentId)     where.departmentId     = departmentId;
+//   if (designationId)    where.designationId    = designationId;
+//   if (employmentTypeId) where.employmentTypeId = employmentTypeId;
+//   if (employeeGradeId)  where.employeeGradeId  = employeeGradeId;
+//   if (reportsToId)      where.reportsToId      = reportsToId;
+
+//   // Apply permission filter LAST — overrides user filters for security
+//   Object.assign(where, permFilter);
+
+//   if (status) {
+//     const statuses = status.split(',').map(s => s.trim());
+//     where.status = statuses.length === 1 ? statuses[0] : { [Op.in]: statuses };
+//   }
+
+//   if (search) {
+//     const like = { [Op.iLike]: `%${search}%` };
+//     where[Op.or] = [
+//       { firstName:      like },
+//       { middleName:     like },
+//       { lastName:       like },
+//       { employeeNumber: like },
+//       { email:          like },
+//     ];
+//   }
+
+//   const { count, rows } = await Employee.findAndCountAll({
+//     where,
+//     limit,
+//     offset,
+//     order: [['createdAt', 'DESC']],
+//     include: [...ORG_INCLUDES, MANAGER_INCLUDE, USER_INCLUDE],
+//   });
+
+//   return { data: rows, meta: buildMeta(count, page, limit) };
+// };
+/**
+ * Paginated employee list with rich filtering.
+ * Permission filter overrides user-supplied filters for security.
+ */
 const getEmployees = async (query = {}, permFilter = {}) => {
   const {
     companyId, branchId, departmentId, designationId,
     employmentTypeId, employeeGradeId, status, reportsToId,
-    search,
+    search, sortBy = 'firstName', sortOrder = 'ASC',
   } = query;
 
   const { limit, offset, page } = getPaginationOptions(query);
   const where = {};
 
-  // Apply user-supplied filters first
+  // Apply user-supplied filters 
   if (companyId)        where.companyId        = companyId;
   if (branchId)         where.branchId         = branchId;
   if (departmentId)     where.departmentId     = departmentId;
@@ -539,17 +591,39 @@ const getEmployees = async (query = {}, permFilter = {}) => {
     ];
   }
 
+  // Build sort order
+  const direction = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+  
+  // Sort mapping for different fields
+  const sortMapping = {
+    'firstName': [['firstName', direction]],
+    'employeeNumber': [['employeeNumber', direction]],
+    'email': [['email', direction]],
+    'phoneNumber': [['phoneNumber', direction]],
+    'dateOfJoining': [['dateOfJoining', direction]],
+    'status': [['status', direction]],
+    'designation.name': [[{ model: Designation, as: 'designation' }, 'name', direction]],
+    'department.name': [[{ model: Department, as: 'department' }, 'name', direction]],
+    'branch.name': [[{ model: Branch, as: 'branch' }, 'name', direction]],
+    'company.name': [[{ model: Company, as: 'company' }, 'name', direction]],
+    'employeeGrade.name': [[{ model: EmployeeGrade, as: 'employeeGrade' }, 'name', direction]],
+    'employmentType.name': [[{ model: EmploymentType, as: 'employmentType' }, 'name', direction]],
+    'reportsTo.firstName': [[{ model: Employee, as: 'reportsTo' }, 'firstName', direction]],
+  };
+  
+  const order = sortMapping[sortBy] || [['firstName', direction]];
+
   const { count, rows } = await Employee.findAndCountAll({
     where,
     limit,
     offset,
-    order: [['createdAt', 'DESC']],
+    order,
     include: [...ORG_INCLUDES, MANAGER_INCLUDE, USER_INCLUDE],
+    distinct: true, // Important for correct count when using includes
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  return { data: rows, meta: buildMeta(count, page, limit, sortBy, sortOrder) };
 };
-
 /**
  * Update employee avatar path
  */
