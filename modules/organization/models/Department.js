@@ -24,21 +24,6 @@ module.exports = (sequelize, DataTypes) => {
       type:      DataTypes.STRING(255),
       allowNull: false,
     },
-
-    // ── Hierarchy helpers ──────────────────────────────────────
-    isGroup: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-      comment:      'True when this department is a grouping node with sub-departments',
-    },
-
-    // ── Behaviour flags ────────────────────────────────────────
-    disabled: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-    },
   }, {
     tableName: 'departments',
     comment:   'Org unit — self-referencing tree (root dept has null parentDepartmentId)',

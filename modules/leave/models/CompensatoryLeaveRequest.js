@@ -43,17 +43,8 @@ module.exports = (sequelize, DataTypes) => {
       comment:      '0 = Draft, 1 = Submitted, 2 = Cancelled',
     },
 
-    // ── Output FK ─────────────────────────────────────────────
-    // Populated after approval — points to the LeaveAllocation
-    // created by this request (credits the balance).
-    leaveAllocationId: {
-      type:      DataTypes.UUID,
-      allowNull: true,
-      comment:   'FK → leave_allocations.id — set when request is approved and allocation is created',
-    },
   }, {
     tableName: 'compensatory_leave_requests',
-    comment:   'Employee claims comp-off for working on a holiday/weekend — on approval creates a LeaveAllocation',
     indexes: [
       { fields: ['employee_id'],  name: 'idx_clr_employee' },
       { fields: ['leave_type_id'], name: 'idx_clr_leave_type' },

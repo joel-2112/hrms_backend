@@ -93,7 +93,7 @@ const SALT_ROUNDS = 10;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ORG_INCLUDES = [
-  { model: Company, as: 'company',         attributes: ['id', 'name', 'abbr'] },
+  { model: Company, as: 'company',         attributes: ['id', 'name', 'code'] },
   { model: Branch, as: 'branch',           attributes: ['id', 'name'], required: false },
   { model: Department, as: 'department',   attributes: ['id', 'name'], required: false },
   { model: Designation, as: 'designation', attributes: ['id', 'name'], required: false },

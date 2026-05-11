@@ -20,11 +20,6 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       // unique:    true,
     },
-    abbr: {
-      type:      DataTypes.STRING(10),
-      allowNull: false,
-      comment:   'Short code used as prefix in document naming e.g. "ACME"',
-    },
     dateOfIncorporation: {
       type:      DataTypes.DATEONLY,
       allowNull: true,
@@ -48,10 +43,6 @@ module.exports = (sequelize, DataTypes) => {
       type:      DataTypes.STRING,
       allowNull: true,
     },
-    addressLine1: {
-      type:      DataTypes.STRING(255),
-      allowNull: true,
-    },
     code: {
       type:      DataTypes.STRING(20),
       allowNull: true,
@@ -73,7 +64,6 @@ module.exports = (sequelize, DataTypes) => {
     comment:   'Top-level legal entity — root of the organization hierarchy',
     indexes: [
       { fields: ['parent_company_id'], name: 'idx_companies_parent' },
-      { unique: true, fields: ['abbr'], name: 'uq_companies_abbr' },
       { unique: true, fields: ['code'], name: 'uq_companies_code' },
     ],
   });

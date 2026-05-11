@@ -1,56 +1,48 @@
-'use strict';
+"use strict";
 
 /**
  * modules/leave/routes/leaveRoutes.js
  *
- * Leave module routes — Leave Types, Periods, Policies, Assignments,
- * Allocations, Holidays, Block Lists, Compensatory Requests,
+ * Leave module routes — Leave Types, Periods, Balances,
+ * Holidays, Block Lists, Compensatory Requests,
  * Applications, Ledger, Encashments, and Compliance utilities.
  *
  * All routes require authentication.
  */
 
-const router = require('express').Router();
-const leaveController = require('../controllers/leaveController');
-const { authenticate } = require('../../../middlewares/authMiddleware');
-const { authorize, action } = require('../../../middlewares/rbacMiddleware');
+const router = require("express").Router();
+const leaveController = require("../controllers/leaveController");
+const { authenticate } = require("../../../middlewares/authMiddleware");
+const { authorize, action } = require("../../../middlewares/rbacMiddleware");
 
 // All routes require authentication
 router.use(authenticate);
-
-
-
-
-
 
 /**
  * @swagger
  * tags:
  *   - name: LeaveTypes
- *     description: Leave type management — define leave categories and rules
+ *     description: Leave type management
  *   - name: LeavePeriods
- *     description: Leave period management — financial/leave year boundaries
- *   - name: LeavePolicies
- *     description: Leave policy management — entitlement templates
- *   - name: LeavePolicyAssignments
- *     description: Policy assignment — assign policies to employees
- *   - name: LeaveAllocations
- *     description: Leave allocations — granted days per employee per leave type
+ *     description: Leave period management
  *   - name: HolidayLists
- *     description: Holiday list management — company holiday calendars
+ *     description: Holiday list management
  *   - name: LeaveBlockLists
- *     description: Leave block lists — dates where leave is restricted
+ *     description: Leave block list management
  *   - name: CompensatoryRequests
- *     description: Compensatory leave — claim comp-off for working on holidays
+ *     description: Compensatory leave requests
  *   - name: LeaveApplications
- *     description: Leave applications — employee leave requests
+ *     description: Leave applications
  *   - name: LeaveLedger
- *     description: Leave ledger — immutable balance audit trail
+ *     description: Leave ledger
  *   - name: LeaveEncashments
- *     description: Leave encashment — convert unused leave to payout
+ *     description: Leave encashment
  *   - name: LeaveCompliance
- *     description: Compliance utilities — date checks, balance validation, expiry
+ *     description: Compliance utilities
+ *   - name: LeaveDashboard
+ *     description: Leave dashboard
  */
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  EMPLOYEE SELF-SERVICE — MY LEAVE
 // ═════════════════════════════════════════════════════════════════════════════
@@ -59,18 +51,15 @@ router.use(authenticate);
  * @swagger
  * /leaves/my-leave/summary:
  *   get:
- *     summary: Get current employee's leave summary (balances, allocations, pending apps)
+ *     summary: Get current employee's leave summary
  *     tags: [LeaveApplications]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Employee leave summary fetched successfully
+ *         description: My leave summary fetched successfully
  */
-router.get('/my-leave/summary',
-  authenticate,
-  leaveController.getMyLeaveSummary
-);
+router.get("/my-leave/summary", leaveController.getMyLeaveSummary);
 
 /**
  * @swagger
@@ -95,18 +84,15 @@ router.get('/my-leave/summary',
  *           type: integer
  *     responses:
  *       200:
- *         description: Employee applications fetched successfully
+ *         description: My leave applications fetched successfully
  */
-router.get('/my-leave/applications',
-  authenticate,
-  leaveController.getMyLeaveApplications
-);
+router.get("/my-leave/applications", leaveController.getMyLeaveApplications);
 
 /**
  * @swagger
  * /leaves/my-leave/calendar:
  *   get:
- *     summary: Get current employee's leave calendar (upcoming + history)
+ *     summary: Get current employee's leave calendar
  *     tags: [LeaveApplications]
  *     security:
  *       - bearerAuth: []
@@ -117,12 +103,41 @@ router.get('/my-leave/applications',
  *           type: integer
  *     responses:
  *       200:
- *         description: Employee leave calendar fetched successfully
+ *         description: My leave calendar fetched successfully
  */
-router.get('/my-leave/calendar',
-  authenticate,
-  leaveController.getMyLeaveCalendar
-);
+router.get("/my-leave/calendar", leaveController.getMyLeaveCalendar);
+
+/**
+ * @swagger
+ * /leaves/my-ledger:
+ *   get:
+ *     summary: Get leave ledger for the authenticated employee
+ *     tags: [LeaveLedger]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: leaveTypeId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: voucherType
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: My ledger fetched successfully
+ */
+router.get("/my-ledger", leaveController.getMyLedger);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE DASHBOARD
@@ -141,15 +156,11 @@ router.get('/my-leave/calendar',
  *         name: period
  *         schema:
  *           type: string
- *         description: Period year (e.g., "2026")
  *     responses:
  *       200:
  *         description: Dashboard stats fetched successfully
  */
-router.get('/dashboard/stats',
-  authorize('LeaveApplication', action.READ),
-  leaveController.getDashboardStats
-);
+router.get("/dashboard/stats", authorize("LeaveApplication", action.READ), leaveController.getDashboardStats);
 
 /**
  * @swagger
@@ -163,16 +174,13 @@ router.get('/dashboard/stats',
  *       200:
  *         description: Dashboard balances fetched successfully
  */
-router.get('/dashboard/balances',
-  authorize('LeaveAllocation', action.READ),
-  leaveController.getDashboardBalances
-);
+router.get("/dashboard/balances", leaveController.getDashboardBalances);
 
 /**
  * @swagger
  * /leaves/dashboard/pending-approvals:
  *   get:
- *     summary: Get pending leave approvals for dashboard
+ *     summary: Get pending leave approvals
  *     tags: [LeaveDashboard]
  *     security:
  *       - bearerAuth: []
@@ -186,10 +194,7 @@ router.get('/dashboard/balances',
  *       200:
  *         description: Pending approvals fetched successfully
  */
-router.get('/dashboard/pending-approvals',
-  authorize('LeaveApplication', action.READ),
-  leaveController.getDashboardPendingApprovals
-);
+router.get("/dashboard/pending-approvals", authorize("LeaveApplication", action.READ), leaveController.getDashboardPendingApprovals);
 
 /**
  * @swagger
@@ -203,16 +208,13 @@ router.get('/dashboard/pending-approvals',
  *       200:
  *         description: On-leave employees fetched successfully
  */
-router.get('/dashboard/on-leave-this-week',
-  authorize('LeaveApplication', action.READ),
-  leaveController.getOnLeaveThisWeek
-);
+router.get("/dashboard/on-leave-this-week", authorize("LeaveApplication", action.READ), leaveController.getOnLeaveThisWeek);
 
 /**
  * @swagger
  * /leaves/dashboard/by-type:
  *   get:
- *     summary: Get leave distribution by type for dashboard
+ *     summary: Get leave distribution by type
  *     tags: [LeaveDashboard]
  *     security:
  *       - bearerAuth: []
@@ -225,10 +227,7 @@ router.get('/dashboard/on-leave-this-week',
  *       200:
  *         description: Leave by type fetched successfully
  */
-router.get('/dashboard/by-type',
-  authorize('LeaveApplication', action.READ),
-  leaveController.getDashboardLeaveByType
-);
+router.get("/dashboard/by-type", authorize("LeaveApplication", action.READ), leaveController.getDashboardLeaveByType);
 
 /**
  * @swagger
@@ -242,10 +241,7 @@ router.get('/dashboard/by-type',
  *       200:
  *         description: Next holiday fetched successfully
  */
-router.get('/dashboard/next-holiday',
-  authorize('HolidayList', action.READ),
-  leaveController.getNextHoliday
-);
+router.get("/dashboard/next-holiday", authorize("HolidayList", action.READ), leaveController.getNextHoliday);
 
 /**
  * @swagger
@@ -259,54 +255,8 @@ router.get('/dashboard/next-holiday',
  *       200:
  *         description: Dashboard data exported successfully
  */
-router.get('/dashboard/export',
-  authorize('LeaveApplication', action.READ),
-  leaveController.exportDashboard
-);
+router.get("/dashboard/export", authorize("LeaveApplication", action.READ), leaveController.exportDashboard);
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  MY LEDGER — Authenticated Employee
-// ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * @swagger
- * /leaves/my-ledger:
- *   get:
- *     summary: Get leave ledger for the authenticated employee
- *     tags: [LeaveLedger]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: leaveTypeId
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Filter by leave type
- *       - in: query
- *         name: voucherType
- *         schema:
- *           type: string
- *           enum: [LeaveAllocation, LeaveApplication, LeaveEncashment, CompensatoryLeaveRequest]
- *         description: Filter by voucher type
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *     responses:
- *       200:
- *         description: My ledger fetched successfully
- */
-router.get('/my-ledger',
-  authenticate,
-  leaveController.getMyLedger
-);
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE TYPES
 // ═════════════════════════════════════════════════════════════════════════════
@@ -329,43 +279,35 @@ router.get('/my-ledger',
  *             properties:
  *               name:
  *                 type: string
- *                 example: Annual Leave
  *               description:
  *                 type: string
- *               maxDaysAllowed:
+ *               eligibilityMonths:
+ *                 type: integer
+ *               baseAllocation:
  *                 type: number
- *                 default: 0
- *               maxCarryForwardedDays:
+ *               annualIncrementDays:
  *                 type: number
- *                 default: 0
+ *               incrementCap:
+ *                 type: number
+ *               allocationRules:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *               maxDaysPerYear:
+ *                 type: number
+ *               maxCarryForwardYears:
+ *                 type: integer
  *               maxContinuousDaysAllowed:
  *                 type: integer
- *               isLeaveWithoutPay:
- *                 type: boolean
- *                 default: false
- *               isOptionalLeave:
- *                 type: boolean
- *                 default: false
- *               isCompensatory:
- *                 type: boolean
- *                 default: false
  *               isEncashable:
  *                 type: boolean
- *                 default: false
- *               allowNegativeBalance:
- *                 type: boolean
- *                 default: false
  *               includeHolidays:
  *                 type: boolean
- *                 default: false
  *               includeWeekends:
  *                 type: boolean
- *                 default: false
  *     responses:
  *       201:
- *         description: Leave type created successfully
- *       409:
- *         description: Leave type already exists
+ *         description: Leave type created
  *   get:
  *     summary: List all leave types
  *     tags: [LeaveTypes]
@@ -373,16 +315,17 @@ router.get('/my-ledger',
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: includeDisabled
+ *         name: includeInactive
  *         schema:
  *           type: boolean
  *     responses:
  *       200:
  *         description: Leave types fetched successfully
  */
-router.route('/leave-types')
-  .post(authorize('LeaveType', action.CREATE), leaveController.createLeaveType)
-  .get(authorize('LeaveType', [action.READ, action.READ_SELF]), leaveController.getLeaveTypes);
+router
+  .route("/leave-types")
+  .post(authorize("LeaveType", action.CREATE), leaveController.createLeaveType)
+  .get(authorize("LeaveType", [action.READ, action.READ_SELF]), leaveController.getLeaveTypes);
 
 /**
  * @swagger
@@ -401,9 +344,7 @@ router.route('/leave-types')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave type fetched successfully
- *       404:
- *         description: Leave type not found
+ *         description: Leave type fetched
  *   patch:
  *     summary: Update a leave type
  *     tags: [LeaveTypes]
@@ -424,9 +365,7 @@ router.route('/leave-types')
  *             type: object
  *     responses:
  *       200:
- *         description: Leave type updated successfully
- *       404:
- *         description: Leave type not found
+ *         description: Leave type updated
  *   delete:
  *     summary: Disable a leave type
  *     tags: [LeaveTypes]
@@ -441,15 +380,13 @@ router.route('/leave-types')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave type disabled successfully
- *       404:
- *         description: Leave type not found
+ *         description: Leave type disabled
  */
-router.route('/leave-types/:id')
-  .get(authorize('LeaveType', action.READ), leaveController.getLeaveTypeById)
-  .patch(authorize('LeaveType', action.WRITE), leaveController.updateLeaveType)
-  .delete(authorize('LeaveType', action.DELETE), leaveController.deleteLeaveType);
-
+router
+  .route("/leave-types/:id")
+  .get(authorize("LeaveType", action.READ), leaveController.getLeaveTypeById)
+  .patch(authorize("LeaveType", action.WRITE), leaveController.updateLeaveType)
+  .delete(authorize("LeaveType", action.DELETE), leaveController.deleteLeaveType);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE PERIODS
@@ -473,7 +410,6 @@ router.route('/leave-types/:id')
  *             properties:
  *               name:
  *                 type: string
- *                 example: "2026 (Jan-Dec)"
  *               companyId:
  *                 type: string
  *                 format: uuid
@@ -485,12 +421,9 @@ router.route('/leave-types/:id')
  *                 format: date
  *               isActive:
  *                 type: boolean
- *                 default: true
  *     responses:
  *       201:
- *         description: Leave period created successfully
- *       409:
- *         description: Leave period already exists
+ *         description: Leave period created
  *   get:
  *     summary: List leave periods
  *     tags: [LeavePeriods]
@@ -508,17 +441,18 @@ router.route('/leave-types/:id')
  *           type: boolean
  *     responses:
  *       200:
- *         description: Leave periods fetched successfully
+ *         description: Leave periods fetched
  */
-router.route('/leave-periods')
-  .post(authorize('LeavePeriod', action.CREATE), leaveController.createLeavePeriod)
-  .get(authorize('LeavePeriod', action.READ), leaveController.getLeavePeriods);
+router
+  .route("/leave-periods")
+  .post(authorize("LeavePeriod", action.CREATE), leaveController.createLeavePeriod)
+  .get(authorize("LeavePeriod", action.READ), leaveController.getLeavePeriods);
 
 /**
  * @swagger
  * /leaves/leave-periods/active:
  *   get:
- *     summary: Get the active leave period for a company
+ *     summary: Get the active leave period
  *     tags: [LeavePeriods]
  *     security:
  *       - bearerAuth: []
@@ -531,14 +465,9 @@ router.route('/leave-periods')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Active leave period fetched successfully
- *       404:
- *         description: No active leave period found
+ *         description: Active leave period fetched
  */
-router.get('/leave-periods/active',
-  authorize('LeavePeriod', action.READ),
-  leaveController.getActiveLeavePeriod
-);
+router.get("/leave-periods/active", authorize("LeavePeriod", action.READ), leaveController.getActiveLeavePeriod);
 
 /**
  * @swagger
@@ -557,9 +486,7 @@ router.get('/leave-periods/active',
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave period fetched successfully
- *       404:
- *         description: Leave period not found
+ *         description: Leave period fetched
  *   patch:
  *     summary: Update a leave period
  *     tags: [LeavePeriods]
@@ -580,9 +507,7 @@ router.get('/leave-periods/active',
  *             type: object
  *     responses:
  *       200:
- *         description: Leave period updated successfully
- *       404:
- *         description: Leave period not found
+ *         description: Leave period updated
  *   delete:
  *     summary: Delete a leave period
  *     tags: [LeavePeriods]
@@ -598,379 +523,23 @@ router.get('/leave-periods/active',
  *     responses:
  *       204:
  *         description: Leave period deleted
- *       404:
- *         description: Leave period not found
- *       409:
- *         description: Cannot delete — allocations exist
  */
-router.route('/leave-periods/:id')
-  .get(authorize('LeavePeriod', action.READ), leaveController.getLeavePeriodById)
-  .patch(authorize('LeavePeriod', action.WRITE), leaveController.updateLeavePeriod)
-  .delete(authorize('LeavePeriod', action.DELETE), leaveController.deleteLeavePeriod);
-
+router
+  .route("/leave-periods/:id")
+  .get(authorize("LeavePeriod", action.READ), leaveController.getLeavePeriodById)
+  .patch(authorize("LeavePeriod", action.WRITE), leaveController.updateLeavePeriod)
+  .delete(authorize("LeavePeriod", action.DELETE), leaveController.deleteLeavePeriod);
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  LEAVE POLICIES
+//  LEAVE BALANCES
 // ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * @swagger
- * /leaves/leave-policies:
- *   post:
- *     summary: Create a new leave policy
- *     tags: [LeavePolicies]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name, leaveTypes]
- *             properties:
- *               name:
- *                 type: string
- *                 example: Standard Full-Time Policy
- *               leaveTypes:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     leaveTypeId:
- *                       type: string
- *                       format: uuid
- *                     annualAllocation:
- *                       type: number
- *                 example:
- *                   - leaveTypeId: "uuid-1"
- *                     annualAllocation: 21
- *                   - leaveTypeId: "uuid-2"
- *                     annualAllocation: 14
- *     responses:
- *       201:
- *         description: Leave policy created successfully
- *       409:
- *         description: Leave policy already exists
- *   get:
- *     summary: List all leave policies
- *     tags: [LeavePolicies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: includeDisabled
- *         schema:
- *           type: boolean
- *     responses:
- *       200:
- *         description: Leave policies fetched successfully
- */
-router.route('/leave-policies')
-  .post(authorize('LeavePolicy', action.CREATE), leaveController.createLeavePolicy)
-  .get(authorize('LeavePolicy', action.READ), leaveController.getLeavePolicies);
-
-/**
- * @swagger
- * /leaves/leave-policies/{id}:
- *   get:
- *     summary: Get a leave policy by ID
- *     tags: [LeavePolicies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Leave policy fetched successfully
- *       404:
- *         description: Leave policy not found
- *   patch:
- *     summary: Update a leave policy
- *     tags: [LeavePolicies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: Leave policy updated successfully
- *       404:
- *         description: Leave policy not found
- *   delete:
- *     summary: Disable a leave policy
- *     tags: [LeavePolicies]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Leave policy disabled successfully
- *       404:
- *         description: Leave policy not found
- */
-router.route('/leave-policies/:id')
-  .get(authorize('LeavePolicy', action.READ), leaveController.getLeavePolicyById)
-  .patch(authorize('LeavePolicy', action.WRITE), leaveController.updateLeavePolicy)
-  .delete(authorize('LeavePolicy', action.DELETE), leaveController.deleteLeavePolicy);
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  LEAVE POLICY ASSIGNMENTS
-// ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * @swagger
- * /leaves/policy-assignments:
- *   post:
- *     summary: Assign a leave policy to an employee
- *     tags: [LeavePolicyAssignments]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [employeeId, leavePolicyId, leavePeriodId, effectiveFrom]
- *             properties:
- *               employeeId:
- *                 type: string
- *                 format: uuid
- *               leavePolicyId:
- *                 type: string
- *                 format: uuid
- *               leavePeriodId:
- *                 type: string
- *                 format: uuid
- *               effectiveFrom:
- *                 type: string
- *                 format: date
- *               effectiveTo:
- *                 type: string
- *                 format: date
- *     responses:
- *       201:
- *         description: Leave policy assigned successfully
- *       409:
- *         description: Employee already has a policy for this period
- *   get:
- *     summary: List policy assignments
- *     tags: [LeavePolicyAssignments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: employeeId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: leavePeriodId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *     responses:
- *       200:
- *         description: Policy assignments fetched successfully
- */
-router.route('/policy-assignments')
-  .post(authorize('LeavePolicyAssignment', action.CREATE), leaveController.createLeavePolicyAssignment)
-  .get(authorize('LeavePolicyAssignment', action.READ), leaveController.getLeavePolicyAssignments);
-
-/**
- * @swagger
- * /leaves/policy-assignments/{id}:
- *   get:
- *     summary: Get a policy assignment by ID
- *     tags: [LeavePolicyAssignments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Policy assignment fetched successfully
- *       404:
- *         description: Policy assignment not found
- */
-router.get('/policy-assignments/:id',
-  authorize('LeavePolicyAssignment', action.READ),
-  leaveController.getLeavePolicyAssignmentById
-);
-
-/**
- * @swagger
- * /leaves/policy-assignments/{id}/generate-allocations:
- *   post:
- *     summary: Generate LeaveAllocation rows from a policy assignment
- *     tags: [LeavePolicyAssignments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       201:
- *         description: Allocations generated successfully
- *       404:
- *         description: Policy assignment not found
- *       422:
- *         description: Allocations already generated
- */
-router.post('/policy-assignments/:id/generate-allocations',
-  authorize('LeavePolicyAssignment', action.SUBMIT),
-  leaveController.generateAllocations
-);
-
-/**
- * @swagger
- * /leaves/policy-assignments/{id}/cancel:
- *   post:
- *     summary: Cancel a policy assignment
- *     tags: [LeavePolicyAssignments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Policy assignment cancelled successfully
- *       404:
- *         description: Policy assignment not found
- */
-router.post('/policy-assignments/:id/cancel',
-  authorize('LeavePolicyAssignment', action.SUBMIT),
-  leaveController.cancelLeavePolicyAssignment
-);
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  LEAVE ALLOCATIONS (read-only)
-// ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * @swagger
- * /leaves/allocations:
- *   get:
- *     summary: List leave allocations
- *     tags: [LeaveAllocations]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: employeeId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: leaveTypeId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: leavePeriodId
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *     responses:
- *       200:
- *         description: Leave allocations fetched successfully
- */
-router.get('/allocations',
-  authorize('LeaveAllocation', [action.READ, action.READ_SELF]),
-  leaveController.getLeaveAllocations
-);
-
-/**
- * @swagger
- * /leaves/allocations/{id}:
- *   get:
- *     summary: Get a leave allocation by ID
- *     tags: [LeaveAllocations]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Leave allocation fetched successfully
- *       404:
- *         description: Leave allocation not found
- */
-router.get('/allocations/:id',
-  authorize('LeaveAllocation', action.READ),
-  leaveController.getLeaveAllocationById
-);
 
 /**
  * @swagger
  * /leaves/balances/{employeeId}:
  *   get:
  *     summary: Get all leave balances for an employee
- *     tags: [LeaveAllocations]
+ *     tags: [LeaveApplications]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -982,19 +551,16 @@ router.get('/allocations/:id',
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave balances fetched successfully
+ *         description: Leave balances fetched
  */
-router.get('/balances/:employeeId',
-  authorize('LeaveAllocation',[ action.READ, action.READ_SELF ]),
-  leaveController.getLeaveBalances
-);
+router.get("/balances/:employeeId", authorize("LeaveAllocation", [action.READ, action.READ_SELF]), leaveController.getLeaveBalances);
 
 /**
  * @swagger
  * /leaves/balances/{employeeId}/{leaveTypeId}:
  *   get:
- *     summary: Get leave balance for one employee + one leave type
- *     tags: [LeaveAllocations]
+ *     summary: Get leave balance for one employee and leave type
+ *     tags: [LeaveApplications]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1012,13 +578,9 @@ router.get('/balances/:employeeId',
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave balance fetched successfully
+ *         description: Leave balance fetched
  */
-router.get('/balances/:employeeId/:leaveTypeId',
-  authorize('LeaveAllocation', [ action.READ, action.READ_SELF]),
-  leaveController.getLeaveBalance
-);
-
+router.get("/balances/:employeeId/:leaveTypeId", authorize("LeaveAllocation", [action.READ, action.READ_SELF]), leaveController.getLeaveBalance);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  HOLIDAY LISTS
@@ -1042,7 +604,6 @@ router.get('/balances/:employeeId/:leaveTypeId',
  *             properties:
  *               name:
  *                 type: string
- *                 example: "Ethiopia Public Holidays 2026"
  *               companyId:
  *                 type: string
  *                 format: uuid
@@ -1056,22 +617,9 @@ router.get('/balances/:employeeId/:leaveTypeId',
  *                 type: array
  *                 items:
  *                   type: object
- *                   properties:
- *                     date:
- *                       type: string
- *                       format: date
- *                     description:
- *                       type: string
- *                 example:
- *                   - date: "2026-01-07"
- *                     description: "Ethiopian Christmas"
- *                   - date: "2026-01-19"
- *                     description: "Timket"
  *     responses:
  *       201:
- *         description: Holiday list created successfully
- *       409:
- *         description: Holiday list already exists
+ *         description: Holiday list created
  *   get:
  *     summary: List holiday lists
  *     tags: [HolidayLists]
@@ -1089,11 +637,12 @@ router.get('/balances/:employeeId/:leaveTypeId',
  *           type: boolean
  *     responses:
  *       200:
- *         description: Holiday lists fetched successfully
+ *         description: Holiday lists fetched
  */
-router.route('/holiday-lists')
-  .post(authorize('HolidayList', action.CREATE), leaveController.createHolidayList)
-  .get(authorize('HolidayList', [action.READ, action.READ_SELF]), leaveController.getHolidayLists);
+router
+  .route("/holiday-lists")
+  .post(authorize("HolidayList", action.CREATE), leaveController.createHolidayList)
+  .get(authorize("HolidayList", [action.READ, action.READ_SELF]), leaveController.getHolidayLists);
 
 /**
  * @swagger
@@ -1112,9 +661,7 @@ router.route('/holiday-lists')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Holiday list fetched successfully
- *       404:
- *         description: Holiday list not found
+ *         description: Holiday list fetched
  *   patch:
  *     summary: Update a holiday list
  *     tags: [HolidayLists]
@@ -1135,9 +682,7 @@ router.route('/holiday-lists')
  *             type: object
  *     responses:
  *       200:
- *         description: Holiday list updated successfully
- *       404:
- *         description: Holiday list not found
+ *         description: Holiday list updated
  *   delete:
  *     summary: Disable a holiday list
  *     tags: [HolidayLists]
@@ -1152,15 +697,13 @@ router.route('/holiday-lists')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Holiday list disabled successfully
- *       404:
- *         description: Holiday list not found
+ *         description: Holiday list disabled
  */
-router.route('/holiday-lists/:id')
-  .get(authorize('HolidayList', action.READ), leaveController.getHolidayListById)
-  .patch(authorize('HolidayList', action.WRITE), leaveController.updateHolidayList)
-  .delete(authorize('HolidayList', action.DELETE), leaveController.deleteHolidayList);
-
+router
+  .route("/holiday-lists/:id")
+  .get(authorize("HolidayList", action.READ), leaveController.getHolidayListById)
+  .patch(authorize("HolidayList", action.WRITE), leaveController.updateHolidayList)
+  .delete(authorize("HolidayList", action.DELETE), leaveController.deleteHolidayList);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE BLOCK LISTS
@@ -1184,7 +727,6 @@ router.route('/holiday-lists/:id')
  *             properties:
  *               name:
  *                 type: string
- *                 example: "Year-End Freeze 2026"
  *               companyId:
  *                 type: string
  *                 format: uuid
@@ -1192,27 +734,17 @@ router.route('/holiday-lists/:id')
  *                 type: array
  *                 items:
  *                   type: object
- *                   properties:
- *                     date:
- *                       type: string
- *                       format: date
- *                     reason:
- *                       type: string
  *               appliesToAllDepartments:
  *                 type: boolean
- *                 default: true
  *               allowedDepartments:
  *                 type: array
  *                 items:
  *                   type: string
- *                   format: uuid
  *     responses:
  *       201:
- *         description: Leave block list created successfully
- *       409:
- *         description: Block list already exists
+ *         description: Block list created
  *   get:
- *     summary: List leave block lists for a company
+ *     summary: List leave block lists
  *     tags: [LeaveBlockLists]
  *     security:
  *       - bearerAuth: []
@@ -1229,11 +761,12 @@ router.route('/holiday-lists/:id')
  *           type: boolean
  *     responses:
  *       200:
- *         description: Leave block lists fetched successfully
+ *         description: Block lists fetched
  */
-router.route('/block-lists')
-  .post(authorize('LeaveBlockList', action.CREATE), leaveController.createLeaveBlockList)
-  .get(authorize('LeaveBlockList', action.READ), leaveController.getLeaveBlockLists);
+router
+  .route("/block-lists")
+  .post(authorize("LeaveBlockList", action.CREATE), leaveController.createLeaveBlockList)
+  .get(authorize("LeaveBlockList", action.READ), leaveController.getLeaveBlockLists);
 
 /**
  * @swagger
@@ -1252,9 +785,7 @@ router.route('/block-lists')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave block list fetched successfully
- *       404:
- *         description: Leave block list not found
+ *         description: Block list fetched
  *   patch:
  *     summary: Update a leave block list
  *     tags: [LeaveBlockLists]
@@ -1275,9 +806,7 @@ router.route('/block-lists')
  *             type: object
  *     responses:
  *       200:
- *         description: Leave block list updated successfully
- *       404:
- *         description: Leave block list not found
+ *         description: Block list updated
  *   delete:
  *     summary: Disable a leave block list
  *     tags: [LeaveBlockLists]
@@ -1292,15 +821,13 @@ router.route('/block-lists')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave block list disabled successfully
- *       404:
- *         description: Leave block list not found
+ *         description: Block list disabled
  */
-router.route('/block-lists/:id')
-  .get(authorize('LeaveBlockList', action.READ), leaveController.getLeaveBlockListById)
-  .patch(authorize('LeaveBlockList', action.WRITE), leaveController.updateLeaveBlockList)
-  .delete(authorize('LeaveBlockList', action.DELETE), leaveController.deleteLeaveBlockList);
-
+router
+  .route("/block-lists/:id")
+  .get(authorize("LeaveBlockList", action.READ), leaveController.getLeaveBlockListById)
+  .patch(authorize("LeaveBlockList", action.WRITE), leaveController.updateLeaveBlockList)
+  .delete(authorize("LeaveBlockList", action.DELETE), leaveController.deleteLeaveBlockList);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  COMPENSATORY LEAVE REQUESTS
@@ -1325,18 +852,14 @@ router.route('/block-lists/:id')
  *               leaveTypeId:
  *                 type: string
  *                 format: uuid
- *                 description: Must be a compensatory leave type
  *               workDate:
  *                 type: string
  *                 format: date
- *                 description: The holiday/weekend the employee worked
  *               reason:
  *                 type: string
  *     responses:
  *       201:
- *         description: Compensatory leave request created
- *       422:
- *         description: Leave type is not compensatory
+ *         description: Compensatory request created
  *   get:
  *     summary: List compensatory leave requests
  *     tags: [CompensatoryRequests]
@@ -1352,24 +875,22 @@ router.route('/block-lists/:id')
  *         name: status
  *         schema:
  *           type: string
- *           enum: [Draft, Approved, Rejected, Cancelled]
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *           default: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 20
  *     responses:
  *       200:
- *         description: Compensatory requests fetched successfully
+ *         description: Compensatory requests fetched
  */
-router.route('/compensatory-requests')
-  .post(authorize('CompensatoryLeaveRequest', action.CREATE), leaveController.createCompensatoryRequest)
-  .get(authorize('CompensatoryLeaveRequest', action.READ), leaveController.getCompensatoryRequests);
+router
+  .route("/compensatory-requests")
+  .post(authorize("CompensatoryLeaveRequest", action.CREATE), leaveController.createCompensatoryRequest)
+  .get(authorize("CompensatoryLeaveRequest", action.READ), leaveController.getCompensatoryRequests);
 
 /**
  * @swagger
@@ -1388,20 +909,15 @@ router.route('/compensatory-requests')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Compensatory request fetched successfully
- *       404:
- *         description: Compensatory request not found
+ *         description: Compensatory request fetched
  */
-router.get('/compensatory-requests/:id',
-  authorize('CompensatoryLeaveRequest', action.READ),
-  leaveController.getCompensatoryRequestById
-);
+router.get("/compensatory-requests/:id", authorize("CompensatoryLeaveRequest", action.READ), leaveController.getCompensatoryRequestById);
 
 /**
  * @swagger
  * /leaves/compensatory-requests/{id}/submit:
  *   post:
- *     summary: Submit compensatory request for approval
+ *     summary: Submit compensatory request
  *     tags: [CompensatoryRequests]
  *     security:
  *       - bearerAuth: []
@@ -1415,20 +931,14 @@ router.get('/compensatory-requests/:id',
  *     responses:
  *       200:
  *         description: Compensatory request submitted
- *       422:
- *         description: Only Draft requests can be submitted
  */
-router.post('/compensatory-requests/:id/submit',
-  authorize('CompensatoryLeaveRequest', action.SUBMIT),
-  leaveController.submitCompensatoryRequest
-);
+router.post("/compensatory-requests/:id/submit", authorize("CompensatoryLeaveRequest", action.SUBMIT), leaveController.submitCompensatoryRequest);
 
 /**
  * @swagger
  * /leaves/compensatory-requests/{id}/approve:
  *   post:
  *     summary: Approve compensatory request
- *     description: Creates a LeaveAllocation and credits the ledger
  *     tags: [CompensatoryRequests]
  *     security:
  *       - bearerAuth: []
@@ -1441,14 +951,9 @@ router.post('/compensatory-requests/:id/submit',
  *           format: uuid
  *     responses:
  *       200:
- *         description: Compensatory request approved — allocation created
- *       422:
- *         description: Cannot approve — invalid status
+ *         description: Compensatory request approved
  */
-router.post('/compensatory-requests/:id/approve',
-  authorize('CompensatoryLeaveRequest', action.SUBMIT),
-  leaveController.approveCompensatoryRequest
-);
+router.post("/compensatory-requests/:id/approve", authorize("CompensatoryLeaveRequest", action.SUBMIT), leaveController.approveCompensatoryRequest);
 
 /**
  * @swagger
@@ -1479,10 +984,7 @@ router.post('/compensatory-requests/:id/approve',
  *       200:
  *         description: Compensatory request rejected
  */
-router.post('/compensatory-requests/:id/reject',
-  authorize('CompensatoryLeaveRequest', action.SUBMIT),
-  leaveController.rejectCompensatoryRequest
-);
+router.post("/compensatory-requests/:id/reject", authorize("CompensatoryLeaveRequest", action.SUBMIT), leaveController.rejectCompensatoryRequest);
 
 /**
  * @swagger
@@ -1503,11 +1005,7 @@ router.post('/compensatory-requests/:id/reject',
  *       200:
  *         description: Compensatory request cancelled
  */
-router.post('/compensatory-requests/:id/cancel',
-  authorize('CompensatoryLeaveRequest', action.CANCEL),
-  leaveController.cancelCompensatoryRequest
-);
-
+router.post("/compensatory-requests/:id/cancel", authorize("CompensatoryLeaveRequest", action.CANCEL), leaveController.cancelCompensatoryRequest);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE APPLICATIONS
@@ -1543,7 +1041,6 @@ router.post('/compensatory-requests/:id/cancel',
  *                 format: date
  *               isHalfDay:
  *                 type: boolean
- *                 default: false
  *               halfDayDate:
  *                 type: string
  *                 format: date
@@ -1558,8 +1055,6 @@ router.post('/compensatory-requests/:id/cancel',
  *     responses:
  *       201:
  *         description: Leave application created
- *       422:
- *         description: Insufficient balance or invalid dates
  *   get:
  *     summary: List leave applications
  *     tags: [LeaveApplications]
@@ -1580,24 +1075,22 @@ router.post('/compensatory-requests/:id/cancel',
  *         name: status
  *         schema:
  *           type: string
- *           enum: [Draft, Open, Approved, Rejected, Cancelled]
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *           default: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 20
  *     responses:
  *       200:
- *         description: Leave applications fetched successfully
+ *         description: Leave applications fetched
  */
-router.route('/applications')
-  .post(authenticate, authorize('LeaveApplication', action.CREATE), leaveController.createLeaveApplication)
-  .get(authenticate, authorize('LeaveApplication', action.READ), leaveController.getLeaveApplications);
+router
+  .route("/applications")
+  .post(authorize("LeaveApplication", action.CREATE), leaveController.createLeaveApplication)
+  .get(authorize("LeaveApplication", action.READ), leaveController.getLeaveApplications);
 
 /**
  * @swagger
@@ -1616,14 +1109,9 @@ router.route('/applications')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave application fetched successfully
- *       404:
- *         description: Leave application not found
+ *         description: Leave application fetched
  */
-router.get('/applications/:id',
-  authorize('LeaveApplication', [ action.READ, action.READ_SELF ]),
-  leaveController.getLeaveApplicationById
-);
+router.get("/applications/:id", authorize("LeaveApplication", [action.READ, action.READ_SELF]), leaveController.getLeaveApplicationById);
 
 /**
  * @swagger
@@ -1643,20 +1131,14 @@ router.get('/applications/:id',
  *     responses:
  *       200:
  *         description: Leave application submitted
- *       422:
- *         description: Only Draft applications can be submitted
  */
-router.post('/applications/:id/submit',
-  authorize('LeaveApplication', action.SUBMIT),
-  leaveController.submitLeaveApplication
-);
+router.post("/applications/:id/submit", authorize("LeaveApplication", action.SUBMIT), leaveController.submitLeaveApplication);
 
 /**
  * @swagger
  * /leaves/applications/{id}/approve:
  *   post:
  *     summary: Approve leave application
- *     description: Debits the leave ledger and updates balance
  *     tags: [LeaveApplications]
  *     security:
  *       - bearerAuth: []
@@ -1669,15 +1151,9 @@ router.post('/applications/:id/submit',
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave application approved — Balance updated
- *       422:
- *         description: Only Open applications can be approved, or insufficient balance
+ *         description: Leave application approved
  */
-router.post('/applications/:id/approve',
-  authenticate,
-  authorize('LeaveApplication', action.WRITE),
-  leaveController.approveLeaveApplication
-);
+router.post("/applications/:id/approve", authorize("LeaveApplication", action.WRITE), leaveController.approveLeaveApplication);
 
 /**
  * @swagger
@@ -1707,20 +1183,14 @@ router.post('/applications/:id/approve',
  *     responses:
  *       200:
  *         description: Leave application rejected
- *       422:
- *         description: Only Open applications can be rejected
  */
-router.post('/applications/:id/reject',
-  authorize('LeaveApplication', action.WRITE),
-  leaveController.rejectLeaveApplication
-);
+router.post("/applications/:id/reject", authorize("LeaveApplication", action.WRITE), leaveController.rejectLeaveApplication);
 
 /**
  * @swagger
  * /leaves/applications/{id}/cancel:
  *   post:
  *     summary: Cancel leave application
- *     description: If already approved, reverses the debit from the ledger
  *     tags: [LeaveApplications]
  *     security:
  *       - bearerAuth: []
@@ -1735,21 +1205,17 @@ router.post('/applications/:id/reject',
  *       200:
  *         description: Leave application cancelled
  */
-router.post('/applications/:id/cancel',
-  authorize('LeaveApplication', action.CANCEL),
-  leaveController.cancelLeaveApplication
-);
-
+router.post("/applications/:id/cancel", authorize("LeaveApplication", action.CANCEL), leaveController.cancelLeaveApplication);
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  LEAVE LEDGER (read-only)
+//  LEAVE LEDGER
 // ═════════════════════════════════════════════════════════════════════════════
 
 /**
  * @swagger
  * /leaves/ledger/{employeeId}/{leaveTypeId}:
  *   get:
- *     summary: Get full leave ledger for an employee per leave type
+ *     summary: Get leave ledger for an employee
  *     tags: [LeaveLedger]
  *     security:
  *       - bearerAuth: []
@@ -1770,25 +1236,19 @@ router.post('/applications/:id/cancel',
  *         name: voucherType
  *         schema:
  *           type: string
- *           enum: [LeaveAllocation, LeaveApplication, LeaveEncashment, CompensatoryLeaveRequest]
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *           default: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 20
  *     responses:
  *       200:
- *         description: Leave ledger fetched successfully
+ *         description: Leave ledger fetched
  */
-router.get('/ledger/:employeeId/:leaveTypeId',
-  authorize('LeaveLedgerEntry', action.READ),
-  leaveController.getLeaveLedger
-);
+router.get("/ledger/:employeeId/:leaveTypeId", authorize("LeaveLedgerEntry", action.READ), leaveController.getLeaveLedger);
 
 /**
  * @swagger
@@ -1807,15 +1267,9 @@ router.get('/ledger/:employeeId/:leaveTypeId',
  *           format: uuid
  *     responses:
  *       200:
- *         description: Ledger entry fetched successfully
- *       404:
- *         description: Ledger entry not found
+ *         description: Ledger entry fetched
  */
-router.get('/ledger-entries/:id',
-  authorize('LeaveLedgerEntry', action.READ),
-  leaveController.getLeaveLedgerEntryById
-);
-
+router.get("/ledger-entries/:id", authorize("LeaveLedgerEntry", action.READ), leaveController.getLeaveLedgerEntryById);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE ENCASHMENTS
@@ -1825,7 +1279,7 @@ router.get('/ledger-entries/:id',
  * @swagger
  * /leaves/encashments:
  *   post:
- *     summary: Create a leave encashment request
+ *     summary: Create a leave encashment
  *     tags: [LeaveEncashments]
  *     security:
  *       - bearerAuth: []
@@ -1843,7 +1297,6 @@ router.get('/ledger-entries/:id',
  *               leaveTypeId:
  *                 type: string
  *                 format: uuid
- *                 description: Must be an encashable leave type
  *               leavePeriodId:
  *                 type: string
  *                 format: uuid
@@ -1857,8 +1310,6 @@ router.get('/ledger-entries/:id',
  *     responses:
  *       201:
  *         description: Leave encashment created
- *       422:
- *         description: Leave type not encashable or insufficient balance
  *   get:
  *     summary: List leave encashments
  *     tags: [LeaveEncashments]
@@ -1874,19 +1325,18 @@ router.get('/ledger-entries/:id',
  *         name: page
  *         schema:
  *           type: integer
- *           default: 1
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 20
  *     responses:
  *       200:
- *         description: Leave encashments fetched successfully
+ *         description: Leave encashments fetched
  */
-router.route('/encashments')
-  .post(authorize('LeaveEncashment', action.CREATE), leaveController.createLeaveEncashment)
-  .get(authorize('LeaveEncashment', action.READ), leaveController.getLeaveEncashments);
+router
+  .route("/encashments")
+  .post(authorize("LeaveEncashment", action.CREATE), leaveController.createLeaveEncashment)
+  .get(authorize("LeaveEncashment", action.READ), leaveController.getLeaveEncashments);
 
 /**
  * @swagger
@@ -1905,14 +1355,9 @@ router.route('/encashments')
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave encashment fetched successfully
- *       404:
- *         description: Leave encashment not found
+ *         description: Leave encashment fetched
  */
-router.get('/encashments/:id',
-  authorize('LeaveEncashment', action.READ),
-  leaveController.getLeaveEncashmentById
-);
+router.get("/encashments/:id", authorize("LeaveEncashment", action.READ), leaveController.getLeaveEncashmentById);
 
 /**
  * @swagger
@@ -1932,20 +1377,14 @@ router.get('/encashments/:id',
  *     responses:
  *       200:
  *         description: Leave encashment submitted
- *       422:
- *         description: Only Draft encashments can be submitted
  */
-router.post('/encashments/:id/submit',
-  authorize('LeaveEncashment', action.SUBMIT),
-  leaveController.submitLeaveEncashment
-);
+router.post("/encashments/:id/submit", authorize("LeaveEncashment", action.SUBMIT), leaveController.submitLeaveEncashment);
 
 /**
  * @swagger
  * /leaves/encashments/{id}/approve:
  *   post:
  *     summary: Approve encashment
- *     description: Debits the leave ledger
  *     tags: [LeaveEncashments]
  *     security:
  *       - bearerAuth: []
@@ -1958,21 +1397,15 @@ router.post('/encashments/:id/submit',
  *           format: uuid
  *     responses:
  *       200:
- *         description: Leave encashment approved — Balance updated
- *       422:
- *         description: Only submitted encashments can be approved
+ *         description: Leave encashment approved
  */
-router.post('/encashments/:id/approve',
-  authorize('LeaveEncashment', action.SUBMIT),
-  leaveController.approveLeaveEncashment
-);
+router.post("/encashments/:id/approve", authorize("LeaveEncashment", action.SUBMIT), leaveController.approveLeaveEncashment);
 
 /**
  * @swagger
  * /leaves/encashments/{id}/reject:
  *   post:
  *     summary: Reject encashment
- *     description: Returns encashment to Draft status
  *     tags: [LeaveEncashments]
  *     security:
  *       - bearerAuth: []
@@ -1986,13 +1419,8 @@ router.post('/encashments/:id/approve',
  *     responses:
  *       200:
  *         description: Leave encashment rejected
- *       422:
- *         description: Only submitted encashments can be rejected
  */
-router.post('/encashments/:id/reject',
-  authorize('LeaveEncashment', action.SUBMIT),
-  leaveController.rejectLeaveEncashment
-);
+router.post("/encashments/:id/reject", authorize("LeaveEncashment", action.SUBMIT), leaveController.rejectLeaveEncashment);
 
 /**
  * @swagger
@@ -2013,11 +1441,7 @@ router.post('/encashments/:id/reject',
  *       200:
  *         description: Leave encashment cancelled
  */
-router.post('/encashments/:id/cancel',
-  authorize('LeaveEncashment', action.CANCEL),
-  leaveController.cancelLeaveEncashment
-);
-
+router.post("/encashments/:id/cancel", authorize("LeaveEncashment", action.CANCEL), leaveController.cancelLeaveEncashment);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  COMPLIANCE & UTILITIES
@@ -2053,16 +1477,13 @@ router.post('/encashments/:id/cancel',
  *       200:
  *         description: Date check completed
  */
-router.get('/compliance/check-date',
-  authorize('LeaveApplication', action.READ),
-  leaveController.checkDate
-);
+router.get("/compliance/check-date", authorize("LeaveApplication", action.READ), leaveController.checkDate);
 
 /**
  * @swagger
  * /leaves/compliance/validate-balance:
  *   get:
- *     summary: Validate leave balance before application
+ *     summary: Validate leave balance
  *     tags: [LeaveCompliance]
  *     security:
  *       - bearerAuth: []
@@ -2088,17 +1509,13 @@ router.get('/compliance/check-date',
  *       200:
  *         description: Balance validation result
  */
-router.get('/compliance/validate-balance',
-  authorize('LeaveApplication', action.READ),
-  leaveController.validateLeaveBalance
-);
+router.get("/compliance/validate-balance", authorize("LeaveApplication", action.READ), leaveController.validateLeaveBalance);
 
 /**
  * @swagger
  * /leaves/compliance/calculate-days:
  *   get:
  *     summary: Calculate working days between two dates
- *     description: Excludes holidays and/or weekends based on parameters
  *     tags: [LeaveCompliance]
  *     security:
  *       - bearerAuth: []
@@ -2119,12 +1536,10 @@ router.get('/compliance/validate-balance',
  *         name: includeHolidays
  *         schema:
  *           type: boolean
- *           default: false
  *       - in: query
  *         name: includeWeekends
  *         schema:
  *           type: boolean
- *           default: false
  *       - in: query
  *         name: holidayListId
  *         schema:
@@ -2134,29 +1549,21 @@ router.get('/compliance/validate-balance',
  *       200:
  *         description: Working days calculated
  */
-router.get('/compliance/calculate-days',
-  authorize('LeaveApplication', action.READ),
-  leaveController.calculateWorkingDays
-);
+router.get("/compliance/calculate-days", authorize("LeaveApplication", action.READ), leaveController.calculateWorkingDays);
 
 /**
  * @swagger
  * /leaves/compliance/expire-overdue:
  *   post:
  *     summary: Bulk expire overdue ledger entries
- *     description: Marks all ledger entries past their toDate as expired — intended for cron jobs
  *     tags: [LeaveCompliance]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Overdue ledger entries marked as expired
+ *         description: Overdue ledger entries expired
  */
-router.post('/compliance/expire-overdue',
-  authorize('LeaveLedgerEntry', action.SUBMIT),
-  leaveController.expireOverdueLedgerEntries
-);
-
+router.post("/compliance/expire-overdue", authorize("LeaveLedgerEntry", action.SUBMIT), leaveController.expireOverdueLedgerEntries);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS

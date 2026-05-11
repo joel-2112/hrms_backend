@@ -31,13 +31,11 @@ module.exports = (sequelize, DataTypes) => {
           isIn: {
             args: [
               [
-                "LeaveAllocation",
                 "LeaveApplication",
                 "LeaveEncashment",
                 "CompensatoryLeaveRequest",
               ],
             ],
-            msg: "Voucher type must be one of: LeaveApplication, LeaveAllocation, LeaveEncashment, CompOffAllocation, CompOffApplication",
           },
         },
         comment: "Which DocType created this ledger entry",

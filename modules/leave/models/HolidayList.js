@@ -31,10 +31,6 @@ module.exports = (sequelize, DataTypes) => {
       type:      DataTypes.DATEONLY,
       allowNull: false,
     },
-
-    // ── Holiday entries (stored as JSONB array) ─────────────────
-    // Each entry: { date: 'YYYY-MM-DD', description: 'New Year' }
-    // Avoids a separate HolidayEntry table for a simple list.
     holidays: {
       type:         DataTypes.JSONB,
       allowNull:    false,
