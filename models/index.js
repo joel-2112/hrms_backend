@@ -75,10 +75,12 @@ const DocumentVersion = require('../modules/document/models/DocumentVersion')(se
 // ── 2.4  employee/  ───────────────────────────────────────────────────────────
 
 const Employee                 = require('../modules/employee/models/Employee')(sequelize, DataTypes);
+const Language                 = require('../modules/employee/models/Language')(sequelize, DataTypes);
 const EmployeePromotion        = require('../modules/employee/models/EmployeePromotion')(sequelize, DataTypes);
 const EmployeeSeparation       = require('../modules/employee/models/EmployeeSeparation')(sequelize, DataTypes);
 const EmployeeSkillMap         = require('../modules/employee/models/EmployeeSkillMap')(sequelize, DataTypes);
 const EmployeeEducation        = require('../modules/employee/models/EmployeeEducation')(sequelize, DataTypes);
+const EducationLevel            = require('../modules/employee/models/EducationLevel')(sequelize, DataTypes);
 const EmployeeExternalWork     = require('../modules/employee/models/EmployeeExternalWork')(sequelize, DataTypes);
 const EmployeeEmergencyContact = require('../modules/employee/models/EmployeeEmergencyContact')(sequelize, DataTypes);
 // ── 2.6  leave/  ──────────────────────────────────────────────────────────────
@@ -261,6 +263,9 @@ Employee.hasMany(DocumentVersion,   { foreignKey: 'uploadedById', as: 'documentV
 Employee.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasOne(Employee,    { foreignKey: 'userId', as: 'employee' });
 
+Employee.hasMany(Language, { foreignKey: 'employeeId', as: 'languages' });
+Language.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employees' });
+
 // ── Employee → organization masters ──────────────────────────────────────────
 Employee.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false, as: 'company' });
 Employee.belongsTo(Branch,         { foreignKey: 'branchId',                           as: 'branch' });
@@ -302,6 +307,9 @@ Employee.hasMany(EmployeeSkillMap,   { foreignKey: 'employeeId',                
 // ── EmployeeEducation → Employee ──────────────────────────────────────────────
 EmployeeEducation.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
 Employee.hasMany(EmployeeEducation,   { foreignKey: 'employeeId',                   as: 'educationHistory' });
+EducationLevel.belongsTo(EmployeeEducation, { foreignKey: 'employeeEducationId', allowNull: false, as: 'employeeEducations' });
+EmployeeEducation.hasMany(EducationLevel, { foreignKey: 'employeeEducationId', allowNull: false, as: 'educationLevels' });
+
 
 // ── EmployeeExternalWork → Employee ──────────────────────────────────────────
 EmployeeExternalWork.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
