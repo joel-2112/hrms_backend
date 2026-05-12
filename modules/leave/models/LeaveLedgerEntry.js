@@ -34,6 +34,8 @@ module.exports = (sequelize, DataTypes) => {
                 "LeaveApplication",
                 "LeaveEncashment",
                 "CompensatoryLeaveRequest",
+                "LeaveAllocation",
+                "Expiration"
               ],
             ],
           },

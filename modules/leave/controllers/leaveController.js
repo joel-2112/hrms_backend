@@ -263,7 +263,15 @@ const cancelLeaveApplication = catchAsync(async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE LEDGER
 // ═════════════════════════════════════════════════════════════════════════════
+const getAllLedgerEntries = catchAsync(async (req, res) => {
+  const { data, meta } = await leaveService.getAllLedgerEntries(req.query);
 
+  ok(res, {
+    message: 'Ledger entries fetched successfully',
+    data,
+    meta,
+  });
+});
 const getLeaveLedger = catchAsync(async (req, res) => {
   const { employeeId, leaveTypeId } = req.params;
   const result = await leaveService.getLeaveLedger(employeeId, leaveTypeId, req.query);
@@ -622,6 +630,7 @@ module.exports = {
   cancelLeaveApplication,
 
   // Leave Ledger
+  getAllLedgerEntries,
   getLeaveLedger,
   getLeaveLedgerEntryById,
 

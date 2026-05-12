@@ -1339,7 +1339,42 @@ router.post(
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE LEDGER
 // ═════════════════════════════════════════════════════════════════════════════
-
+/**
+ * @swagger
+ * /leaves/ledgers:
+ *   get:
+ *     summary: Get all ledger entries
+ *     tags: [LeaveLedger]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: employeeId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: leaveTypeId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: voucherType
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Ledger entries fetched successfully
+ */
+router.get("/ledgers", authorize("LeaveLedgerEntry", action.READ), leaveController.getAllLedgerEntries);
 /**
  * @swagger
  * /leaves/ledger/{employeeId}/{leaveTypeId}:

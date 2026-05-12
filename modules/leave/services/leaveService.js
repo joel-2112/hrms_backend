@@ -119,7 +119,6 @@ const createLeaveType = async (data) => {
 
   const leaveType = await LeaveType.create({
     name: data.name,
-    description: data.description || null,
     eligibilityMonths: data.eligibilityMonths ?? null,
     baseAllocation: data.baseAllocation ?? 0,
     annualIncrementDays: data.annualIncrementDays ?? 0,
@@ -840,7 +839,33 @@ const cancelLeaveApplication = async (id) => {
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE LEDGER
 // ═════════════════════════════════════════════════════════════════════════════
+const getAllLedgerEntries = async (query = {}) => {
+  const { employeeId, leaveTypeId, voucherType } = query;
+  const { limit, offset, page } = getPaginationOptions(query);
 
+  const where = {};
+  if (employeeId) where.employeeId = employeeId;
+  if (leaveTypeId) where.leaveTypeId = leaveTypeId;
+  if (voucherType) where.voucherType = voucherType;
+
+  const { count, rows } = await LeaveLedgerEntry.findAndCountAll({
+    where, limit, offset,
+    order: [["createdAt", "DESC"]],
+    include: [
+      {
+        model: Employee,
+        as: "employee",
+        attributes: ["id", "firstName", "middleName" ,"lastName", "employeeNumber"],
+      },
+      {
+        model: LeaveType,
+        as: "leaveType",
+      },
+    ],
+  });
+
+  return { data: rows, meta: buildMeta(count, page, limit) };
+};
 const getLeaveLedger = async (employeeId, leaveTypeId, query = {}) => {
   const { limit, offset, page } = getPaginationOptions(query);
   const where = { employeeId, leaveTypeId };
@@ -1446,6 +1471,7 @@ module.exports = {
   cancelLeaveApplication,
 
   // Leave Ledger
+  getAllLedgerEntries,
   getLeaveLedger,
   getLeaveLedgerEntryById,
   getMyLedger,
