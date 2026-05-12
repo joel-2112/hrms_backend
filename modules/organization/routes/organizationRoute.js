@@ -7,7 +7,6 @@ const { authorize, action } = require('../../../middlewares/rbacMiddleware');
 
 const router = express.Router();
 
-// All organization routes require a valid JWT
 router.use(authenticate);
 
 /**
@@ -151,6 +150,9 @@ router
  *                 type: string
  *               code:
  *                 type: string
+ *               dateOfIncorporation:
+ *                 type: string
+ *                 format: date
  *               parentCompanyId:
  *                 type: string
  *                 format: uuid
@@ -234,6 +236,9 @@ router
  *                 type: string
  *               code:
  *                 type: string
+ *               dateOfIncorporation:
+ *                 type: string
+ *                 format: date
  *     responses:
  *       201:
  *         description: Branch created successfully
@@ -285,8 +290,16 @@ router
  *               companyId:
  *                 type: string
  *                 format: uuid
- *               disabled:
- *                 type: boolean
+ *               country:
+ *                 type: string
+ *               region:
+ *                 type: string
+ *               zone:
+ *                 type: string
+ *               city:
+ *                 type: string
+ *               code:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Branch updated successfully
@@ -435,8 +448,6 @@ router
  *               parentDepartmentId:
  *                 type: string
  *                 format: uuid
- *               disabled:
- *                 type: boolean
  *     responses:
  *       200:
  *         description: Department updated successfully
@@ -549,8 +560,6 @@ router
  *             properties:
  *               name:
  *                 type: string
- *               disabled:
- *                 type: boolean
  *     responses:
  *       200:
  *         description: Designation updated successfully
@@ -590,7 +599,7 @@ router
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: includeDisabled
+ *         name: includeInactive
  *         schema:
  *           type: boolean
  *     responses:
@@ -659,7 +668,7 @@ router
  *             properties:
  *               name:
  *                 type: string
- *               disabled:
+ *               isActive:
  *                 type: boolean
  *     responses:
  *       200:
@@ -781,8 +790,6 @@ router
  *                 type: number
  *               sortOrder:
  *                 type: integer
- *               disabled:
- *                 type: boolean
  *     responses:
  *       200:
  *         description: Employee grade updated successfully

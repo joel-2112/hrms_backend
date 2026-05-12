@@ -93,8 +93,6 @@ router.patch(
  *     description: Previous employment history (external work)
  *   - name: EmployeeEmergencyContacts
  *     description: Emergency contact management per employee
- *   - name: EmployeeLanguages
- *     description: Languages spoken by each employee
  *   - name: EmployeeSeparation
  *     description: Separation / exit management workflow
  *   - name: EmployeePromotions
