@@ -20,7 +20,68 @@ const { uploadAvatar } = require("../../../middlewares/uploadMiddleware");
 //  All routes require authentication
 // ─────────────────────────────────────────────────────────────────────────────
 router.use(authenticate);
+/**
+ * @swagger
+ * /employees/pending-work-email:
+ *   get:
+ *     summary: Get employees pending work email assignment
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Pending work email employees retrieved
+ */
+router.get(
+  '/pending-work-email',
+  authorize('Employee', action.READ),
+  employeeController.getPendingWorkEmail,
+);
 
+/**
+ * @swagger
+ * /employees/{id}/assign-work-email:
+ *   patch:
+ *     summary: IT assigns work email to an employee
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [workEmail]
+ *             properties:
+ *               workEmail:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Work email assigned successfully
+ */
+router.patch(
+  '/:id/assign-work-email',
+  authorize('Employee', action.WRITE),
+  employeeController.assignWorkEmail,
+);
 /**
  * @swagger
  * tags:

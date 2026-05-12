@@ -38,6 +38,7 @@ const {
 const logger = require("../../../utils/logger");
 const emailService = require("../../../utils/emailService");
 const roleService = require("../../role/services/roleService");
+const leaveService = require("../../leave/services/leaveService");
 
 const SALT_ROUNDS = 10;
 
@@ -433,10 +434,22 @@ const approveEmployee = async (employeeId, approverUserId) => {
         { transaction: t },
       );
     }
+
     await employee.update(
       { userId: user.id, status: "Active" },
       { transaction: t },
     );
+
+    // ═══════════════════════════════════════════════════════════════
+    //  AUTO-ALLOCATE LEAVE TYPES FOR THE NEW EMPLOYEE
+    // ═══════════════════════════════════════════════════════════════
+    const updatedEmployee = await Employee.findByPk(employeeId, {
+      attributes: ["id", "companyId", "dateOfJoining", "gender"],
+      transaction: t,
+    });
+    await leaveService.autoAllocateForEmployee(employeeId, updatedEmployee, t);
+    logger.info("Leave types auto-allocated for new employee", { employeeId });
+
     return { employee, user };
   });
 
@@ -464,6 +477,89 @@ const approveEmployee = async (employeeId, approverUserId) => {
   roleService.invalidateUserCache(result.user.id);
 
   return { employee: result.employee, temporaryPassword };
+};
+
+/**
+ * IT assigns work email to an employee who needs it.
+ */
+const assignWorkEmail = async (employeeId, workEmail) => {
+  if (!workEmail) throw new AppError("Work email is required", 422);
+
+  const employee = await Employee.findByPk(employeeId);
+  if (!employee) throw new AppError("Employee not found", 404);
+  if (!employee.needWorkEmail) {
+    throw new AppError(
+      "This employee does not require work email assignment",
+      422,
+    );
+  }
+  if (employee.email) {
+    throw new AppError("Work email already assigned", 409);
+  }
+
+  // Check email not used by another employee or user
+  const existingEmployee = await Employee.findOne({
+    where: { email: workEmail.toLowerCase().trim() },
+  });
+  if (existingEmployee)
+    throw new AppError(
+      "This email is already assigned to another employee",
+      409,
+    );
+
+  const existingUser = await User.findOne({
+    where: { email: workEmail.toLowerCase().trim() },
+  });
+  if (existingUser) throw new AppError("This email is already in use", 409);
+
+  await employee.update({
+    email: workEmail.toLowerCase().trim(),
+    needWorkEmail: false,
+  });
+
+  // Update the linked User account email too
+  if (employee.userId) {
+    await User.update(
+      { email: workEmail.toLowerCase().trim() },
+      { where: { id: employee.userId } },
+    );
+  }
+
+  // Send welcome email with temporary password
+  const user = await User.findByPk(employee.userId);
+  if (user) {
+    const tempPassword = generateTemporaryPassword();
+    const newHash = await bcrypt.hash(tempPassword, 10);
+    await user.update({ passwordHash: newHash });
+
+    emailService.sendWorkEmailReady(employee, tempPassword).then((res) => {
+      if (res.success)
+        logger.info("Work email ready notification sent", { employeeId });
+    });
+  }
+
+  logger.info("Work email assigned", { employeeId, workEmail });
+  return employee;
+};
+
+/**
+ * Get employees pending work email assignment.
+ */
+const getPendingWorkEmailEmployees = async (query = {}) => {
+  const { limit, offset, page } = getPaginationOptions(query);
+  const { count, rows } = await Employee.findAndCountAll({
+    where: { needWorkEmail: true, status: "Active" },
+    limit,
+    offset,
+    order: [["createdAt", "DESC"]],
+    include: [
+      { model: Company, as: "company", attributes: ["id", "name"] },
+      { model: Department, as: "department", attributes: ["id", "name"] },
+      { model: Branch, as: "branch", attributes: ["id", "name"] },
+    ],
+    attributes: { exclude: ["bankAccountNumber", "nationalIdNumber"] },
+  });
+  return { data: rows, meta: buildMeta(count, page, limit) };
 };
 
 const getEmployees = async (query = {}, permFilter = {}) => {
@@ -1728,6 +1824,8 @@ module.exports = {
   activateUser,
   getEmployeeByUserId,
   updateAvatar,
+  getPendingWorkEmailEmployees,
+  assignWorkEmail,
 
   getEducation,
   addEducation,

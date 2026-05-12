@@ -10,7 +10,41 @@ const { authenticate, requireSuperUser } = require('../../../middlewares/authMid
  *   name: Auth
  *   description: Authentication — register, login, session management, and password
  */
-
+/**
+ * @swagger
+ * /auth/create-username:
+ *   post:
+ *     summary: Create username for login (when no work email assigned)
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 minLength: 4
+ *                 maxLength: 30
+ *                 pattern: '^[a-zA-Z0-9._-]+$'
+ *                 example: "kedir.abebe"
+ *     responses:
+ *       200:
+ *         description: Username created successfully
+ *       409:
+ *         description: Username already taken
+ *       422:
+ *         description: Invalid username or work email required
+ */
+router.post(
+  '/create-username',
+  authenticate,
+  authController.createUsername,
+);
 /**
  * @swagger
  * /auth/register:
@@ -305,7 +339,7 @@ router.delete('/me/sessions/:sessionId', authenticate, authController.terminateM
  *         description: New password does not meet requirements
  */
 router.patch('/change-password', authenticate, authController.changePassword);
-
+ 
 // ═══════════════════════════════════════════════════════════════
 //  ADMIN ROUTES (require SuperUser)
 // ═══════════════════════════════════════════════════════════════

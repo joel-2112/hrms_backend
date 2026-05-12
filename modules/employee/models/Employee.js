@@ -184,13 +184,20 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: true,
         validate: { isEmail: true },
-        comment: "personal email — typically mirrors User.email",
+        comment: "working email — typically mirrors User.email",
       },
       personalEmail: {
         type: DataTypes.STRING(255),
         allowNull: true,
         validate: { isEmail: true },
         comment: "alternative personal email for emergency contact",
+      },
+      needWorkEmail: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment:
+          "Set by approver — if true, employee needs work email assigned by IT before login",
       },
 
       phoneNumber: {

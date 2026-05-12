@@ -51,6 +51,18 @@ const approveEmployee = catchAsync(async (req, res) => {
   });
 });
 
+const assignWorkEmail = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const { workEmail } = req.body;
+  const employee = await employeeService.assignWorkEmail(id, workEmail);
+  ok(res, { message: 'Work email assigned successfully. Credentials sent to employee.', data: employee });
+});
+
+const getPendingWorkEmail = catchAsync(async (req, res) => {
+  const { data, meta } = await employeeService.getPendingWorkEmailEmployees(req.query);
+  ok(res, { message: 'Pending work email employees retrieved', data, meta });
+});
+
 const getEmployees = catchAsync(async (req, res) => {
   const permFilter = req.perms?.dataFilter || {};
   const { data, meta } = await employeeService.getEmployees(
@@ -408,6 +420,8 @@ module.exports = {
   deactivateUser,
   activateUser,
   updateAvatar,
+  assignWorkEmail,
+  getPendingWorkEmail,
 
   getEducation,
   addEducation,

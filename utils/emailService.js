@@ -4,7 +4,7 @@
  * utils/emailService.js
  *
  * Nodemailer-based email service for sending transactional emails.
- * Supports employee credentials, leave notifications, and general communications.
+ * All employee emails are delivered to personalEmail.
  */
 
 const nodemailer = require('nodemailer');
@@ -23,7 +23,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Verify connection on startup
 transporter.verify()
   .then(() => logger.info('Email service connected successfully'))
   .catch((err) => logger.warn('Email service connection failed — emails will not be sent', { error: err.message }));
@@ -32,9 +31,6 @@ transporter.verify()
 //  EMAIL TEMPLATES
 // ─────────────────────────────────────────────
 
-/**
- * Build HTML email wrapper with company branding
- */
 const wrapTemplate = (title, content) => `
 <!DOCTYPE html>
 <html>
@@ -81,20 +77,15 @@ const wrapTemplate = (title, content) => `
 //  SEND FUNCTIONS
 // ─────────────────────────────────────────────
 
-/**
- * Send a generic email
- */
 const sendEmail = async ({ to, subject, title, content }) => {
   try {
     const html = wrapTemplate(title, content);
-
     const info = await transporter.sendMail({
       from: `"${process.env.SMTP_FROM}" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
     });
-
     logger.info('Email sent', { messageId: info.messageId, to, subject });
     return { success: true, messageId: info.messageId };
   } catch (err) {
@@ -104,14 +95,80 @@ const sendEmail = async ({ to, subject, title, content }) => {
 };
 
 /**
- * Send employee account credentials after approval
+ * Send credentials when needWorkEmail = false (no work email required)
  */
-const sendEmployeeCredentials = async (employee, temporaryPassword, loginUrl = null) => {
-  const loginLink = loginUrl || process.env.ERP_LOGIN_URL || 'https://erp.teamworksc.com/login';
+const sendEmployeeCredentials = async (employee, temporaryPassword) => {
+  const loginLink = process.env.ERP_LOGIN_URL || 'https://erp.teamworksc.com/login';
 
   const content = `
-    <p>Dear <strong>${employee.firstName} ${employee.middleName} ${employee.lastName}</strong>,</p>
-    <p>Your employee account has been approved and created in the Teamwork ERP system. You can now log in using the credentials below.</p>
+    <p>Dear <strong>${employee.firstName} ${employee.middleName || ''} ${employee.lastName}</strong>,</p>
+    <p>Your employee account has been approved and created in Teamwork ERP.</p>
+    <p>You can log in using your email and the temporary password below. You'll be prompted to create a <strong>username</strong> on your first login.</p>
+    
+    <div class="credentials">
+      <div style="margin-bottom: 12px;">
+        <div class="label">Employee Number</div>
+        <div class="value">${employee.employeeNumber || 'N/A'}</div>
+      </div>
+      <div>
+        <div class="label">Temporary Password</div>
+        <div class="value">${temporaryPassword}</div>
+      </div>
+    </div>
+
+    <p style="color: #d97706; font-weight: 600;">⚠️ You will create your username and change your password on first login.</p>
+    <p>Keep your credentials secure and do not share them with anyone.</p>
+    
+    <div style="text-align: center;">
+      <a href="${loginLink}" class="button">Log in to Teamwork ERP</a>
+    </div>
+  `;
+
+  return sendEmail({
+    to: employee.personalEmail,
+    subject: 'Welcome to Teamwork ERP — Your Account Credentials',
+    title: 'Account Created Successfully',
+    content,
+  });
+};
+
+/**
+ * Send notification when needWorkEmail = true (work email pending)
+ */
+const sendWorkEmailPending = async (employee) => {
+  const content = `
+    <p>Dear <strong>${employee.firstName} ${employee.middleName || ''} ${employee.lastName}</strong>,</p>
+    <p>Your employee account has been <strong style="color: #059669;">approved</strong>!</p>
+    <p>Your IT team is setting up your work email. Once assigned, you'll receive another email with your login credentials.</p>
+    
+    <div class="credentials">
+      <div>
+        <div class="label">Employee Number</div>
+        <div class="value">${employee.employeeNumber || 'N/A'}</div>
+      </div>
+    </div>
+
+    <p style="margin-top: 16px;">For now, please wait for your work email to be configured. <strong>No action is needed from you.</strong></p>
+    <p style="color: #6b7280; font-size: 13px;">If you have any questions, please contact HR.</p>
+  `;
+
+  return sendEmail({
+    to: employee.personalEmail,
+    subject: 'Welcome to Teamwork ERP — Work Email Pending',
+    title: 'Account Approved — Work Email Pending',
+    content,
+  });
+};
+
+/**
+ * Send credentials when IT assigns work email
+ */
+const sendWorkEmailReady = async (employee, temporaryPassword) => {
+  const loginLink = process.env.ERP_LOGIN_URL || 'https://erp.teamworksc.com/login';
+
+  const content = `
+    <p>Dear <strong>${employee.firstName} ${employee.middleName || ''} ${employee.lastName}</strong>,</p>
+    <p>Your work email has been configured. You can now log in to Teamwork ERP.</p>
     
     <div class="credentials">
       <div style="margin-bottom: 12px;">
@@ -119,7 +176,7 @@ const sendEmployeeCredentials = async (employee, temporaryPassword, loginUrl = n
         <div class="value">${employee.employeeNumber || 'N/A'}</div>
       </div>
       <div style="margin-bottom: 12px;">
-        <div class="label">Email / Username</div>
+        <div class="label">Work Email</div>
         <div class="value">${employee.email}</div>
       </div>
       <div>
@@ -128,9 +185,7 @@ const sendEmployeeCredentials = async (employee, temporaryPassword, loginUrl = n
       </div>
     </div>
 
-    <p style="color: #d97706; font-weight: 600;">⚠️ Important: You will be required to change your password upon first login.</p>
-    
-    <p>Please keep your credentials secure and do not share them with anyone.</p>
+    <p style="color: #d97706; font-weight: 600;">⚠️ You will be required to change your password upon first login.</p>
     
     <div style="text-align: center;">
       <a href="${loginLink}" class="button">Log in to Teamwork ERP</a>
@@ -138,9 +193,9 @@ const sendEmployeeCredentials = async (employee, temporaryPassword, loginUrl = n
   `;
 
   return sendEmail({
-    to: employee.email,
-    subject: 'Welcome to Teamwork ERP — Your Account Credentials',
-    title: 'Account Created Successfully',
+    to: employee.personalEmail,
+    subject: 'Welcome to Teamwork ERP — Your Login Credentials',
+    title: 'Work Email Ready — Login Credentials',
     content,
   });
 };
@@ -154,7 +209,6 @@ const sendLeaveStatusNotification = async (employee, application, status) => {
     Rejected: { color: '#dc2626', emoji: '❌', action: 'rejected' },
     Submitted: { color: '#d97706', emoji: '📋', action: 'submitted for approval' },
   };
-
   const config = statusConfig[status] || statusConfig.Submitted;
 
   const formatDate = (d) => new Date(d).toLocaleDateString('en-US', {
@@ -166,32 +220,19 @@ const sendLeaveStatusNotification = async (employee, application, status) => {
     <p>Your leave application has been <strong style="color: ${config.color};">${config.action}</strong>.</p>
     
     <div class="credentials">
-      <div style="margin-bottom: 8px;">
-        <div class="label">Leave Type</div>
-        <div class="value">${application.leaveType?.name || 'N/A'}</div>
-      </div>
-      <div style="margin-bottom: 8px;">
-        <div class="label">From</div>
-        <div class="value">${formatDate(application.fromDate)}</div>
-      </div>
-      <div style="margin-bottom: 8px;">
-        <div class="label">To</div>
-        <div class="value">${formatDate(application.toDate)}</div>
-      </div>
-      <div>
-        <div class="label">Working Days</div>
-        <div class="value">${application.totalLeaveDays} days</div>
-      </div>
+      <div style="margin-bottom: 8px;"><div class="label">Leave Type</div><div class="value">${application.leaveType?.name || 'N/A'}</div></div>
+      <div style="margin-bottom: 8px;"><div class="label">From</div><div class="value">${formatDate(application.fromDate)}</div></div>
+      <div style="margin-bottom: 8px;"><div class="label">To</div><div class="value">${formatDate(application.toDate)}</div></div>
+      <div><div class="label">Working Days</div><div class="value">${application.totalLeaveDays} days</div></div>
     </div>
 
     ${application.rejectionReason ? `<p style="color: #dc2626;"><strong>Rejection Reason:</strong> ${application.rejectionReason}</p>` : ''}
-    
     <p>You can view the full details in your leave dashboard.</p>
   `;
 
   return sendEmail({
-    to: employee.email,
-    subject: `${config.emoji} Leave Application ${config.action.charAt(0).toUpperCase() + config.action.slice(1)} — ${application.leaveType?.name || 'Leave'}`,
+    to: employee.personalEmail || employee.email,
+    subject: `${config.emoji} Leave Application ${config.action.charAt(0).toUpperCase() + config.action.slice(1)}`,
     title: `Leave Application ${status}`,
     content,
   });
@@ -204,16 +245,10 @@ const sendPasswordReset = async (user, resetToken, resetUrl = null) => {
   const resetLink = resetUrl || `${process.env.ERP_BASE_URL || 'https://erp.teamworksc.com'}/reset-password?token=${resetToken}`;
 
   const content = `
-    <p>Dear <strong>${user.firstName} ${user.middleName} ${user.lastName}</strong>,</p>
+    <p>Dear <strong>${user.firstName} ${user.middleName || ''} ${user.lastName}</strong>,</p>
     <p>We received a request to reset your password. Click the button below to set a new password.</p>
-    
-    <div style="text-align: center;">
-      <a href="${resetLink}" class="button">Reset Password</a>
-    </div>
-    
-    <p style="margin-top: 16px; font-size: 12px; color: #9ca3af;">
-      This link will expire in 1 hour. If you did not request a password reset, please ignore this email.
-    </p>
+    <div style="text-align: center;"><a href="${resetLink}" class="button">Reset Password</a></div>
+    <p style="margin-top: 16px; font-size: 12px; color: #9ca3af;">This link will expire in 1 hour. If you did not request a password reset, please ignore this email.</p>
   `;
 
   return sendEmail({
@@ -233,30 +268,17 @@ const sendLeaveApprovalRequest = async (approver, applicant, application) => {
   });
 
   const content = `
-    <p>Dear <strong>${approver.firstName} ${approver.middleName} ${approver.lastName}</strong>,</p>
+    <p>Dear <strong>${approver.firstName} ${approver.middleName || ''} ${approver.lastName}</strong>,</p>
     <p>A leave application requires your approval.</p>
     
     <div class="credentials">
-      <div style="margin-bottom: 8px;">
-        <div class="label">Applicant</div>
-        <div class="value">${applicant.firstName} ${applicant.middleName} ${applicant.lastName} (${applicant.employeeNumber || 'N/A'})</div>
-      </div>
-      <div style="margin-bottom: 8px;">
-        <div class="label">Leave Type</div>
-        <div class="value">${application.leaveType?.name || 'N/A'}</div>
-      </div>
-      <div style="margin-bottom: 8px;">
-        <div class="label">Dates</div>
-        <div class="value">${formatDate(application.fromDate)} — ${formatDate(application.toDate)}</div>
-      </div>
-      <div>
-        <div class="label">Working Days</div>
-        <div class="value">${application.totalLeaveDays} days</div>
-      </div>
+      <div style="margin-bottom: 8px;"><div class="label">Applicant</div><div class="value">${applicant.firstName} ${applicant.middleName || ''} ${applicant.lastName} (${applicant.employeeNumber || 'N/A'})</div></div>
+      <div style="margin-bottom: 8px;"><div class="label">Leave Type</div><div class="value">${application.leaveType?.name || 'N/A'}</div></div>
+      <div style="margin-bottom: 8px;"><div class="label">Dates</div><div class="value">${formatDate(application.fromDate)} — ${formatDate(application.toDate)}</div></div>
+      <div><div class="label">Working Days</div><div class="value">${application.totalLeaveDays} days</div></div>
     </div>
 
     ${application.reason ? `<p><strong>Reason:</strong> ${application.reason}</p>` : ''}
-    
     <p>Please review and approve or reject this application from the Leave Applications page.</p>
   `;
 
@@ -274,6 +296,8 @@ const sendLeaveApprovalRequest = async (approver, applicant, application) => {
 module.exports = {
   sendEmail,
   sendEmployeeCredentials,
+  sendWorkEmailPending,
+  sendWorkEmailReady,
   sendLeaveStatusNotification,
   sendPasswordReset,
   sendLeaveApprovalRequest,
