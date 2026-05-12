@@ -415,7 +415,6 @@ const createHolidayList = async (data) => {
     companyId: data.companyId || null,
     fromDate: data.fromDate,
     toDate: data.toDate,
-    holidays: data.holidays || [],
     disabled: false,
   });
 
