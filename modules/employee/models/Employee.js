@@ -57,7 +57,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(255),
         allowNull: true,
         comment:
-          "Primary work location (e.g. 'Head Office', 'Remote', 'Branch', 'anywhere') for organizational and payroll purposes",
+          "Primary work location (e.g. 'Head Office', 'Branch', 'anywhere') for organizational and payroll purposes",
       },
 
       // ─────────────────────────────────────────────

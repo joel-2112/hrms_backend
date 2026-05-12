@@ -251,43 +251,21 @@ const deleteEmergencyContact = catchAsync(async (req, res) => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  SKILL MAP & LANGUAGES
+//   LANGUAGES
 // ═════════════════════════════════════════════════════════════════════════════
-
-const getSkillMap = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const map = await employeeService.getSkillMap(id);
-  ok(res, { message: "Skill map retrieved", data: map });
-});
-
-const upsertSkillMap = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const map = await employeeService.upsertSkillMap(id, req.body);
-  ok(res, { message: "Skill map saved", data: map });
-});
-
 const getLanguages = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const languages = await employeeService.getLanguages(id);
+  const languages = await employeeService.getLanguages();
   ok(res, { message: "Languages retrieved", data: languages });
 });
 
 const addLanguage = catchAsync(async (req, res) => {
-  const { id } = req.params;
-  const language = await employeeService.addLanguage(id, req.body);
+  const language = await employeeService.addLanguage(req.body);
   created(res, { message: "Language added", data: language });
-});
-
-const deleteLanguage = catchAsync(async (req, res) => {
-  const { id, languageId } = req.params;
-  await employeeService.deleteLanguage(id, languageId);
-  noContent(res);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  SEPARATION
-// ═════════════════════════════════════════════════════════════════════════════
-
+// ══════════╛
 const initiateSeparation = catchAsync(async (req, res) => {
   const { id } = req.params;
   const separation = await employeeService.initiateSeparation(id, req.body);
@@ -423,6 +401,9 @@ module.exports = {
   assignWorkEmail,
   getPendingWorkEmail,
 
+  addLanguage,
+  getLanguages,
+
   getEducation,
   addEducation,
   updateEducation,
@@ -439,12 +420,6 @@ module.exports = {
   addEmergencyContact,
   updateEmergencyContact,
   deleteEmergencyContact,
-
-  getSkillMap,
-  upsertSkillMap,
-  getLanguages,
-  addLanguage,
-  deleteLanguage,
 
   initiateSeparation,
   submitSeparation,

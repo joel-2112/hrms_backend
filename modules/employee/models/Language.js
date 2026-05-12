@@ -9,7 +9,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     employeeId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       comment: "FK → employees.id",
     },
     name: {

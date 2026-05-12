@@ -4,7 +4,7 @@
  * modules/employee/routes/employeeRoutes.js
  *
  * Employee lifecycle routes — core profile, education, external work,
- * emergency contacts, skill map, separation, and promotion history.
+ * emergency contacts, separation, and promotion history.
  *
  * All routes require authentication.
  * Mutating routes are guarded by RBAC middleware.
@@ -93,8 +93,8 @@ router.patch(
  *     description: Previous employment history (external work)
  *   - name: EmployeeEmergencyContacts
  *     description: Emergency contact management per employee
- *   - name: EmployeeSkillMap
- *     description: Skills, certifications, and training records
+ *   - name: EmployeeLanguages
+ *     description: Languages spoken by each employee
  *   - name: EmployeeSeparation
  *     description: Separation / exit management workflow
  *   - name: EmployeePromotions
@@ -574,34 +574,20 @@ router.put('/:id/avatar',
 
 /**
  * @swagger
- * /employees/{id}/languages:
+ * /employees/languages:
  *   get:
- *     summary: Get all languages for an employee
+ *     summary: Get all languages
  *     tags: [Employees]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
  *     responses:
  *       200:
  *         description: Languages retrieved
  *   post:
- *     summary: Add a language to an employee
+ *     summary: Create a new language
  *     tags: [Employees]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -612,45 +598,18 @@ router.put('/:id/avatar',
  *             properties:
  *               name:
  *                 type: string
+ *                 example: "Amharic"
  *     responses:
  *       201:
- *         description: Language added
+ *         description: Language created
+ *       409:
+ *         description: Language already exists
  */
 router
-  .route("/:id/languages")
+  .route("/languages")
   .get(authorize("Employee", action.READ), employeeController.getLanguages)
   .post(authorize("Employee", action.WRITE), employeeController.addLanguage);
 
-/**
- * @swagger
- * /employees/{id}/languages/{languageId}:
- *   delete:
- *     summary: Delete a language from an employee
- *     tags: [Employees]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *       - in: path
- *         name: languageId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       204:
- *         description: Language deleted
- */
-router.delete(
-  "/:id/languages/:languageId",
-  authorize("Employee", action.DELETE),
-  employeeController.deleteLanguage,
-);
 // ═════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD & STATISTICS (static routes — must be before /:id)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -844,7 +803,7 @@ router.get(
  *     summary: Get full employee profile by ID
  *     description: >
  *       Returns the employee with **all** sub-records (education, external work,
- *       emergency contacts, skill map, separations, recent promotions).
+ *       emergency contacts, languages, separations, recent promotions).
  *       Non-HR callers receive a stripped version without confidential fields.
  *     tags: [Employees]
  *     security:
@@ -1622,76 +1581,6 @@ router
     authorize("Employee", action.DELETE),
     employeeController.deleteEmergencyContact,
   );
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  SKILL MAP
-// ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * @swagger
- * /employees/{id}/skill-map:
- *   get:
- *     summary: Get the skill map record
- *     description: >
- *       Returns the skill map or an empty structure if none exists yet.
- *     tags: [EmployeeSkillMap]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Skill map
- *   put:
- *     summary: Create or replace the entire skill map
- *     description: >
- *       Full upsert — sends the complete `{ skills, certifications, languages }` object.
- *     tags: [EmployeeSkillMap]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               skills:
- *                 type: array
- *                 items:
- *                   type: object
- *               certifications:
- *                 type: array
- *                 items:
- *                   type: object
- *               certificateUrls:
- *                 type: array
- *                 items:
- *                   type: object
- *               languages:
- *                 type: array
- *                 items:
- *                   type: object
- *     responses:
- *       200:
- *         description: Skill map saved
- */
-router
-  .route("/:id/skill-map")
-  .get(authorize("Employee", action.READ), employeeController.getSkillMap)
-  .put(authorize("Employee", action.WRITE), employeeController.upsertSkillMap);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  SEPARATION

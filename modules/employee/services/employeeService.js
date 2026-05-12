@@ -24,7 +24,6 @@ const {
   EducationLevel,
   EmployeeExternalWork,
   EmployeeEmergencyContact,
-  EmployeeSkillMap,
   EmployeeSeparation,
   EmployeePromotion,
   Language,
@@ -655,7 +654,6 @@ const getEmployeeById = async (id) => {
         as: "emergencyContacts",
         required: false,
       },
-      { model: EmployeeSkillMap, as: "skillMaps", required: false },
       { model: EmployeeSeparation, as: "separations", required: false },
       { model: Language, as: "languages", required: false },
       {
@@ -688,7 +686,6 @@ const getMyProfile = async (userId) => {
       },
       { model: EmployeeExternalWork, required: false },
       { model: EmployeeEmergencyContact, required: false },
-      { model: EmployeeSkillMap, required: false },
       { model: Language, as: "languages", required: false },
     ],
     attributes: { exclude: ["employeeDocuments"] },
@@ -962,8 +959,31 @@ const activateUser = async (employeeId) => {
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  EDUCATION
+//  LANGUAGES
 // ═════════════════════════════════════════════════════════════════════════════
+
+const getLanguages = async () => {
+  return Language.findAll({
+    attributes: ["id", "name"],
+    order: [["name", "ASC"]],
+  });
+};
+
+const addLanguage = async (data) => {
+  if (!data.name) throw new AppError("name is required", 422);
+
+  const exists = await Language.findOne({ where: { name: data.name } });
+  if (exists)
+    throw new AppError(`Language "${data.name}" already exists`, 409);
+
+  const language = await Language.create({ name: data.name });
+  logger.info("Language created", { id: language.id, name: language.name });
+  return language;
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  EDUCATION
+// ════════════════════════╛
 
 const getEducation = async (employeeId) => {
   await assertEmployeeExists(employeeId);
@@ -1151,65 +1171,6 @@ const deleteEmergencyContact = async (employeeId, recordId) => {
   if (!record) throw new AppError("Emergency contact not found", 404);
   await record.destroy();
   logger.info("Emergency contact deleted", { employeeId, recordId });
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  SKILL MAP & LANGUAGES
-// ═════════════════════════════════════════════════════════════════════════════
-
-const getSkillMap = async (employeeId) => {
-  await assertEmployeeExists(employeeId);
-  const map = await EmployeeSkillMap.findOne({ where: { employeeId } });
-  return (
-    map || {
-      employeeId,
-      skills: [],
-      certifications: [],
-      certificateUrls: [],
-      languages: [],
-    }
-  );
-};
-
-const upsertSkillMap = async (employeeId, data) => {
-  await assertEmployeeExists(employeeId);
-  const [map] = await EmployeeSkillMap.findOrCreate({
-    where: { employeeId },
-    defaults: {
-      employeeId,
-      skills: [],
-      certifications: [],
-      certificateUrls: [],
-      languages: [],
-    },
-  });
-  await map.update({
-    skills: data.skills ?? map.skills,
-    certifications: data.certifications ?? map.certifications,
-    certificateUrls: data.certificateUrls ?? map.certificateUrls,
-    languages: data.languages ?? map.languages,
-  });
-  logger.info("SkillMap saved", { employeeId });
-  return map;
-};
-
-const getLanguages = async (employeeId) => {
-  await assertEmployeeExists(employeeId);
-  return Language.findAll({ where: { employeeId } });
-};
-
-const addLanguage = async (employeeId, data) => {
-  await assertEmployeeExists(employeeId);
-  if (!data.name) throw new AppError("name is required", 422);
-  return Language.create({ employeeId, name: data.name });
-};
-
-const deleteLanguage = async (employeeId, languageId) => {
-  const lang = await Language.findOne({
-    where: { id: languageId, employeeId },
-  });
-  if (!lang) throw new AppError("Language not found", 404);
-  await lang.destroy();
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1827,6 +1788,9 @@ module.exports = {
   getPendingWorkEmailEmployees,
   assignWorkEmail,
 
+  addLanguage,
+  getLanguages,
+  
   getEducation,
   addEducation,
   updateEducation,
@@ -1843,12 +1807,6 @@ module.exports = {
   addEmergencyContact,
   updateEmergencyContact,
   deleteEmergencyContact,
-
-  getSkillMap,
-  upsertSkillMap,
-  getLanguages,
-  addLanguage,
-  deleteLanguage,
 
   initiateSeparation,
   submitSeparation,

@@ -78,7 +78,6 @@ const Employee                 = require('../modules/employee/models/Employee')(
 const Language                 = require('../modules/employee/models/Language')(sequelize, DataTypes);
 const EmployeePromotion        = require('../modules/employee/models/EmployeePromotion')(sequelize, DataTypes);
 const EmployeeSeparation       = require('../modules/employee/models/EmployeeSeparation')(sequelize, DataTypes);
-const EmployeeSkillMap         = require('../modules/employee/models/EmployeeSkillMap')(sequelize, DataTypes);
 const EmployeeEducation        = require('../modules/employee/models/EmployeeEducation')(sequelize, DataTypes);
 const EducationLevel            = require('../modules/employee/models/EducationLevel')(sequelize, DataTypes);
 const EmployeeExternalWork     = require('../modules/employee/models/EmployeeExternalWork')(sequelize, DataTypes);
@@ -299,10 +298,6 @@ EmployeeSeparation.belongsTo(Employee, { foreignKey: 'approvedById',            
 Employee.hasMany(EmployeeSeparation,   { foreignKey: 'employeeId',                    as: 'separations' });
 Employee.hasMany(EmployeeSeparation,   { foreignKey: 'approvedById',                  as: 'approvedSeparations' });
 
-// ── EmployeeSkillMap → Employee ───────────────────────────────────────────────
-//    hasMany — an employee may accumulate many skill records over time.
-EmployeeSkillMap.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
-Employee.hasMany(EmployeeSkillMap,   { foreignKey: 'employeeId',                   as: 'skillMaps' });
 
 // ── EmployeeEducation → Employee ──────────────────────────────────────────────
 EmployeeEducation.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
@@ -582,7 +577,6 @@ module.exports = {
   Employee,
   EmployeePromotion,
   EmployeeSeparation,
-  EmployeeSkillMap,
   EmployeeEducation,
   EducationLevel,
   EmployeeExternalWork,
