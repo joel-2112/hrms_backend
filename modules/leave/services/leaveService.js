@@ -117,23 +117,54 @@ const createLeaveType = async (data) => {
   const exists = await LeaveType.findOne({ where: { name: data.name } });
   if (exists) throw new AppError(`Leave type "${data.name}" already exists`, 409);
 
-  const leaveType = await LeaveType.create({
-    name: data.name,
-    eligibilityMonths: data.eligibilityMonths ?? null,
-    baseAllocation: data.baseAllocation ?? 0,
-    annualIncrementDays: data.annualIncrementDays ?? 0,
-    incrementCap: data.incrementCap ?? null,
-    allocationRules: data.allocationRules ?? null,
-    maxDaysPerYear: data.maxDaysPerYear ?? null,
-    maxCarryForwardYears: data.maxCarryForwardYears ?? null,
-    maxContinuousDaysAllowed: data.maxContinuousDaysAllowed ?? null,
-    isEncashable: data.isEncashable ?? false,
-    includeHolidays: data.includeHolidays ?? false,
-    includeWeekends: data.includeWeekends ?? false,
-    isActive: true,
+  const leaveType = await sequelize.transaction(async (t) => {
+    const leaveType = await LeaveType.create({
+      name: data.name,
+      eligibilityMonths: data.eligibilityMonths ?? null,
+      baseAllocation: data.baseAllocation ?? 0,
+      annualIncrementDays: data.annualIncrementDays ?? 0,
+      incrementCap: data.incrementCap ?? null,
+      allocationRules: data.allocationRules ?? null,
+      maxDaysPerYear: data.maxDaysPerYear ?? null,
+      maxCarryForwardYears: data.maxCarryForwardYears ?? null,
+      maxContinuousDaysAllowed: data.maxContinuousDaysAllowed ?? null,
+      isEncashable: data.isEncashable ?? false,
+      includeHolidays: data.includeHolidays ?? false,
+      includeWeekends: data.includeWeekends ?? false,
+      isActive: true,
+    }, { transaction: t });
+
+    // Auto-assign to all active employees
+    const employees = await Employee.findAll({
+      where: { status: "Active" },
+      attributes: ["id", "companyId", "dateOfJoining", "gender"],
+      transaction: t,
+    });
+
+    const activePeriod = await LeavePeriod.findOne({
+      where: { isActive: true },
+      transaction: t,
+    });
+
+    for (const employee of employees) {
+      const entitlement = getEntitlementForEmployee(leaveType, employee, activePeriod);
+      if (entitlement > 0) {
+        await createLedgerEntry({
+          employeeId: employee.id,
+          leaveTypeId: leaveType.id,
+          voucherType: "LeaveAllocation",
+          voucherNo: leaveType.id,
+          leaves: entitlement,
+          fromDate: activePeriod?.startDate || new Date().toISOString().split("T")[0],
+          toDate: activePeriod?.endDate || new Date().toISOString().split("T")[0],
+        }, t);
+      }
+    }
+
+    return leaveType;
   });
 
-  logger.info("LeaveType created", { id: leaveType.id, name: leaveType.name });
+  logger.info("LeaveType created and auto-assigned", { id: leaveType.id, name: leaveType.name });
   return leaveType;
 };
 
@@ -166,8 +197,8 @@ const updateLeaveType = async (id, data) => {
 const deleteLeaveType = async (id) => {
   const lt = await LeaveType.findByPk(id);
   if (!lt) throw new AppError("Leave type not found", 404);
-  await lt.update({ isActive: false });
-  logger.info("LeaveType disabled", { id, name: lt.name });
+  await lt.destroy({ force: true });
+  logger.info("LeaveType deleted", { id, name: lt.name });
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -256,14 +287,16 @@ const deleteLeavePeriod = async (id) => {
 
 const getEntitlementForEmployee = (leaveType, employee, period) => {
   // Check allocationRules first (gender-based)
-  if (leaveType.allocationRules && Array.isArray(leaveType.allocationRules)) {
+   if (leaveType.allocationRules && Array.isArray(leaveType.allocationRules)) {
     for (const rule of leaveType.allocationRules) {
-      if (rule.field === "gender" && rule.operator === "=" && employee.gender === rule.value) {
-        return rule.days;
+      if (rule.field === "gender") {
+        const allowedGenders = Array.isArray(rule.value) ? rule.value : [rule.value];
+        if (allowedGenders.includes(employee.gender)) {
+          return rule.days;
+        }
       }
     }
   }
-
   // If no rules match, use baseAllocation
   let entitlement = leaveType.baseAllocation || 0;
 
