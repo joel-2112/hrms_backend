@@ -98,7 +98,7 @@ router.post('/register', authController.register);
  *               password:
  *                 type: string
  *                 format: password
- *                 example: 1Q0p2#9o
+ *                 example: StrongPass@123
  *     responses:
  *       200:
  *         description: Login successful — token set in HTTP-only cookie
@@ -116,9 +116,10 @@ router.post('/register', authController.register);
  *                           type: object
  *                           properties:
  *                             id:        { type: string, format: uuid }
- *                             firstName: { type: string, example: Aisha }
- *                             lastName:  { type: string, example: Mensah }
- *                             email:     { type: string, example: aisha.mensah@company.com }
+ *                             firstName: { type: string, example: Eyuel }
+ *                             middleName: { type: string, example: Kassahun }
+ *                             lastName:  { type: string, example: Yenew }
+ *                             email:     { type: string, example: eyuel@gmail.com }
  *                         session:
  *                           type: object
  *                           properties:
@@ -188,9 +189,10 @@ router.post('/logout', authenticate, authController.logout);
  *                       type: object
  *                       properties:
  *                         id:             { type: string, format: uuid }
- *                         firstName:      { type: string, example: Aisha }
- *                         lastName:       { type: string, example: Mensah }
- *                         email:          { type: string, example: aisha.mensah@company.com }
+ *                         firstName:      { type: string, example: Eyuel }
+ *                         middleName:     { type: string, example: Kassahun }
+ *                         lastName:       { type: string, example: Yenew }
+ *                         email:          { type: string, example: eyuel@gmail.com }
  *                         currentSession:
  *                           type: object
  *                           properties:

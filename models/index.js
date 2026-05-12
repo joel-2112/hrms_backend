@@ -307,8 +307,8 @@ Employee.hasMany(EmployeeSkillMap,   { foreignKey: 'employeeId',                
 // ── EmployeeEducation → Employee ──────────────────────────────────────────────
 EmployeeEducation.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
 Employee.hasMany(EmployeeEducation,   { foreignKey: 'employeeId',                   as: 'educationHistory' });
-EducationLevel.belongsTo(EmployeeEducation, { foreignKey: 'employeeEducationId', allowNull: false, as: 'employeeEducations' });
-EmployeeEducation.hasMany(EducationLevel, { foreignKey: 'employeeEducationId', allowNull: false, as: 'educationLevels' });
+EducationLevel.belongsTo(EmployeeEducation, { foreignKey: 'employeeEducationId',  as: 'employeeEducations' });
+EmployeeEducation.hasMany(EducationLevel, { foreignKey: 'employeeEducationId', as: 'educationLevels' });
 
 
 // ── EmployeeExternalWork → Employee ──────────────────────────────────────────
@@ -584,8 +584,10 @@ module.exports = {
   EmployeeSeparation,
   EmployeeSkillMap,
   EmployeeEducation,
+  EducationLevel,
   EmployeeExternalWork,
   EmployeeEmergencyContact,
+  Language,
 
   // ── leave ─────────────────────────────────────────────────────────────────
   HolidayList,

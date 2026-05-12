@@ -63,7 +63,6 @@ module.exports = (sequelize, DataTypes) => {
               "Contract",
               "Internship",
               "Freelance",
-              "Other",
             ],
           ],
         },
@@ -79,12 +78,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment:
           "Null if employee is currently working here (external / side engagement)",
-      },
-
-      // ── Exit context ───────────────────────────────────────────
-      exitReason: {
-        type: DataTypes.STRING,
-        allowNull: true,
       },
     },
     {

@@ -40,6 +40,45 @@ router.use(authenticate);
  *     description: Promotion / demotion history (read-only — writes via Performance module)
  */
 
+
+  /**
+ * @swagger
+ * /employees/education-levels:
+ *   get:
+ *     summary: Get all education levels
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Education levels retrieved
+ *   post:
+ *     summary: Create a new education level
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Bachelor"
+ *     responses:
+ *       201:
+ *         description: Education level created
+ *       409:
+ *         description: Education level already exists
+ */
+router
+  .route("/education-levels")
+  .get(authorize("Employee", action.READ), employeeController.getEducationLevels)
+  .post(authorize("Employee", action.WRITE), employeeController.createEducationLevel);
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  CORE PROFILE
 // ═════════════════════════════════════════════════════════════════════════════
@@ -465,6 +504,91 @@ router.put('/:id/avatar',
   authorize('Employee', action.WRITE),
   uploadAvatar.single('avatar'),
   employeeController.updateAvatar
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LANGUAGES
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /employees/{id}/languages:
+ *   get:
+ *     summary: Get all languages for an employee
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Languages retrieved
+ *   post:
+ *     summary: Add a language to an employee
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Language added
+ */
+router
+  .route("/:id/languages")
+  .get(authorize("Employee", action.READ), employeeController.getLanguages)
+  .post(authorize("Employee", action.WRITE), employeeController.addLanguage);
+
+/**
+ * @swagger
+ * /employees/{id}/languages/{languageId}:
+ *   delete:
+ *     summary: Delete a language from an employee
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: languageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       204:
+ *         description: Language deleted
+ */
+router.delete(
+  "/:id/languages/:languageId",
+  authorize("Employee", action.DELETE),
+  employeeController.deleteLanguage,
 );
 // ═════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD & STATISTICS (static routes — must be before /:id)
