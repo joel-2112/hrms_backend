@@ -327,10 +327,13 @@ LeaveApplication.belongsTo(Employee,    { foreignKey: 'employeeId',   allowNull:
 LeaveApplication.belongsTo(Employee,    { foreignKey: 'approverId',                     as: 'approver' });
 LeaveApplication.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',  allowNull: false, as: 'leaveType' });
 LeaveApplication.belongsTo(HolidayList, { foreignKey: 'holidayListId',                  as: 'holidayList' });
+LeaveApplication.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId',                  as: 'leavePeriod' });
+
 Employee.hasMany(LeaveApplication,      { foreignKey: 'employeeId',                     as: 'leaveApplications' });
 Employee.hasMany(LeaveApplication,      { foreignKey: 'approverId',                     as: 'approvedLeaveApplications' });
 LeaveType.hasMany(LeaveApplication,     { foreignKey: 'leaveTypeId',                    as: 'applications' });
 HolidayList.hasMany(LeaveApplication,   { foreignKey: 'holidayListId',                  as: 'leaveApplications' });
+LeavePeriod.hasMany(LeaveApplication,   { foreignKey: 'leavePeriodId',                  as: 'leaveApplications' });
 
 // ── CompensatoryLeaveRequest → Employee + LeaveType ───────────────────────────
 CompensatoryLeaveRequest.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });

@@ -65,10 +65,12 @@ const assertLeavePeriodValid = async (leavePeriodId) => {
   return lp;
 };
 
-const computeBalance = async (employeeId, leaveTypeId) => {
-  const result = await LeaveLedgerEntry.sum("leaves", {
-    where: { employeeId, leaveTypeId, isExpired: false },
-  });
+const computeBalance = async (employeeId, leaveTypeId, leavePeriodId) => {
+  const where = { employeeId, leaveTypeId, isExpired: false };
+  if (leavePeriodId) {
+    where.leavePeriodId = leavePeriodId;
+  }
+  const result = await LeaveLedgerEntry.sum("leaves", { where });
   return parseFloat(result) || 0;
 };
 
@@ -86,6 +88,7 @@ const createLedgerEntry = async (data, transaction) => {
   return LeaveLedgerEntry.create({
     employeeId: data.employeeId,
     leaveTypeId: data.leaveTypeId,
+    leavePeriodId: data.leavePeriodId || null,
     voucherType: data.voucherType,
     voucherNo: data.voucherNo,
     leaves: data.leaves,
@@ -152,6 +155,7 @@ const createLeaveType = async (data) => {
         await createLedgerEntry({
           employeeId: employee.id,
           leaveTypeId: leaveType.id,
+          leavePeriodId: activePeriod?.id || null,
           voucherType: "LeaveAllocation",
           voucherNo: leaveType.id,
           leaves: entitlement,
@@ -354,6 +358,7 @@ const autoAllocateForEmployee = async (employeeId, employee, transaction) => {
     await createLedgerEntry({
       employeeId,
       leaveTypeId: leaveType.id,
+      leavePeriodId: activePeriod.id,
       voucherNo: employeeId,
       leaves: days,
       fromDate: activePeriod.startDate,
@@ -374,7 +379,7 @@ const autoAllocateForEmployee = async (employeeId, employee, transaction) => {
 const getLeaveBalance = async (employeeId, leaveTypeId) => {
   await assertEmployeeActive(employeeId);
   await assertLeaveTypeValid(leaveTypeId);
-  const balance = await computeBalance(employeeId, leaveTypeId);
+  const balance = await computeBalance(employeeId, leaveTypeId, null);
   return { employeeId, leaveTypeId, balance };
 };
 
@@ -384,7 +389,7 @@ const getLeaveBalances = async (employeeId) => {
   const leaveTypes = await LeaveType.findAll({ where: { isActive: true } });
   const balances = await Promise.all(
     leaveTypes.map(async (lt) => {
-      const balance = await computeBalance(employeeId, lt.id);
+      const balance = await computeBalance(employeeId, lt.id, null);
       return {
         leaveTypeId: lt.id,
         leaveTypeName: lt.name,
@@ -572,6 +577,7 @@ const approveCompensatoryRequest = async (id, approverUserId) => {
     await createLedgerEntry({
       employeeId: request.employeeId,
       leaveTypeId: request.leaveTypeId,
+      leavePeriodId: activePeriod?.id || null,
       voucherType: "CompensatoryLeaveRequest",
       voucherNo: request.id,
       leaves: 1,
@@ -611,7 +617,7 @@ const cancelCompensatoryRequest = async (id) => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 const createLeaveApplication = async (data, userId) => {
-  const { employeeId, leaveTypeId, fromDate, toDate, isHalfDay, halfDayDate, reason, followUpDate, holidayListId } = data;
+  const { employeeId, leaveTypeId, leavePeriodId, fromDate, toDate, isHalfDay, halfDayDate, reason, followUpDate, holidayListId } = data;
 
   if (!employeeId || !leaveTypeId || !fromDate || !toDate) {
     throw new AppError("employeeId, leaveTypeId, fromDate and toDate are required", 422);
@@ -622,6 +628,19 @@ const createLeaveApplication = async (data, userId) => {
 
   const employee = await assertEmployeeActive(employeeId);
   const leaveType = await assertLeaveTypeValid(leaveTypeId);
+
+  // Leave Period validation
+  let finalLeavePeriodId = leavePeriodId;
+  if (finalLeavePeriodId) {
+    const lp = await assertLeavePeriodValid(finalLeavePeriodId);
+    if (lp.companyId !== employee.companyId) {
+      throw new AppError("Invalid leave period for this company", 422);
+    }
+  } else {
+    // If not provided, fallback to active period
+    const activePeriod = await getActiveLeavePeriod(employee.companyId);
+    finalLeavePeriodId = activePeriod.id;
+  }
 
   // Eligibility check
   if (leaveType.eligibilityMonths) {
@@ -696,9 +715,9 @@ const createLeaveApplication = async (data, userId) => {
   }
 
   // Balance check
-  const balance = await computeBalance(employeeId, leaveTypeId);
+  const balance = await computeBalance(employeeId, leaveTypeId, finalLeavePeriodId);
   if (balance < totalLeaveDays) {
-    throw new AppError(`Insufficient balance. Required: ${totalLeaveDays}, Available: ${balance}`, 422);
+    throw new AppError(`Insufficient balance for the selected period. Required: ${totalLeaveDays}, Available: ${balance}`, 422);
   }
 
   // Overlap check
@@ -715,7 +734,7 @@ const createLeaveApplication = async (data, userId) => {
   }
 
   const application = await LeaveApplication.create({
-    employeeId, leaveTypeId, fromDate, toDate, totalLeaveDays,
+    employeeId, leaveTypeId, leavePeriodId: finalLeavePeriodId, fromDate, toDate, totalLeaveDays,
     isHalfDay: isHalfDay ?? false,
     halfDayDate: isHalfDay ? halfDayDate : null,
     reason: reason || null,
@@ -804,7 +823,7 @@ const approveLeaveApplication = async (id, approverUserId) => {
   if (!app) throw new AppError("Leave application not found", 404);
   if (app.status !== "Open") throw new AppError("Only Open applications can be approved", 422);
 
-  const balance = await computeBalance(app.employeeId, app.leaveTypeId);
+  const balance = await computeBalance(app.employeeId, app.leaveTypeId, app.leavePeriodId);
   if (balance < parseFloat(app.totalLeaveDays)) {
     throw new AppError(`Insufficient balance. Required: ${app.totalLeaveDays}, Available: ${balance}`, 422);
   }
@@ -813,6 +832,7 @@ const approveLeaveApplication = async (id, approverUserId) => {
     await createLedgerEntry({
       employeeId: app.employeeId,
       leaveTypeId: app.leaveTypeId,
+      leavePeriodId: app.leavePeriodId,
       voucherType: "LeaveApplication",
       voucherNo: app.id,
       leaves: -Math.abs(parseFloat(app.totalLeaveDays)),
@@ -851,6 +871,7 @@ const cancelLeaveApplication = async (id) => {
       await createLedgerEntry({
         employeeId: app.employeeId,
         leaveTypeId: app.leaveTypeId,
+        leavePeriodId: app.leavePeriodId,
         voucherType: "LeaveApplication",
         voucherNo: app.id,
         leaves: Math.abs(parseFloat(app.totalLeaveDays)),
@@ -908,7 +929,7 @@ const getLeaveLedger = async (employeeId, leaveTypeId, query = {}) => {
     order: [["createdAt", "DESC"]],
   });
 
-  const balance = await computeBalance(employeeId, leaveTypeId);
+  const balance = await computeBalance(employeeId, leaveTypeId, query.leavePeriodId);
   return { data: rows, meta: buildMeta(count, page, limit), currentBalance: balance };
 };
 
@@ -976,7 +997,7 @@ const createLeaveEncashment = async (data) => {
 
   await assertLeavePeriodValid(data.leavePeriodId);
 
-  const balance = await computeBalance(data.employeeId, data.leaveTypeId);
+  const balance = await computeBalance(data.employeeId, data.leaveTypeId, data.leavePeriodId);
   if (balance < parseFloat(data.leavesToEncash)) {
     throw new AppError(`Insufficient balance. Requested: ${data.leavesToEncash}, Available: ${balance}`, 422);
   }
@@ -1035,6 +1056,7 @@ const approveLeaveEncashment = async (id) => {
     await createLedgerEntry({
       employeeId: enc.employeeId,
       leaveTypeId: enc.leaveTypeId,
+      leavePeriodId: enc.leavePeriodId,
       voucherType: "LeaveEncashment",
       voucherNo: enc.id,
       leaves: -Math.abs(parseFloat(enc.leavesToEncash)),
@@ -1120,8 +1142,8 @@ const calculateWorkingDays = async (fromDate, toDate, includeHolidays, includeWe
   return count;
 };
 
-const validateLeaveBalance = async (employeeId, leaveTypeId, requestedDays) => {
-  const balance = await computeBalance(employeeId, leaveTypeId);
+const validateLeaveBalance = async (employeeId, leaveTypeId, requestedDays, leavePeriodId) => {
+  const balance = await computeBalance(employeeId, leaveTypeId, leavePeriodId);
   if (balance < requestedDays) {
     return { sufficient: false, balance, requested: requestedDays, shortfall: requestedDays - balance };
   }
@@ -1225,7 +1247,7 @@ const getDashboardStats = async (companyId, period, userBranchId, userDepartment
       const employees = await Employee.findAll({ where: employeeWhere, attributes: ["id"], limit: 100 });
       for (const emp of employees) {
         for (const lt of encashableTypes) {
-          const balance = await computeBalance(emp.id, lt.id);
+          const balance = await computeBalance(emp.id, lt.id, null);
           if (balance > 0) { encashmentEligible++; break; }
         }
       }
@@ -1262,7 +1284,7 @@ const getDashboardBalances = async (companyId, userBranchId) => {
     let totalAllocated = 0, totalRemaining = 0, employeeCount = 0;
 
     for (const emp of employees) {
-      const balance = await computeBalance(emp.id, leaveType.id);
+      const balance = await computeBalance(emp.id, leaveType.id, null);
       if (balance > 0) {
         totalRemaining += balance;
         employeeCount++;

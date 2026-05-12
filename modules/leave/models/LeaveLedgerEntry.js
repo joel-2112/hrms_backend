@@ -19,6 +19,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         comment: "FK → leave_types.id",
       },
+      leavePeriodId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        comment: "FK → leave_periods.id",
+      },
 
       // ── Polymorphic source reference ───────────────────────────
       // Points back to whichever document created this entry.
@@ -87,6 +92,7 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         { fields: ["employee_id"], name: "idx_lle_employee" },
         { fields: ["leave_type_id"], name: "idx_lle_leave_type" },
+        { fields: ["leave_period_id"], name: "idx_lle_leave_period" },
         { fields: ["voucher_type", "voucher_no"], name: "idx_lle_voucher" },
         { fields: ["from_date", "to_date"], name: "idx_lle_period" },
       ],
