@@ -14,7 +14,7 @@
 
 const { Op } = require('sequelize');
 const crypto = require('crypto');
-const { User, Role, UserRole, RoleProfile, UserSession, LoginAttempt } = require('../../../models');
+const { User, Role, UserRole, RoleProfile, UserSession, LoginAttempt, Employee } = require('../../../models');
 const { AppError } = require('../../../middlewares/errorMiddleware');
 const { generateToken, verifyToken } = require('../../../utils/jwt');
 
