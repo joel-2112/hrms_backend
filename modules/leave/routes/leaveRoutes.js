@@ -2,12 +2,6 @@
 
 /**
  * modules/leave/routes/leaveRoutes.js
- *
- * Leave module routes — Leave Types, Periods, Balances,
- * Holidays, Block Lists, Compensatory Requests,
- * Applications, Ledger, Encashments, and Compliance utilities.
- *
- * All routes require authentication.
  */
 
 const router = require("express").Router();
@@ -15,7 +9,6 @@ const leaveController = require("../controllers/leaveController");
 const { authenticate } = require("../../../middlewares/authMiddleware");
 const { authorize, action } = require("../../../middlewares/rbacMiddleware");
 
-// All routes require authentication
 router.use(authenticate);
 
 /**
@@ -34,9 +27,9 @@ router.use(authenticate);
  *   - name: LeaveApplications
  *     description: Leave applications
  *   - name: LeaveLedger
- *     description: Leave ledger
+ *     description: Leave ledger entries
  *   - name: LeaveEncashments
- *     description: Leave encashment
+ *     description: Leave encashment requests
  *   - name: LeaveCompliance
  *     description: Compliance utilities
  *   - name: LeaveDashboard
@@ -44,7 +37,7 @@ router.use(authenticate);
  */
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  EMPLOYEE SELF-SERVICE — MY LEAVE
+//  EMPLOYEE SELF-SERVICE
 // ═════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -57,7 +50,7 @@ router.use(authenticate);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: My leave summary fetched successfully
+ *         description: My leave summary fetched
  */
 router.get("/my-leave/summary", leaveController.getMyLeaveSummary);
 
@@ -84,7 +77,7 @@ router.get("/my-leave/summary", leaveController.getMyLeaveSummary);
  *           type: integer
  *     responses:
  *       200:
- *         description: My leave applications fetched successfully
+ *         description: My leave applications fetched
  */
 router.get("/my-leave/applications", leaveController.getMyLeaveApplications);
 
@@ -103,7 +96,7 @@ router.get("/my-leave/applications", leaveController.getMyLeaveApplications);
  *           type: integer
  *     responses:
  *       200:
- *         description: My leave calendar fetched successfully
+ *         description: My leave calendar fetched
  */
 router.get("/my-leave/calendar", leaveController.getMyLeaveCalendar);
 
@@ -111,7 +104,7 @@ router.get("/my-leave/calendar", leaveController.getMyLeaveCalendar);
  * @swagger
  * /leaves/my-ledger:
  *   get:
- *     summary: Get leave ledger for the authenticated employee
+ *     summary: Get leave ledger for authenticated employee
  *     tags: [LeaveLedger]
  *     security:
  *       - bearerAuth: []
@@ -135,7 +128,7 @@ router.get("/my-leave/calendar", leaveController.getMyLeaveCalendar);
  *           type: integer
  *     responses:
  *       200:
- *         description: My ledger fetched successfully
+ *         description: My ledger fetched
  */
 router.get("/my-ledger", leaveController.getMyLedger);
 
@@ -158,9 +151,13 @@ router.get("/my-ledger", leaveController.getMyLedger);
  *           type: string
  *     responses:
  *       200:
- *         description: Dashboard stats fetched successfully
+ *         description: Dashboard stats fetched
  */
-router.get("/dashboard/stats", authorize("LeaveApplication", action.READ), leaveController.getDashboardStats);
+router.get(
+  "/dashboard/stats",
+  authorize("LeaveApplication", action.READ),
+  leaveController.getDashboardStats,
+);
 
 /**
  * @swagger
@@ -172,7 +169,7 @@ router.get("/dashboard/stats", authorize("LeaveApplication", action.READ), leave
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Dashboard balances fetched successfully
+ *         description: Dashboard balances fetched
  */
 router.get("/dashboard/balances", leaveController.getDashboardBalances);
 
@@ -192,9 +189,13 @@ router.get("/dashboard/balances", leaveController.getDashboardBalances);
  *           default: 4
  *     responses:
  *       200:
- *         description: Pending approvals fetched successfully
+ *         description: Pending approvals fetched
  */
-router.get("/dashboard/pending-approvals", authorize("LeaveApplication", action.READ), leaveController.getDashboardPendingApprovals);
+router.get(
+  "/dashboard/pending-approvals",
+  authorize("LeaveApplication", action.READ),
+  leaveController.getDashboardPendingApprovals,
+);
 
 /**
  * @swagger
@@ -206,9 +207,13 @@ router.get("/dashboard/pending-approvals", authorize("LeaveApplication", action.
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: On-leave employees fetched successfully
+ *         description: On-leave employees fetched
  */
-router.get("/dashboard/on-leave-this-week", authorize("LeaveApplication", action.READ), leaveController.getOnLeaveThisWeek);
+router.get(
+  "/dashboard/on-leave-this-week",
+  authorize("LeaveApplication", action.READ),
+  leaveController.getOnLeaveThisWeek,
+);
 
 /**
  * @swagger
@@ -225,9 +230,13 @@ router.get("/dashboard/on-leave-this-week", authorize("LeaveApplication", action
  *           type: string
  *     responses:
  *       200:
- *         description: Leave by type fetched successfully
+ *         description: Leave by type fetched
  */
-router.get("/dashboard/by-type", authorize("LeaveApplication", action.READ), leaveController.getDashboardLeaveByType);
+router.get(
+  "/dashboard/by-type",
+  authorize("LeaveApplication", action.READ),
+  leaveController.getDashboardLeaveByType,
+);
 
 /**
  * @swagger
@@ -239,9 +248,13 @@ router.get("/dashboard/by-type", authorize("LeaveApplication", action.READ), lea
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Next holiday fetched successfully
+ *         description: Next holiday fetched
  */
-router.get("/dashboard/next-holiday", authorize("HolidayList", action.READ), leaveController.getNextHoliday);
+router.get(
+  "/dashboard/next-holiday",
+  authorize("HolidayList", action.READ),
+  leaveController.getNextHoliday,
+);
 
 /**
  * @swagger
@@ -253,9 +266,13 @@ router.get("/dashboard/next-holiday", authorize("HolidayList", action.READ), lea
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Dashboard data exported successfully
+ *         description: Dashboard data exported
  */
-router.get("/dashboard/export", authorize("LeaveApplication", action.READ), leaveController.exportDashboard);
+router.get(
+  "/dashboard/export",
+  authorize("LeaveApplication", action.READ),
+  leaveController.exportDashboard,
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE TYPES
@@ -320,12 +337,15 @@ router.get("/dashboard/export", authorize("LeaveApplication", action.READ), leav
  *           type: boolean
  *     responses:
  *       200:
- *         description: Leave types fetched successfully
+ *         description: Leave types fetched
  */
 router
   .route("/leave-types")
   .post(authorize("LeaveType", action.CREATE), leaveController.createLeaveType)
-  .get(authorize("LeaveType", [action.READ, action.READ_SELF]), leaveController.getLeaveTypes);
+  .get(
+    authorize("LeaveType", [action.READ, action.READ_SELF]),
+    leaveController.getLeaveTypes,
+  );
 
 /**
  * @swagger
@@ -386,7 +406,10 @@ router
   .route("/leave-types/:id")
   .get(authorize("LeaveType", action.READ), leaveController.getLeaveTypeById)
   .patch(authorize("LeaveType", action.WRITE), leaveController.updateLeaveType)
-  .delete(authorize("LeaveType", action.DELETE), leaveController.deleteLeaveType);
+  .delete(
+    authorize("LeaveType", action.DELETE),
+    leaveController.deleteLeaveType,
+  );
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE PERIODS
@@ -445,7 +468,10 @@ router
  */
 router
   .route("/leave-periods")
-  .post(authorize("LeavePeriod", action.CREATE), leaveController.createLeavePeriod)
+  .post(
+    authorize("LeavePeriod", action.CREATE),
+    leaveController.createLeavePeriod,
+  )
   .get(authorize("LeavePeriod", action.READ), leaveController.getLeavePeriods);
 
 /**
@@ -467,7 +493,11 @@ router
  *       200:
  *         description: Active leave period fetched
  */
-router.get("/leave-periods/active", authorize("LeavePeriod", action.READ), leaveController.getActiveLeavePeriod);
+router.get(
+  "/leave-periods/active",
+  authorize("LeavePeriod", action.READ),
+  leaveController.getActiveLeavePeriod,
+);
 
 /**
  * @swagger
@@ -526,9 +556,18 @@ router.get("/leave-periods/active", authorize("LeavePeriod", action.READ), leave
  */
 router
   .route("/leave-periods/:id")
-  .get(authorize("LeavePeriod", action.READ), leaveController.getLeavePeriodById)
-  .patch(authorize("LeavePeriod", action.WRITE), leaveController.updateLeavePeriod)
-  .delete(authorize("LeavePeriod", action.DELETE), leaveController.deleteLeavePeriod);
+  .get(
+    authorize("LeavePeriod", action.READ),
+    leaveController.getLeavePeriodById,
+  )
+  .patch(
+    authorize("LeavePeriod", action.WRITE),
+    leaveController.updateLeavePeriod,
+  )
+  .delete(
+    authorize("LeavePeriod", action.DELETE),
+    leaveController.deleteLeavePeriod,
+  );
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE BALANCES
@@ -553,7 +592,11 @@ router
  *       200:
  *         description: Leave balances fetched
  */
-router.get("/balances/:employeeId", authorize("LeaveAllocation", [action.READ, action.READ_SELF]), leaveController.getLeaveBalances);
+router.get(
+  "/balances/:employeeId",
+  authorize("LeaveAllocation", [action.READ, action.READ_SELF]),
+  leaveController.getLeaveBalances,
+);
 
 /**
  * @swagger
@@ -580,7 +623,11 @@ router.get("/balances/:employeeId", authorize("LeaveAllocation", [action.READ, a
  *       200:
  *         description: Leave balance fetched
  */
-router.get("/balances/:employeeId/:leaveTypeId", authorize("LeaveAllocation", [action.READ, action.READ_SELF]), leaveController.getLeaveBalance);
+router.get(
+  "/balances/:employeeId/:leaveTypeId",
+  authorize("LeaveAllocation", [action.READ, action.READ_SELF]),
+  leaveController.getLeaveBalance,
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  HOLIDAY LISTS
@@ -641,8 +688,14 @@ router.get("/balances/:employeeId/:leaveTypeId", authorize("LeaveAllocation", [a
  */
 router
   .route("/holiday-lists")
-  .post(authorize("HolidayList", action.CREATE), leaveController.createHolidayList)
-  .get(authorize("HolidayList", [action.READ, action.READ_SELF]), leaveController.getHolidayLists);
+  .post(
+    authorize("HolidayList", action.CREATE),
+    leaveController.createHolidayList,
+  )
+  .get(
+    authorize("HolidayList", [action.READ, action.READ_SELF]),
+    leaveController.getHolidayLists,
+  );
 
 /**
  * @swagger
@@ -701,9 +754,18 @@ router
  */
 router
   .route("/holiday-lists/:id")
-  .get(authorize("HolidayList", action.READ), leaveController.getHolidayListById)
-  .patch(authorize("HolidayList", action.WRITE), leaveController.updateHolidayList)
-  .delete(authorize("HolidayList", action.DELETE), leaveController.deleteHolidayList);
+  .get(
+    authorize("HolidayList", action.READ),
+    leaveController.getHolidayListById,
+  )
+  .patch(
+    authorize("HolidayList", action.WRITE),
+    leaveController.updateHolidayList,
+  )
+  .delete(
+    authorize("HolidayList", action.DELETE),
+    leaveController.deleteHolidayList,
+  );
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE BLOCK LISTS
@@ -765,8 +827,14 @@ router
  */
 router
   .route("/block-lists")
-  .post(authorize("LeaveBlockList", action.CREATE), leaveController.createLeaveBlockList)
-  .get(authorize("LeaveBlockList", action.READ), leaveController.getLeaveBlockLists);
+  .post(
+    authorize("LeaveBlockList", action.CREATE),
+    leaveController.createLeaveBlockList,
+  )
+  .get(
+    authorize("LeaveBlockList", action.READ),
+    leaveController.getLeaveBlockLists,
+  );
 
 /**
  * @swagger
@@ -825,9 +893,18 @@ router
  */
 router
   .route("/block-lists/:id")
-  .get(authorize("LeaveBlockList", action.READ), leaveController.getLeaveBlockListById)
-  .patch(authorize("LeaveBlockList", action.WRITE), leaveController.updateLeaveBlockList)
-  .delete(authorize("LeaveBlockList", action.DELETE), leaveController.deleteLeaveBlockList);
+  .get(
+    authorize("LeaveBlockList", action.READ),
+    leaveController.getLeaveBlockListById,
+  )
+  .patch(
+    authorize("LeaveBlockList", action.WRITE),
+    leaveController.updateLeaveBlockList,
+  )
+  .delete(
+    authorize("LeaveBlockList", action.DELETE),
+    leaveController.deleteLeaveBlockList,
+  );
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  COMPENSATORY LEAVE REQUESTS
@@ -889,8 +966,14 @@ router
  */
 router
   .route("/compensatory-requests")
-  .post(authorize("CompensatoryLeaveRequest", action.CREATE), leaveController.createCompensatoryRequest)
-  .get(authorize("CompensatoryLeaveRequest", action.READ), leaveController.getCompensatoryRequests);
+  .post(
+    authorize("CompensatoryLeaveRequest", action.CREATE),
+    leaveController.createCompensatoryRequest,
+  )
+  .get(
+    authorize("CompensatoryLeaveRequest", action.READ),
+    leaveController.getCompensatoryRequests,
+  );
 
 /**
  * @swagger
@@ -911,7 +994,11 @@ router
  *       200:
  *         description: Compensatory request fetched
  */
-router.get("/compensatory-requests/:id", authorize("CompensatoryLeaveRequest", action.READ), leaveController.getCompensatoryRequestById);
+router.get(
+  "/compensatory-requests/:id",
+  authorize("CompensatoryLeaveRequest", action.READ),
+  leaveController.getCompensatoryRequestById,
+);
 
 /**
  * @swagger
@@ -932,7 +1019,11 @@ router.get("/compensatory-requests/:id", authorize("CompensatoryLeaveRequest", a
  *       200:
  *         description: Compensatory request submitted
  */
-router.post("/compensatory-requests/:id/submit", authorize("CompensatoryLeaveRequest", action.SUBMIT), leaveController.submitCompensatoryRequest);
+router.post(
+  "/compensatory-requests/:id/submit",
+  authorize("CompensatoryLeaveRequest", action.SUBMIT),
+  leaveController.submitCompensatoryRequest,
+);
 
 /**
  * @swagger
@@ -953,7 +1044,11 @@ router.post("/compensatory-requests/:id/submit", authorize("CompensatoryLeaveReq
  *       200:
  *         description: Compensatory request approved
  */
-router.post("/compensatory-requests/:id/approve", authorize("CompensatoryLeaveRequest", action.SUBMIT), leaveController.approveCompensatoryRequest);
+router.post(
+  "/compensatory-requests/:id/approve",
+  authorize("CompensatoryLeaveRequest", action.SUBMIT),
+  leaveController.approveCompensatoryRequest,
+);
 
 /**
  * @swagger
@@ -984,7 +1079,11 @@ router.post("/compensatory-requests/:id/approve", authorize("CompensatoryLeaveRe
  *       200:
  *         description: Compensatory request rejected
  */
-router.post("/compensatory-requests/:id/reject", authorize("CompensatoryLeaveRequest", action.SUBMIT), leaveController.rejectCompensatoryRequest);
+router.post(
+  "/compensatory-requests/:id/reject",
+  authorize("CompensatoryLeaveRequest", action.SUBMIT),
+  leaveController.rejectCompensatoryRequest,
+);
 
 /**
  * @swagger
@@ -1005,7 +1104,11 @@ router.post("/compensatory-requests/:id/reject", authorize("CompensatoryLeaveReq
  *       200:
  *         description: Compensatory request cancelled
  */
-router.post("/compensatory-requests/:id/cancel", authorize("CompensatoryLeaveRequest", action.CANCEL), leaveController.cancelCompensatoryRequest);
+router.post(
+  "/compensatory-requests/:id/cancel",
+  authorize("CompensatoryLeaveRequest", action.CANCEL),
+  leaveController.cancelCompensatoryRequest,
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE APPLICATIONS
@@ -1089,8 +1192,14 @@ router.post("/compensatory-requests/:id/cancel", authorize("CompensatoryLeaveReq
  */
 router
   .route("/applications")
-  .post(authorize("LeaveApplication", action.CREATE), leaveController.createLeaveApplication)
-  .get(authorize("LeaveApplication", action.READ), leaveController.getLeaveApplications);
+  .post(
+    authorize("LeaveApplication", action.CREATE),
+    leaveController.createLeaveApplication,
+  )
+  .get(
+    authorize("LeaveApplication", action.READ),
+    leaveController.getLeaveApplications,
+  );
 
 /**
  * @swagger
@@ -1111,7 +1220,11 @@ router
  *       200:
  *         description: Leave application fetched
  */
-router.get("/applications/:id", authorize("LeaveApplication", [action.READ, action.READ_SELF]), leaveController.getLeaveApplicationById);
+router.get(
+  "/applications/:id",
+  authorize("LeaveApplication", [action.READ, action.READ_SELF]),
+  leaveController.getLeaveApplicationById,
+);
 
 /**
  * @swagger
@@ -1132,7 +1245,11 @@ router.get("/applications/:id", authorize("LeaveApplication", [action.READ, acti
  *       200:
  *         description: Leave application submitted
  */
-router.post("/applications/:id/submit", authorize("LeaveApplication", action.SUBMIT), leaveController.submitLeaveApplication);
+router.post(
+  "/applications/:id/submit",
+  authorize("LeaveApplication", action.SUBMIT),
+  leaveController.submitLeaveApplication,
+);
 
 /**
  * @swagger
@@ -1153,7 +1270,11 @@ router.post("/applications/:id/submit", authorize("LeaveApplication", action.SUB
  *       200:
  *         description: Leave application approved
  */
-router.post("/applications/:id/approve", authorize("LeaveApplication", action.WRITE), leaveController.approveLeaveApplication);
+router.post(
+  "/applications/:id/approve",
+  authorize("LeaveApplication", action.WRITE),
+  leaveController.approveLeaveApplication,
+);
 
 /**
  * @swagger
@@ -1184,7 +1305,11 @@ router.post("/applications/:id/approve", authorize("LeaveApplication", action.WR
  *       200:
  *         description: Leave application rejected
  */
-router.post("/applications/:id/reject", authorize("LeaveApplication", action.WRITE), leaveController.rejectLeaveApplication);
+router.post(
+  "/applications/:id/reject",
+  authorize("LeaveApplication", action.WRITE),
+  leaveController.rejectLeaveApplication,
+);
 
 /**
  * @swagger
@@ -1205,7 +1330,11 @@ router.post("/applications/:id/reject", authorize("LeaveApplication", action.WRI
  *       200:
  *         description: Leave application cancelled
  */
-router.post("/applications/:id/cancel", authorize("LeaveApplication", action.CANCEL), leaveController.cancelLeaveApplication);
+router.post(
+  "/applications/:id/cancel",
+  authorize("LeaveApplication", action.CANCEL),
+  leaveController.cancelLeaveApplication,
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE LEDGER
@@ -1224,8 +1353,7 @@ router.post("/applications/:id/cancel", authorize("LeaveApplication", action.CAN
  *         name: employeeId
  *         required: true
  *         schema:
- *           type: string
- *           format: uuid
+ *           type: string *           format: uuid
  *       - in: path
  *         name: leaveTypeId
  *         required: true
@@ -1248,7 +1376,11 @@ router.post("/applications/:id/cancel", authorize("LeaveApplication", action.CAN
  *       200:
  *         description: Leave ledger fetched
  */
-router.get("/ledger/:employeeId/:leaveTypeId", authorize("LeaveLedgerEntry", action.READ), leaveController.getLeaveLedger);
+router.get(
+  "/ledger/:employeeId/:leaveTypeId",
+  authorize("LeaveLedgerEntry", action.READ),
+  leaveController.getLeaveLedger,
+);
 
 /**
  * @swagger
@@ -1269,7 +1401,11 @@ router.get("/ledger/:employeeId/:leaveTypeId", authorize("LeaveLedgerEntry", act
  *       200:
  *         description: Ledger entry fetched
  */
-router.get("/ledger-entries/:id", authorize("LeaveLedgerEntry", action.READ), leaveController.getLeaveLedgerEntryById);
+router.get(
+  "/ledger-entries/:id",
+  authorize("LeaveLedgerEntry", action.READ),
+  leaveController.getLeaveLedgerEntryById,
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  LEAVE ENCASHMENTS
@@ -1335,8 +1471,14 @@ router.get("/ledger-entries/:id", authorize("LeaveLedgerEntry", action.READ), le
  */
 router
   .route("/encashments")
-  .post(authorize("LeaveEncashment", action.CREATE), leaveController.createLeaveEncashment)
-  .get(authorize("LeaveEncashment", action.READ), leaveController.getLeaveEncashments);
+  .post(
+    authorize("LeaveEncashment", action.CREATE),
+    leaveController.createLeaveEncashment,
+  )
+  .get(
+    authorize("LeaveEncashment", action.READ),
+    leaveController.getLeaveEncashments,
+  );
 
 /**
  * @swagger
@@ -1357,7 +1499,11 @@ router
  *       200:
  *         description: Leave encashment fetched
  */
-router.get("/encashments/:id", authorize("LeaveEncashment", action.READ), leaveController.getLeaveEncashmentById);
+router.get(
+  "/encashments/:id",
+  authorize("LeaveEncashment", action.READ),
+  leaveController.getLeaveEncashmentById,
+);
 
 /**
  * @swagger
@@ -1378,7 +1524,11 @@ router.get("/encashments/:id", authorize("LeaveEncashment", action.READ), leaveC
  *       200:
  *         description: Leave encashment submitted
  */
-router.post("/encashments/:id/submit", authorize("LeaveEncashment", action.SUBMIT), leaveController.submitLeaveEncashment);
+router.post(
+  "/encashments/:id/submit",
+  authorize("LeaveEncashment", action.SUBMIT),
+  leaveController.submitLeaveEncashment,
+);
 
 /**
  * @swagger
@@ -1399,7 +1549,11 @@ router.post("/encashments/:id/submit", authorize("LeaveEncashment", action.SUBMI
  *       200:
  *         description: Leave encashment approved
  */
-router.post("/encashments/:id/approve", authorize("LeaveEncashment", action.SUBMIT), leaveController.approveLeaveEncashment);
+router.post(
+  "/encashments/:id/approve",
+  authorize("LeaveEncashment", action.SUBMIT),
+  leaveController.approveLeaveEncashment,
+);
 
 /**
  * @swagger
@@ -1420,7 +1574,11 @@ router.post("/encashments/:id/approve", authorize("LeaveEncashment", action.SUBM
  *       200:
  *         description: Leave encashment rejected
  */
-router.post("/encashments/:id/reject", authorize("LeaveEncashment", action.SUBMIT), leaveController.rejectLeaveEncashment);
+router.post(
+  "/encashments/:id/reject",
+  authorize("LeaveEncashment", action.SUBMIT),
+  leaveController.rejectLeaveEncashment,
+);
 
 /**
  * @swagger
@@ -1441,7 +1599,11 @@ router.post("/encashments/:id/reject", authorize("LeaveEncashment", action.SUBMI
  *       200:
  *         description: Leave encashment cancelled
  */
-router.post("/encashments/:id/cancel", authorize("LeaveEncashment", action.CANCEL), leaveController.cancelLeaveEncashment);
+router.post(
+  "/encashments/:id/cancel",
+  authorize("LeaveEncashment", action.CANCEL),
+  leaveController.cancelLeaveEncashment,
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  COMPLIANCE & UTILITIES
@@ -1477,7 +1639,11 @@ router.post("/encashments/:id/cancel", authorize("LeaveEncashment", action.CANCE
  *       200:
  *         description: Date check completed
  */
-router.get("/compliance/check-date", authorize("LeaveApplication", action.READ), leaveController.checkDate);
+router.get(
+  "/compliance/check-date",
+  authorize("LeaveApplication", action.READ),
+  leaveController.checkDate,
+);
 
 /**
  * @swagger
@@ -1509,7 +1675,11 @@ router.get("/compliance/check-date", authorize("LeaveApplication", action.READ),
  *       200:
  *         description: Balance validation result
  */
-router.get("/compliance/validate-balance", authorize("LeaveApplication", action.READ), leaveController.validateLeaveBalance);
+router.get(
+  "/compliance/validate-balance",
+  authorize("LeaveApplication", action.READ),
+  leaveController.validateLeaveBalance,
+);
 
 /**
  * @swagger
@@ -1549,7 +1719,11 @@ router.get("/compliance/validate-balance", authorize("LeaveApplication", action.
  *       200:
  *         description: Working days calculated
  */
-router.get("/compliance/calculate-days", authorize("LeaveApplication", action.READ), leaveController.calculateWorkingDays);
+router.get(
+  "/compliance/calculate-days",
+  authorize("LeaveApplication", action.READ),
+  leaveController.calculateWorkingDays,
+);
 
 /**
  * @swagger
@@ -1563,7 +1737,11 @@ router.get("/compliance/calculate-days", authorize("LeaveApplication", action.RE
  *       200:
  *         description: Overdue ledger entries expired
  */
-router.post("/compliance/expire-overdue", authorize("LeaveLedgerEntry", action.SUBMIT), leaveController.expireOverdueLedgerEntries);
+router.post(
+  "/compliance/expire-overdue",
+  authorize("LeaveLedgerEntry", action.SUBMIT),
+  leaveController.expireOverdueLedgerEntries,
+);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  EXPORTS
