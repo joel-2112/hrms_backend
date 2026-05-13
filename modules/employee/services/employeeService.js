@@ -388,19 +388,19 @@ const approveEmployee = async (employeeId, approverUserId) => {
       `Employee cannot be approved from status '${employee.status}'`,
       422,
     );
-  if (!employee.email)
+  if (!employee.personalEmail)
     throw new AppError(
       "Employee must have an email before a User account can be created",
       422,
     );
 
   const approver = await User.unscoped().findByPk(approverUserId, {
-    attributes: ["id", "isSuperUser", "isSystemManager"],
+    attributes: ["id", "firstName", "middleName", "lastName", "isSuperUser", "isSystemManager"],
   });
   if (!approver) throw new AppError("Approver not found", 404);
 
   const existingUser = await User.unscoped().findOne({
-    where: { email: employee.email },
+    where: { email: employee.personalEmail },
   });
   const temporaryPassword = generateTemporaryPassword();
 
@@ -425,7 +425,7 @@ const approveEmployee = async (employeeId, approverUserId) => {
           firstName: employee.firstName,
           middleName: employee.middleName,
           lastName: employee.lastName,
-          email: employee.email,
+          email: employee.personalEmail,
           passwordHash: temporaryPassword,
           status: "Active",
           language: "en",
@@ -458,7 +458,7 @@ const approveEmployee = async (employeeId, approverUserId) => {
       if (res.success)
         logger.info("Credentials email sent", {
           employeeId,
-          email: result.employee.email,
+          email: result.employee.personalEmail,
         });
       else
         logger.warn("Credentials email failed", {
@@ -911,7 +911,7 @@ const getDirectReports = async (managerId, query = {}) => {
     limit,
     offset,
     order: [
-      ["lastName", "ASC"],
+      ["middleName", "ASC"],
       ["firstName", "ASC"],
     ],
     include: [...ORG_INCLUDES],
