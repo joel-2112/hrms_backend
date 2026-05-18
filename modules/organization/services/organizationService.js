@@ -2,7 +2,6 @@
 
 const { Op } = require("sequelize");
 const {
-  sequelize,
   Company,
   Branch,
   Department,
@@ -16,53 +15,29 @@ const { AppError } = require("../../../middlewares/errorMiddleware");
 //  COMPANY
 // ══════════════════════════════════════════════
 
-const createCompany = async ({
-  name,
-  country,
-  region,
-  zone,
-  city,
-  code,
-  dateOfEstablishment,
-  parentCompanyId,
-  taxId,
-  phone,
-  email,
-  address,
-  website,
-  abbreviation,
-  defaultCurrency,
-}) => {
+const createCompany = async (data) => {
+  const { name, country, region, zone, city, code, dateOfIncorporation, parentCompanyId } = data;
+
+  if (!name || !country) throw new AppError("name and country are required", 422);
+
   const exists = await Company.findOne({ where: { name } });
   if (exists) throw new AppError(`Company "${name}" already exists`, 409);
 
   return Company.create({
     name,
-    abbr: abbreviation,
-    currency: defaultCurrency,
     country,
-    region,
-    zone,
-    city,
-    code,
+    region: region || null,
+    zone: zone || null,
+    city: city || null,
+    code: code || null,
+    dateOfIncorporation: dateOfIncorporation || null,
     parentCompanyId: parentCompanyId || null,
-    taxId,
-    phone,
-    email,
-    address,
-    website,
-    dateOfIncorporation: dateOfEstablishment,
   });
 };
 
-const getAllCompanies = async ({
-  includeDisabled = false,
-  parentCompanyId,
-} = {}) => {
+const getAllCompanies = async ({ parentCompanyId } = {}) => {
   const where = {};
-  if (!includeDisabled) where.disabled = false;
-  if (parentCompanyId !== undefined)
-    where.parentCompanyId = parentCompanyId || null; // null = root companies
+  if (parentCompanyId !== undefined) where.parentCompanyId = parentCompanyId || null;
 
   return Company.findAll({
     where,
@@ -91,7 +66,6 @@ const updateCompany = async (id, updates) => {
   const company = await Company.findByPk(id);
   if (!company) throw new AppError("Company not found", 404);
 
-  // Prevent a company from being set as its own parent
   if (updates.parentCompanyId && updates.parentCompanyId === id)
     throw new AppError("A company cannot be its own parent", 422);
 
@@ -108,34 +82,17 @@ const deleteCompany = async (id) => {
     Department.count({ where: { companyId: id } }),
   ]);
 
-  if (subsidiaries > 0)
-    throw new AppError(
-      `Cannot delete — company has ${subsidiaries} subsidiary(ies)`,
-      409,
-    );
-  if (branches > 0)
-    throw new AppError(
-      `Cannot delete — company has ${branches} branch(es)`,
-      409,
-    );
-  if (departments > 0)
-    throw new AppError(
-      `Cannot delete — company has ${departments} department(s)`,
-      409,
-    );
+  if (subsidiaries > 0) throw new AppError(`Cannot delete — company has ${subsidiaries} subsidiary(ies)`, 409);
+  if (branches > 0) throw new AppError(`Cannot delete — company has ${branches} branch(es)`, 409);
+  if (departments > 0) throw new AppError(`Cannot delete — company has ${departments} department(s)`, 409);
 
   await company.destroy();
 };
 
-// Get full company tree rooted at a given company (or all roots)
 const getCompanyTree = async (rootId = null) => {
   const where = { parentCompanyId: rootId };
-  const nodes = await Company.findAll({
-    where,
-    order: [["name", "ASC"]],
-  });
+  const nodes = await Company.findAll({ where, order: [["name", "ASC"]] });
 
-  // Recursively attach children
   for (const node of nodes) {
     node.dataValues.children = await getCompanyTree(node.id);
   }
@@ -146,29 +103,31 @@ const getCompanyTree = async (rootId = null) => {
 //  BRANCH
 // ══════════════════════════════════════════════
 
-const createBranch = async ({
-  name,
-  country,
-  region,
-  zone,
-  city,
-  code,
-  companyId,
-  dateOfIncorporation,
-}) => {
+const createBranch = async (data) => {
+  const { name, companyId, country, region, zone, city, code, dateOfIncorporation } = data;
+
+  if (!name || !companyId) throw new AppError("name and companyId are required", 422);
+
   const company = await Company.findByPk(companyId);
   if (!company) throw new AppError("Company not found", 404);
 
   const exists = await Branch.findOne({ where: { name, companyId } });
-  if (exists)
-    throw new AppError(`Branch "${name}" already exists in this company`, 409);
+  if (exists) throw new AppError(`Branch "${name}" already exists in this company`, 409);
 
-  return Branch.create({ name, country, region, zone, city, code, companyId, dateOfIncorporation });
+  return Branch.create({
+    name,
+    companyId,
+    country: country || "Ethiopia",
+    region: region || null,
+    zone: zone || null,
+    city: city || null,
+    code: code || null,
+    dateOfIncorporation: dateOfIncorporation || null,
+  });
 };
 
-const getAllBranches = async ({ companyId, includeDisabled = false } = {}) => {
+const getAllBranches = async ({ companyId } = {}) => {
   const where = {};
-  if (!includeDisabled) where.disabled = false;
   if (companyId) where.companyId = companyId;
 
   return Branch.findAll({
@@ -190,7 +149,6 @@ const updateBranch = async (id, updates) => {
   const branch = await Branch.findByPk(id);
   if (!branch) throw new AppError("Branch not found", 404);
 
-  // If moving to a different company, verify it exists
   if (updates.companyId && updates.companyId !== branch.companyId) {
     const company = await Company.findByPk(updates.companyId);
     if (!company) throw new AppError("Target company not found", 404);
@@ -203,14 +161,9 @@ const deleteBranch = async (id) => {
   const branch = await Branch.findByPk(id);
   if (!branch) throw new AppError("Branch not found", 404);
 
-  // Guarded by employee FK — check via raw count to avoid circular import
   const { Employee } = require("../../../models");
   const empCount = await Employee.count({ where: { branchId: id } });
-  if (empCount > 0)
-    throw new AppError(
-      `Cannot delete — ${empCount} employee(s) assigned to this branch`,
-      409,
-    );
+  if (empCount > 0) throw new AppError(`Cannot delete — ${empCount} employee(s) assigned to this branch`, 409);
 
   await branch.destroy();
 };
@@ -219,44 +172,30 @@ const deleteBranch = async (id) => {
 //  DEPARTMENT
 // ══════════════════════════════════════════════
 
-const createDepartment = async ({ name, companyId, parentDepartmentId }) => {
+const createDepartment = async (data) => {
+  const { name, companyId, parentDepartmentId } = data;
+
+  if (!name || !companyId) throw new AppError("name and companyId are required", 422);
+
   const company = await Company.findByPk(companyId);
   if (!company) throw new AppError("Company not found", 404);
 
   if (parentDepartmentId) {
     const parent = await Department.findByPk(parentDepartmentId);
     if (!parent) throw new AppError("Parent department not found", 404);
-    if (parent.companyId !== companyId)
-      throw new AppError(
-        "Parent department must belong to the same company",
-        422,
-      );
+    if (parent.companyId !== companyId) throw new AppError("Parent department must belong to the same company", 422);
   }
 
   const exists = await Department.findOne({ where: { name, companyId } });
-  if (exists)
-    throw new AppError(
-      `Department "${name}" already exists in this company`,
-      409,
-    );
+  if (exists) throw new AppError(`Department "${name}" already exists in this company`, 409);
 
-  return Department.create({
-    name,
-    companyId,
-    parentDepartmentId: parentDepartmentId || null,
-  });
+  return Department.create({ name, companyId, parentDepartmentId: parentDepartmentId || null });
 };
 
-const getAllDepartments = async ({
-  companyId,
-  parentDepartmentId,
-  includeDisabled = false,
-} = {}) => {
+const getAllDepartments = async ({ companyId, parentDepartmentId } = {}) => {
   const where = {};
-  if (!includeDisabled) where.disabled = false;
   if (companyId) where.companyId = companyId;
-  if (parentDepartmentId !== undefined)
-    where.parentDepartmentId = parentDepartmentId || null;
+  if (parentDepartmentId !== undefined) where.parentDepartmentId = parentDepartmentId || null;
 
   return Department.findAll({
     where,
@@ -286,16 +225,10 @@ const updateDepartment = async (id, updates) => {
   if (!dept) throw new AppError("Department not found", 404);
 
   if (updates.parentDepartmentId) {
-    if (updates.parentDepartmentId === id)
-      throw new AppError("A department cannot be its own parent", 422);
-
+    if (updates.parentDepartmentId === id) throw new AppError("A department cannot be its own parent", 422);
     const parent = await Department.findByPk(updates.parentDepartmentId);
     if (!parent) throw new AppError("Parent department not found", 404);
-    if (parent.companyId !== dept.companyId)
-      throw new AppError(
-        "Parent department must belong to the same company",
-        422,
-      );
+    if (parent.companyId !== dept.companyId) throw new AppError("Parent department must belong to the same company", 422);
   }
 
   return dept.update(updates);
@@ -305,26 +238,18 @@ const deleteDepartment = async (id) => {
   const dept = await Department.findByPk(id);
   if (!dept) throw new AppError("Department not found", 404);
 
+  const { Employee } = require("../../../models");
   const [subDepts, empCount] = await Promise.all([
     Department.count({ where: { parentDepartmentId: id } }),
-    require("../../../models").Employee.count({ where: { departmentId: id } }),
+    Employee.count({ where: { departmentId: id } }),
   ]);
 
-  if (subDepts > 0)
-    throw new AppError(
-      `Cannot delete — department has ${subDepts} sub-department(s)`,
-      409,
-    );
-  if (empCount > 0)
-    throw new AppError(
-      `Cannot delete — ${empCount} employee(s) assigned to this department`,
-      409,
-    );
+  if (subDepts > 0) throw new AppError(`Cannot delete — department has ${subDepts} sub-department(s)`, 409);
+  if (empCount > 0) throw new AppError(`Cannot delete — ${empCount} employee(s) assigned to this department`, 409);
 
   await dept.destroy();
 };
 
-// Recursive department tree within a company
 const getDepartmentTree = async (companyId, parentDepartmentId = null) => {
   const nodes = await Department.findAll({
     where: { companyId, parentDepartmentId },
@@ -341,15 +266,18 @@ const getDepartmentTree = async (companyId, parentDepartmentId = null) => {
 //  DESIGNATION
 // ══════════════════════════════════════════════
 
-const createDesignation = async ({ name, jobFunction }) => {
+const createDesignation = async (data) => {
+  const { name } = data;
+  if (!name) throw new AppError("name is required", 422);
+
   const exists = await Designation.findOne({ where: { name } });
   if (exists) throw new AppError(`Designation "${name}" already exists`, 409);
-  return Designation.create({ name, jobFunction });
+
+  return Designation.create({ name });
 };
 
-const getAllDesignations = async ({ includeDisabled = false, search } = {}) => {
+const getAllDesignations = async ({ search } = {}) => {
   const where = {};
-  if (!includeDisabled) where.disabled = false;
   if (search) where.name = { [Op.iLike]: `%${search}%` };
 
   return Designation.findAll({ where, order: [["name", "ASC"]] });
@@ -371,14 +299,9 @@ const deleteDesignation = async (id) => {
   const designation = await Designation.findByPk(id);
   if (!designation) throw new AppError("Designation not found", 404);
 
-  const empCount = await require("../../../models").Employee.count({
-    where: { designationId: id },
-  });
-  if (empCount > 0)
-    throw new AppError(
-      `Cannot delete — ${empCount} employee(s) hold this designation`,
-      409,
-    );
+  const { Employee } = require("../../../models");
+  const empCount = await Employee.count({ where: { designationId: id } });
+  if (empCount > 0) throw new AppError(`Cannot delete — ${empCount} employee(s) hold this designation`, 409);
 
   await designation.destroy();
 };
@@ -387,16 +310,18 @@ const deleteDesignation = async (id) => {
 //  EMPLOYMENT TYPE
 // ══════════════════════════════════════════════
 
-const createEmploymentType = async ({ name, description }) => {
+const createEmploymentType = async (data) => {
+  const { name } = data;
+  if (!name) throw new AppError("name is required", 422);
+
   const exists = await EmploymentType.findOne({ where: { name } });
-  if (exists)
-    throw new AppError(`Employment type "${name}" already exists`, 409);
-  return EmploymentType.create({ name, description });
+  if (exists) throw new AppError(`Employment type "${name}" already exists`, 409);
+
+  return EmploymentType.create({ name });
 };
 
-const getAllEmploymentTypes = async ({ includeDisabled = false } = {}) => {
-  const where = includeDisabled ? {} : { disabled: false };
-  return EmploymentType.findAll({ where, order: [["name", "ASC"]] });
+const getAllEmploymentTypes = async () => {
+  return EmploymentType.findAll({ order: [["name", "ASC"]] });
 };
 
 const getEmploymentTypeById = async (id) => {
@@ -415,14 +340,9 @@ const deleteEmploymentType = async (id) => {
   const type = await EmploymentType.findByPk(id);
   if (!type) throw new AppError("Employment type not found", 404);
 
-  const empCount = await require("../../../models").Employee.count({
-    where: { employmentTypeId: id },
-  });
-  if (empCount > 0)
-    throw new AppError(
-      `Cannot delete — ${empCount} employee(s) use this employment type`,
-      409,
-    );
+  const { Employee } = require("../../../models");
+  const empCount = await Employee.count({ where: { employmentTypeId: id } });
+  if (empCount > 0) throw new AppError(`Cannot delete — ${empCount} employee(s) use this employment type`, 409);
 
   await type.destroy();
 };
@@ -431,24 +351,23 @@ const deleteEmploymentType = async (id) => {
 //  EMPLOYEE GRADE
 // ══════════════════════════════════════════════
 
-const createEmployeeGrade = async ({
-  name,
-  description,
-  defaultLeavePolicyId,
-}) => {
+const createEmployeeGrade = async (data) => {
+  const { name, minBaseSalary, maxBaseSalary, sortOrder } = data;
+  if (!name) throw new AppError("name is required", 422);
+
   const exists = await EmployeeGrade.findOne({ where: { name } });
-  if (exists)
-    throw new AppError(`Employee grade "${name}" already exists`, 409);
+  if (exists) throw new AppError(`Employee grade "${name}" already exists`, 409);
+
   return EmployeeGrade.create({
     name,
-    description,
-    defaultLeavePolicyId: defaultLeavePolicyId || null,
+    minBaseSalary: minBaseSalary ?? null,
+    maxBaseSalary: maxBaseSalary ?? null,
+    sortOrder: sortOrder ?? 0,
   });
 };
 
-const getAllEmployeeGrades = async ({ includeDisabled = false } = {}) => {
-  const where = includeDisabled ? {} : { disabled: false };
-  return EmployeeGrade.findAll({ where, order: [["name", "ASC"]] });
+const getAllEmployeeGrades = async () => {
+  return EmployeeGrade.findAll({ order: [["sortOrder", "ASC"], ["name", "ASC"]] });
 };
 
 const getEmployeeGradeById = async (id) => {
@@ -467,14 +386,9 @@ const deleteEmployeeGrade = async (id) => {
   const grade = await EmployeeGrade.findByPk(id);
   if (!grade) throw new AppError("Employee grade not found", 404);
 
-  const empCount = await require("../../../models").Employee.count({
-    where: { employeeGradeId: id },
-  });
-  if (empCount > 0)
-    throw new AppError(
-      `Cannot delete — ${empCount} employee(s) assigned to this grade`,
-      409,
-    );
+  const { Employee } = require("../../../models");
+  const empCount = await Employee.count({ where: { employeeGradeId: id } });
+  if (empCount > 0) throw new AppError(`Cannot delete — ${empCount} employee(s) assigned to this grade`, 409);
 
   await grade.destroy();
 };
@@ -484,7 +398,6 @@ const deleteEmployeeGrade = async (id) => {
 // ══════════════════════════════════════════════
 
 module.exports = {
-  // Company
   createCompany,
   getAllCompanies,
   getCompanyById,
@@ -492,14 +405,12 @@ module.exports = {
   deleteCompany,
   getCompanyTree,
 
-  // Branch
   createBranch,
   getAllBranches,
   getBranchById,
   updateBranch,
   deleteBranch,
 
-  // Department
   createDepartment,
   getAllDepartments,
   getDepartmentById,
@@ -507,21 +418,18 @@ module.exports = {
   deleteDepartment,
   getDepartmentTree,
 
-  // Designation
   createDesignation,
   getAllDesignations,
   getDesignationById,
   updateDesignation,
   deleteDesignation,
 
-  // EmploymentType
   createEmploymentType,
   getAllEmploymentTypes,
   getEmploymentTypeById,
   updateEmploymentType,
   deleteEmploymentType,
 
-  // EmployeeGrade
   createEmployeeGrade,
   getAllEmployeeGrades,
   getEmployeeGradeById,

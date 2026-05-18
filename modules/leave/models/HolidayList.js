@@ -10,36 +10,26 @@ module.exports = (sequelize, DataTypes) => {
     name: {
       type:      DataTypes.STRING(255),
       allowNull: false,
-      // unique:    true,
-      comment:   'e.g. "Kenya Public Holidays 2025", "Nairobi Office 2025"',
+      comment:   'e.g. "Ethiopian Christmas", "Eid al-Fitr", "Easter Weekend"',
     },
 
-    // ── Scope ──────────────────────────────────────────────────
-    // FK → companies.id — resolved via index.js association
-    companyId: {
-      type:      DataTypes.UUID,
-      allowNull: true,
-      comment:   'FK → companies.id — null means applies to all companies',
-    },
-
-    // ── Period ─────────────────────────────────────────────────
+    // ── Date range ─────────────────────────────────────────────
     fromDate: {
       type:      DataTypes.DATEONLY,
       allowNull: false,
+      comment:   'Start date — same as toDate for single-day holidays',
     },
     toDate: {
       type:      DataTypes.DATEONLY,
       allowNull: false,
+      comment:   'End date — same as fromDate for single-day holidays',
     },
 
-    // ── Holiday entries (stored as JSONB array) ─────────────────
-    // Each entry: { date: 'YYYY-MM-DD', description: 'New Year' }
-    // Avoids a separate HolidayEntry table for a simple list.
-    holidays: {
-      type:         DataTypes.JSONB,
-      allowNull:    false,
-      defaultValue: [],
-      comment:      'Array of { date, description } objects',
+    // ── Scope ──────────────────────────────────────────────────
+    companyId: {
+      type:      DataTypes.UUID,
+      allowNull: true,
+      comment:   'FK → companies.id — null means applies to all companies',
     },
 
     // ── Behaviour flags ────────────────────────────────────────
@@ -50,11 +40,11 @@ module.exports = (sequelize, DataTypes) => {
     },
   }, {
     tableName: 'holiday_lists',
-    comment:   'Named list of public/company holidays for a year — referenced by ShiftType, Employee, LeaveApplication',
+    comment:   'Holiday records — one row per holiday or holiday range',
     indexes: [
-      { unique: true, fields: ['name', 'company_id'], name: 'uq_holiday_lists_name_company' },
+      { unique: true, fields: ['name', 'from_date', 'to_date', 'company_id'], name: 'uq_holiday_lists_name_dates_company' },
       { fields: ['company_id'], name: 'idx_holiday_lists_company' },
-      { fields: ['from_date', 'to_date'], name: 'idx_holiday_lists_period' },
+      { fields: ['from_date', 'to_date'], name: 'idx_holiday_lists_dates' },
     ],
   });
   return HolidayList;

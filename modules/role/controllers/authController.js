@@ -10,6 +10,7 @@
 
 const authService = require('../services/authService');
 const { created, ok, noContent } = require('../../../utils/response');
+const { catchAsync } = require("../../../utils/catchAsync");
 
 // Cookie configuration
 const isProd = process.env.NODE_ENV === 'production';
@@ -66,7 +67,21 @@ const login = async (req, res, next) => {
     next(err);
   }
 };
+/**
+ * POST /api/auth/create-username
+ * Employee creates their username for login (when no work email assigned).
+ */
+const createUsername = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const { username } = req.body;
 
+  const result = await authService.createUsername(userId, username);
+
+  ok(res, {
+    message: 'Username created successfully. You can now use it to log in.',
+    data: result,
+  });
+});
 // ─────────────────────────────────────────────
 //  LOGOUT (clears cookie, terminates session)
 // ─────────────────────────────────────────────
@@ -185,6 +200,7 @@ const getAllActiveSessions = async (req, res, next) => {
 module.exports = {
   register,
   login,
+  createUsername,
   logout,
   getMe,
   getMySessions,

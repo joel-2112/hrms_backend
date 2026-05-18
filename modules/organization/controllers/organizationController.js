@@ -11,7 +11,7 @@ const { AppError } = require('../../../middlewares/errorMiddleware');
 
 const createCompany = catchAsync(async (req, res) => {
   const company = await organizationService.createCompany(req.body);
-  return created(res, { company }, 'Company created successfully');
+  created(res, { message: 'Company created successfully', data: company });
 });
 
 const getAllCompanies = catchAsync(async (req, res) => {
@@ -20,64 +20,58 @@ const getAllCompanies = catchAsync(async (req, res) => {
     includeDisabled: includeDisabled === 'true',
     parentCompanyId: parentCompanyId || undefined,
   });
-  return ok(res, { companies }, 'Companies fetched successfully', {
-    results: companies.length,
-  });
+  ok(res, { message: 'Companies fetched successfully', data: companies });
 });
 
 const getCompanyById = catchAsync(async (req, res) => {
   const company = await organizationService.getCompanyById(req.params.id);
-  return ok(res, { company }, 'Company fetched successfully');
+  ok(res, { message: 'Company fetched successfully', data: company });
 });
 
 const updateCompany = catchAsync(async (req, res) => {
   const company = await organizationService.updateCompany(req.params.id, req.body);
-  return ok(res, { company }, 'Company updated successfully');
+  ok(res, { message: 'Company updated successfully', data: company });
 });
 
 const deleteCompany = catchAsync(async (req, res) => {
   await organizationService.deleteCompany(req.params.id);
-  return noContent(res);
+  noContent(res);
 });
 
 const getCompanyTree = catchAsync(async (req, res) => {
   const { rootId } = req.query;
   const tree = await organizationService.getCompanyTree(rootId || null);
-  return ok(res, { tree }, 'Company tree fetched successfully');
+  ok(res, { message: 'Company tree fetched successfully', data: tree });
 });
 
 // ══════════════════════════════════════════════
 //  BRANCH
 // ══════════════════════════════════════════════
+
 const createBranch = catchAsync(async (req, res) => {
   const branch = await organizationService.createBranch(req.body);
-  return created(res, { branch }, 'Branch created successfully');
+  created(res, { message: 'Branch created successfully', data: branch });
 });
 
 const getAllBranches = catchAsync(async (req, res) => {
   const { companyId, includeDisabled } = req.query;
-  const branches = await organizationService.getAllBranches({
-    companyId,
-    includeDisabled: includeDisabled === 'true',
-  });
-  return ok(res, { branches }, 'Branches fetched successfully', {
-    results: branches.length,
-  });
+  const branches = await organizationService.getAllBranches({ companyId, includeDisabled: includeDisabled === 'true' });
+  ok(res, { message: 'Branches fetched successfully', data: branches });
 });
 
 const getBranchById = catchAsync(async (req, res) => {
   const branch = await organizationService.getBranchById(req.params.id);
-  return ok(res, { branch }, 'Branch fetched successfully');
+  ok(res, { message: 'Branch fetched successfully', data: branch });
 });
 
 const updateBranch = catchAsync(async (req, res) => {
   const branch = await organizationService.updateBranch(req.params.id, req.body);
-  return ok(res, { branch }, 'Branch updated successfully');
+  ok(res, { message: 'Branch updated successfully', data: branch });
 });
 
 const deleteBranch = catchAsync(async (req, res) => {
   await organizationService.deleteBranch(req.params.id);
-  return noContent(res);
+  noContent(res);
 });
 
 // ══════════════════════════════════════════════
@@ -86,7 +80,7 @@ const deleteBranch = catchAsync(async (req, res) => {
 
 const createDepartment = catchAsync(async (req, res) => {
   const department = await organizationService.createDepartment(req.body);
-  return created(res, { department }, 'Department created successfully');
+  created(res, { message: 'Department created successfully', data: department });
 });
 
 const getAllDepartments = catchAsync(async (req, res) => {
@@ -96,33 +90,29 @@ const getAllDepartments = catchAsync(async (req, res) => {
     parentDepartmentId: parentDepartmentId || undefined,
     includeDisabled: includeDisabled === 'true',
   });
-  return ok(res, { departments }, 'Departments fetched successfully', {
-    results: departments.length,
-  });
+  ok(res, { message: 'Departments fetched successfully', data: departments });
 });
 
 const getDepartmentById = catchAsync(async (req, res) => {
   const department = await organizationService.getDepartmentById(req.params.id);
-  return ok(res, { department }, 'Department fetched successfully');
+  ok(res, { message: 'Department fetched successfully', data: department });
 });
 
 const updateDepartment = catchAsync(async (req, res) => {
   const department = await organizationService.updateDepartment(req.params.id, req.body);
-  return ok(res, { department }, 'Department updated successfully');
+  ok(res, { message: 'Department updated successfully', data: department });
 });
 
 const deleteDepartment = catchAsync(async (req, res) => {
   await organizationService.deleteDepartment(req.params.id);
-  return noContent(res);
+  noContent(res);
 });
 
 const getDepartmentTree = catchAsync(async (req, res) => {
   const { companyId } = req.query;
-  if (!companyId) {
-    throw new AppError('companyId query parameter is required', 400);
-  }
+  if (!companyId) throw new AppError('companyId query parameter is required', 400);
   const tree = await organizationService.getDepartmentTree(companyId);
-  return ok(res, { tree }, 'Department tree fetched successfully');
+  ok(res, { message: 'Department tree fetched successfully', data: tree });
 });
 
 // ══════════════════════════════════════════════
@@ -131,33 +121,30 @@ const getDepartmentTree = catchAsync(async (req, res) => {
 
 const createDesignation = catchAsync(async (req, res) => {
   const designation = await organizationService.createDesignation(req.body);
-  return created(res, { designation }, 'Designation created successfully');
+  created(res, { message: 'Designation created successfully', data: designation });
 });
 
 const getAllDesignations = catchAsync(async (req, res) => {
   const { includeDisabled, search } = req.query;
   const designations = await organizationService.getAllDesignations({
-    includeDisabled: includeDisabled === 'true',
-    search,
+    includeDisabled: includeDisabled === 'true', search,
   });
-  return ok(res, { designations }, 'Designations fetched successfully', {
-    results: designations.length,
-  });
+  ok(res, { message: 'Designations fetched successfully', data: designations });
 });
 
 const getDesignationById = catchAsync(async (req, res) => {
   const designation = await organizationService.getDesignationById(req.params.id);
-  return ok(res, { designation }, 'Designation fetched successfully');
+  ok(res, { message: 'Designation fetched successfully', data: designation });
 });
 
 const updateDesignation = catchAsync(async (req, res) => {
   const designation = await organizationService.updateDesignation(req.params.id, req.body);
-  return ok(res, { designation }, 'Designation updated successfully');
+  ok(res, { message: 'Designation updated successfully', data: designation });
 });
 
 const deleteDesignation = catchAsync(async (req, res) => {
   await organizationService.deleteDesignation(req.params.id);
-  return noContent(res);
+  noContent(res);
 });
 
 // ══════════════════════════════════════════════
@@ -166,32 +153,28 @@ const deleteDesignation = catchAsync(async (req, res) => {
 
 const createEmploymentType = catchAsync(async (req, res) => {
   const employmentType = await organizationService.createEmploymentType(req.body);
-  return created(res, { employmentType }, 'Employment type created successfully');
+  created(res, { message: 'Employment type created successfully', data: employmentType });
 });
 
 const getAllEmploymentTypes = catchAsync(async (req, res) => {
   const { includeDisabled } = req.query;
-  const employmentTypes = await organizationService.getAllEmploymentTypes({
-    includeDisabled: includeDisabled === 'true',
-  });
-  return ok(res, { employmentTypes }, 'Employment types fetched successfully', {
-    results: employmentTypes.length,
-  });
+  const employmentTypes = await organizationService.getAllEmploymentTypes({ includeDisabled: includeDisabled === 'true' });
+  ok(res, { message: 'Employment types fetched successfully', data: employmentTypes });
 });
 
 const getEmploymentTypeById = catchAsync(async (req, res) => {
   const employmentType = await organizationService.getEmploymentTypeById(req.params.id);
-  return ok(res, { employmentType }, 'Employment type fetched successfully');
+  ok(res, { message: 'Employment type fetched successfully', data: employmentType });
 });
 
 const updateEmploymentType = catchAsync(async (req, res) => {
   const employmentType = await organizationService.updateEmploymentType(req.params.id, req.body);
-  return ok(res, { employmentType }, 'Employment type updated successfully');
+  ok(res, { message: 'Employment type updated successfully', data: employmentType });
 });
 
 const deleteEmploymentType = catchAsync(async (req, res) => {
   await organizationService.deleteEmploymentType(req.params.id);
-  return noContent(res);
+  noContent(res);
 });
 
 // ══════════════════════════════════════════════
@@ -200,32 +183,28 @@ const deleteEmploymentType = catchAsync(async (req, res) => {
 
 const createEmployeeGrade = catchAsync(async (req, res) => {
   const grade = await organizationService.createEmployeeGrade(req.body);
-  return created(res, { grade }, 'Employee grade created successfully');
+  created(res, { message: 'Employee grade created successfully', data: grade });
 });
 
 const getAllEmployeeGrades = catchAsync(async (req, res) => {
   const { includeDisabled } = req.query;
-  const grades = await organizationService.getAllEmployeeGrades({
-    includeDisabled: includeDisabled === 'true',
-  });
-  return ok(res, { grades }, 'Employee grades fetched successfully', {
-    results: grades.length,
-  });
+  const grades = await organizationService.getAllEmployeeGrades({ includeDisabled: includeDisabled === 'true' });
+  ok(res, { message: 'Employee grades fetched successfully', data: grades });
 });
 
 const getEmployeeGradeById = catchAsync(async (req, res) => {
   const grade = await organizationService.getEmployeeGradeById(req.params.id);
-  return ok(res, { grade }, 'Employee grade fetched successfully');
+  ok(res, { message: 'Employee grade fetched successfully', data: grade });
 });
 
 const updateEmployeeGrade = catchAsync(async (req, res) => {
   const grade = await organizationService.updateEmployeeGrade(req.params.id, req.body);
-  return ok(res, { grade }, 'Employee grade updated successfully');
+  ok(res, { message: 'Employee grade updated successfully', data: grade });
 });
 
 const deleteEmployeeGrade = catchAsync(async (req, res) => {
   await organizationService.deleteEmployeeGrade(req.params.id);
-  return noContent(res);
+  noContent(res);
 });
 
 // ══════════════════════════════════════════════
@@ -233,7 +212,6 @@ const deleteEmployeeGrade = catchAsync(async (req, res) => {
 // ══════════════════════════════════════════════
 
 module.exports = {
-  // Company
   createCompany,
   getAllCompanies,
   getCompanyById,
@@ -241,14 +219,12 @@ module.exports = {
   deleteCompany,
   getCompanyTree,
 
-  // Branch
   createBranch,
   getAllBranches,
   getBranchById,
   updateBranch,
   deleteBranch,
 
-  // Department
   createDepartment,
   getAllDepartments,
   getDepartmentById,
@@ -256,21 +232,18 @@ module.exports = {
   deleteDepartment,
   getDepartmentTree,
 
-  // Designation
   createDesignation,
   getAllDesignations,
   getDesignationById,
   updateDesignation,
   deleteDesignation,
 
-  // EmploymentType
   createEmploymentType,
   getAllEmploymentTypes,
   getEmploymentTypeById,
   updateEmploymentType,
   deleteEmploymentType,
 
-  // EmployeeGrade
   createEmployeeGrade,
   getAllEmployeeGrades,
   getEmployeeGradeById,

@@ -25,8 +25,13 @@ module.exports = (sequelize, DataTypes) => {
       country: {
         type: DataTypes.STRING(100),
         allowNull: true,
+        defaultValue: "Ethiopia",
       },
       region: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      zone: {
         type: DataTypes.STRING,
         allowNull: true,
       },
@@ -43,16 +48,6 @@ module.exports = (sequelize, DataTypes) => {
       dateOfIncorporation: {
         type: DataTypes.DATEONLY,
         allowNull: true,
-      },
-      phone: {
-        type: DataTypes.STRING(30),
-        allowNull: true,
-      },
-      // ── Behaviour flags ────────────────────────────────────────
-      disabled: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
       },
     },
     {

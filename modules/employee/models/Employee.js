@@ -15,8 +15,7 @@ module.exports = (sequelize, DataTypes) => {
       userId: {
         type: DataTypes.UUID,
         allowNull: true,
-        comment:
-          "FK → users.id — the login account for this employee",
+        comment: "FK → users.id — the login account for this employee",
       },
       companyId: {
         type: DataTypes.UUID,
@@ -52,6 +51,13 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
         comment: "FK → employees.id (self-ref) — direct line manager",
+      },
+
+      workLocation: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment:
+          "Primary work location (e.g. 'Head Office', 'Branch', 'anywhere') for organizational and payroll purposes",
       },
 
       // ─────────────────────────────────────────────
@@ -105,7 +111,10 @@ module.exports = (sequelize, DataTypes) => {
           isIn: [["Single", "Married", "Divorced", "Widowed"]],
         },
       },
-
+      dateOfBirth: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+      },
       // ─────────────────────────────────────────────
       //  SECTION 3 — PHOTO and docuuments
       // ─────────────────────────────────────────────
@@ -122,28 +131,19 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       // ─────────────────────────────────────────────
-      //  SECTION 4 — EMPLOYMENT DETAILS
+      //  SECTION 4 — EMPLOYMENT DETAILS for the new employee form
       // ─────────────────────────────────────────────
       status: {
         type: DataTypes.STRING,
         allowNull: false,
-        defaultValue: "Active",
+        defaultValue: "pending",
         validate: {
-          isIn: [["Active", "Inactive", "onLeave", "Suspended", "exited"]],
+          isIn: [["pending", "Active", "onLeave", "Suspended", "exited"]],
         },
       },
       dateOfJoining: {
         type: DataTypes.DATEONLY,
         allowNull: false,
-      },
-      dateOfBirth: {
-        type: DataTypes.DATEONLY,
-        allowNull: true,
-      },
-      salary: {
-        type: DataTypes.DECIMAL(15, 2),
-        allowNull: true,
-        comment: "Current gross salary for payroll processing",
       },
       portfolioUrl: {
         type: DataTypes.STRING(512),
@@ -157,6 +157,12 @@ module.exports = (sequelize, DataTypes) => {
         validate: { isUrl: true },
         comment: "Link to GitHub profile for technical employees",
       },
+      linkedInUrl: {
+        type: DataTypes.STRING(512),
+        allowNull: true,
+        validate: { isUrl: true },
+        comment: "Link to LinkedIn profile for professional networking",
+      },
       contractEndDate: {
         type: DataTypes.DATEONLY,
         allowNull: true,
@@ -167,33 +173,51 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Last working day — populated on separation",
       },
-      encashmentDate: {
-        type: DataTypes.DATEONLY,
-        allowNull: true,
-        comment: "Date of final leave encashment on exit",
-      },
-
       // ─────────────────────────────────────────────
       //  SECTION 5 — CONTACT
       // ─────────────────────────────────────────────
+      username: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+      },
       email: {
         type: DataTypes.STRING(255),
         allowNull: true,
         validate: { isEmail: true },
-        comment: "Work email — typically mirrors User.email",
+        comment: "working email — typically mirrors User.email",
       },
+      personalEmail: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        validate: { isEmail: true },
+        comment: "alternative personal email for emergency contact",
+      },
+      needWorkEmail: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+        comment:
+          "Set by approver — if true, employee needs work email assigned by IT before login",
+      },
+
       phoneNumber: {
         type: DataTypes.STRING(30),
         allowNull: true,
-        comment: "Office / desk phone",
+        comment: "Personal phone number",
+      },
+      alternativePhoneNumber: {
+        type: DataTypes.STRING(30),
+        allowNull: true,
+        comment: "Secondary phone number for emergency contact",
       },
 
       // ─────────────────────────────────────────────
       //  SECTION 6 — ADDRESS
       // ─────────────────────────────────────────────
-      City: {
+      Country: {
         type: DataTypes.STRING(100),
         allowNull: true,
+        defaultValue: "Ethiopia",
       },
       Region: {
         type: DataTypes.STRING(100),
@@ -203,16 +227,13 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(100),
         allowNull: true,
       },
-      Country: {
+      City: {
         type: DataTypes.STRING(100),
         allowNull: true,
       },
-      currentPostalCode: {
-        type: DataTypes.STRING(20),
-        allowNull: true,
-      },
+
       // ─────────────────────────────────────────────
-      //  SECTION 9 — BANK DETAILS
+      //  SECTION 9 — payroll and financial info
       // ─────────────────────────────────────────────
       bankName: {
         type: DataTypes.STRING(150),
@@ -222,19 +243,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(100),
         allowNull: true,
       },
-      mobileMoneyNumber: {
-        type: DataTypes.STRING(30),
+      tinNumber: {
+        type: DataTypes.STRING(100),
         allowNull: true,
-        comment:
-          "telebitt or equivalent mobile money number for payroll disbursement",
       },
-      paymentMethod: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: "Bank Transfer",
-        validate: {
-          isIn: [["Bank Transfer", "Tele Birr ", "Cheque", "Cash"]],
-        },
+      salary: {
+        type: DataTypes.DECIMAL(15, 2),
+        allowNull: true,
+        comment: "Current gross salary for payroll processing",
       },
 
       // ─────────────────────────────────────────────

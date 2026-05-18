@@ -13,31 +13,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       comment:   'Contract category e.g. "Full-time", "Part-time", "Contract", "Intern"',
     },
-    description: {
-      type:      DataTypes.TEXT,
-      allowNull: true,
+    isActive: {
+      type:         DataTypes.BOOLEAN,
+      allowNull:    true,
+      defaultValue: true,
+      comment:      'Soft delete flag',
     },
 
-    // ── Payroll behaviour hints ────────────────────────────────
-    isFullTime: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-      comment:      'Full-time employees accrue leave and are included in statutory payroll',
-    },
-    isContractual: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-      comment:      'Contract workers may have different leave and tax treatment',
-    },
-
-    // ── Behaviour flags ────────────────────────────────────────
-    disabled: {
-      type:         DataTypes.BOOLEAN,
-      allowNull:    false,
-      defaultValue: false,
-    },
   }, {
     tableName: 'employment_types',
     comment:   'Contract type master — referenced only by Employee',

@@ -55,6 +55,19 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       validate:  { isEmail: true },
     },
+    nationalId: {
+      type:      DataTypes.STRING(100),
+      allowNull: true,
+    },
+    photo: {
+      type:      DataTypes.STRING(255),
+      allowNull: true,
+      comment:   'URL or file path to contact photo',
+    },
+    address: {
+      type:      DataTypes.STRING(255),
+      allowNull: true,
+    },
   }, {
     tableName: 'employee_emergency_contacts',
     comment:   'Emergency contacts — hasMany allows multiple contacts per employee',

@@ -16,11 +16,6 @@ module.exports = (sequelize, DataTypes) => {
         comment:
           'Seniority tier e.g. "Grade A", "Senior", "Associate", "Executive"',
       },
-      description: {
-        type: DataTypes.TEXT,
-        allowNull: true,
-      },
-
       // ── Pay band boundaries ────────────────────────────────────
       minBaseSalary: {
         type: DataTypes.DECIMAL(15, 2),
@@ -32,12 +27,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         comment: "Upper bound of base salary for this grade (informational)",
       },
-      defaultLeavePolicyId: {
-        type: DataTypes.UUID,
-        allowNull: true,
-        comment:
-          "FK → leave_policies.id — default leave policy for employees with this grade",
-      },
+
 
       // ── Ordering ───────────────────────────────────────────────
       sortOrder: {
@@ -46,13 +36,6 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 0,
         comment:
           "Lower number = more junior; used to order grades in dropdowns",
-      },
-
-      // ── Behaviour flags ────────────────────────────────────────
-      disabled: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
       },
     },
     {

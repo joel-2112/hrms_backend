@@ -14,7 +14,7 @@
 
 const { Op } = require('sequelize');
 const crypto = require('crypto');
-const { User, Role, UserRole, RoleProfile, UserSession, LoginAttempt } = require('../../../models');
+const { User, Role, UserRole, RoleProfile, UserSession, LoginAttempt, Employee } = require('../../../models');
 const { AppError } = require('../../../middlewares/errorMiddleware');
 const { generateToken, verifyToken } = require('../../../utils/jwt');
 
@@ -138,41 +138,79 @@ const register = async ({ firstName, middleName, lastName, email, password, role
   return User.findByPk(user.id);
 };
 
-// ─────────────────────────────────────────────
-//  LOGIN (returns session data, token is set by controller in cookie)
-// ─────────────────────────────────────────────
 const login = async ({ email, password, ip, userAgent }) => {
   if (!email || !password) throw new AppError('Email and password are required', 422);
 
-  // Check account lockout
-  const locked = await isAccountLocked(email);
+  // ═══════════════════════════════════════════════════════════
+  //  RESOLVE USER BY LOGIN ID (work email → email → username → personal email)
+  // ═══════════════════════════════════════════════════════════
+  const loginId = email.toLowerCase().trim();
+
+  // Priority 1: Check work email (Employee.email)
+  let user = await resolveUserByWorkEmail(loginId);
+
+  // Priority 2: Check username (User.username)
+  if (!user) {
+    user = await resolveUserByUsername(loginId);
+  }
+
+  // Priority 3: Check personal email (Employee.personalEmail)
+  if (!user) {
+    user = await resolveUserByPersonalEmail(loginId);
+  }
+
+  // If still not found, check User.email directly (backward compat)
+  if (!user) {
+    user = await User.scope('withPassword').findOne({
+      where: { email: loginId },
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  NO USER FOUND
+  // ═══════════════════════════════════════════════════════════
+  if (!user) {
+    await recordLoginAttempt(loginId, ip, false);
+    throw new AppError('Invalid email/username or password', 401);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  CHECK IF WORK EMAIL IS PENDING
+  // ═══════════════════════════════════════════════════════════
+  const employee = await Employee.findOne({ where: { userId: user.id } });
+  if (employee?.needWorkEmail) {
+    await recordLoginAttempt(loginId, ip, false);
+    throw new AppError(
+      'Your work email has not been assigned yet. Please wait for IT to configure your work email before logging in.',
+      403,
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  CHECK ACCOUNT LOCKOUT
+  // ═══════════════════════════════════════════════════════════
+  const locked = await isAccountLocked(user.email);
   if (locked) {
-    await recordLoginAttempt(email, ip, false);
+    await recordLoginAttempt(loginId, ip, false);
     throw new AppError(`Account locked. Too many failed attempts. Try again in ${LOCKOUT_DURATION_MS / 60000} minutes`, 429);
   }
 
-  const user = await User.scope('withPassword').findOne({
-    where: { email: email.toLowerCase().trim() },
-  });
-
-  if (!user) {
-    await recordLoginAttempt(email, ip, false);
-    throw new AppError('Invalid email or password', 401);
-  }
-
+  // ═══════════════════════════════════════════════════════════
+  //  CHECK STATUS & PASSWORD
+  // ═══════════════════════════════════════════════════════════
   if (user.status !== 'Active') {
-    await recordLoginAttempt(email, ip, false);
+    await recordLoginAttempt(loginId, ip, false);
     throw new AppError(`Account is ${user.status.toLowerCase()} — contact HR`, 403);
   }
 
   const valid = await user.verifyPassword(password);
   if (!valid) {
-    await recordLoginAttempt(email, ip, false);
-    throw new AppError('Invalid email or password', 401);
+    await recordLoginAttempt(loginId, ip, false);
+    throw new AppError('Invalid email/username or password', 401);
   }
 
   // Clear failed attempts on successful login
-  await clearFailedAttempts(email);
+  await clearFailedAttempts(user.email);
 
   // Generate device fingerprint
   const deviceFingerprint = generateDeviceFingerprint(ip, userAgent);
@@ -189,16 +227,13 @@ const login = async ({ email, password, ip, userAgent }) => {
 
   let session;
   if (existingSession) {
-    // Refresh existing session
     session = existingSession;
     session.lastActivityAt = new Date();
     session.expiresAt = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
     await session.save();
   } else {
-    // Create new session
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + SESSION_EXPIRY_DAYS);
-
     session = await UserSession.create({
       userId: user.id,
       sessionToken: crypto.randomBytes(32).toString('hex'),
@@ -211,10 +246,8 @@ const login = async ({ email, password, ip, userAgent }) => {
     });
   }
 
-  // Update user's last login
   await user.update({ lastLogin: new Date() }).catch(() => {});
 
-  // Build JWT payload (includes session ID for tracking)
   const tokenPayload = {
     id: user.id,
     email: user.email,
@@ -228,8 +261,7 @@ const login = async ({ email, password, ip, userAgent }) => {
   const token = generateToken(tokenPayload);
   const safeUser = await User.findByPk(user.id);
 
-  // Record successful login
-  await recordLoginAttempt(email, ip, true);
+  await recordLoginAttempt(loginId, ip, true);
 
   return {
     token,
@@ -240,6 +272,71 @@ const login = async ({ email, password, ip, userAgent }) => {
       deviceInfo: { ip, userAgent }
     }
   };
+};
+
+/**
+ * Create username for an employee who doesn't have a work email yet.
+ * Only works if needWorkEmail flag is false (approver didn't require work email).
+ */
+const createUsername = async (userId, username) => {
+  if (!username) throw new AppError('Username is required', 422);
+  
+  // Validate username format
+  const usernameRegex = /^[a-zA-Z0-9._-]{4,30}$/;
+  if (!usernameRegex.test(username)) {
+    throw new AppError('Username must be 4-30 characters: letters, numbers, dots, underscores, hyphens', 422);
+  }
+
+  // Check if username already taken
+  const existing = await User.findOne({ where: { username: username.toLowerCase().trim() } });
+  if (existing) throw new AppError('This username is already taken. Please choose another.', 409);
+
+  const user = await User.findByPk(userId);
+  if (!user) throw new AppError('User not found', 404);
+
+  // Check if user already has a username
+  if (user.username) throw new AppError('Username already set', 422);
+
+  // Check employee's needWorkEmail flag
+  const employee = await Employee.findOne({ where: { userId } });
+  if (!employee) throw new AppError('Employee record not found', 404);
+  if (employee.needWorkEmail) {
+    throw new AppError('Your account requires a work email assigned by IT. Please wait for IT to configure your work email.', 422);
+  }
+
+  await user.update({ username: username.toLowerCase().trim() });
+  
+  logger.info('Username created', { userId, username });
+  return { username: user.username };
+};
+
+// ═══════════════════════════════════════════════════════════
+//  RESOLVER HELPERS
+// ═══════════════════════════════════════════════════════════
+
+const resolveUserByWorkEmail = async (loginId) => {
+  const employee = await Employee.findOne({
+    where: { email: loginId },
+    attributes: ['userId'],
+  });
+  if (!employee?.userId) return null;
+  return User.scope('withPassword').findByPk(employee.userId);
+};
+
+const resolveUserByUsername = async (loginId) => {
+  return User.scope('withPassword').findOne({
+    where: { username: loginId },
+  });
+};
+
+const resolveUserByPersonalEmail = async (loginId) => {
+  const employee = await Employee.findOne({
+    where: { personalEmail: loginId },
+    attributes: ['userId', 'needWorkEmail'],
+  });
+  // Only allow personal email login if work email is NOT required
+  if (!employee?.userId || employee.needWorkEmail) return null;
+  return User.scope('withPassword').findByPk(employee.userId);
 };
 
 // ─────────────────────────────────────────────
@@ -477,6 +574,7 @@ const cleanupSessions = async () => {
 module.exports = {
   register,
   login,
+  createUsername,
   logout,
   getUserSessions,
   terminateSession,

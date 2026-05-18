@@ -11,7 +11,6 @@
 //  2. Imports    – one require() per model, grouped by module
 //                  Import order follows the dependency chain:
 //                  role → organization → document → employee →
-//                  attendance → leave → payroll → recruitment → performance
 //  3. Associations – every belongsTo / hasMany / hasOne / belongsToMany pair
 //                  declared HERE, never inside individual model files,
 //                  to avoid circular-require issues.
@@ -76,31 +75,19 @@ const DocumentVersion = require('../modules/document/models/DocumentVersion')(se
 // ── 2.4  employee/  ───────────────────────────────────────────────────────────
 
 const Employee                 = require('../modules/employee/models/Employee')(sequelize, DataTypes);
+const Language                 = require('../modules/employee/models/Language')(sequelize, DataTypes);
 const EmployeePromotion        = require('../modules/employee/models/EmployeePromotion')(sequelize, DataTypes);
 const EmployeeSeparation       = require('../modules/employee/models/EmployeeSeparation')(sequelize, DataTypes);
-const EmployeeSkillMap         = require('../modules/employee/models/EmployeeSkillMap')(sequelize, DataTypes);
 const EmployeeEducation        = require('../modules/employee/models/EmployeeEducation')(sequelize, DataTypes);
+const EducationLevel            = require('../modules/employee/models/EducationLevel')(sequelize, DataTypes);
 const EmployeeExternalWork     = require('../modules/employee/models/EmployeeExternalWork')(sequelize, DataTypes);
 const EmployeeEmergencyContact = require('../modules/employee/models/EmployeeEmergencyContact')(sequelize, DataTypes);
-
-// ── 2.5  attendance/  ─────────────────────────────────────────────────────────
-
-const ShiftType         = require('../modules/attendance/models/ShiftType')(sequelize, DataTypes);
-const ShiftAssignment   = require('../modules/attendance/models/ShiftAssignment')(sequelize, DataTypes);
-const ShiftRequest      = require('../modules/attendance/models/ShiftRequest')(sequelize, DataTypes);
-const Attendance        = require('../modules/attendance/models/Attendance')(sequelize, DataTypes);
-const EmployeeCheckin   = require('../modules/attendance/models/EmployeeCheckin')(sequelize, DataTypes);
-const AttendanceRequest = require('../modules/attendance/models/AttendanceRequest')(sequelize, DataTypes);
-
 // ── 2.6  leave/  ──────────────────────────────────────────────────────────────
 
 const HolidayList              = require('../modules/leave/models/HolidayList')(sequelize, DataTypes);
 const LeaveType                = require('../modules/leave/models/LeaveType')(sequelize, DataTypes);
 const LeavePeriod              = require('../modules/leave/models/LeavePeriod')(sequelize, DataTypes);
 const LeaveBlockList           = require('../modules/leave/models/LeaveBlockList')(sequelize, DataTypes);
-const LeavePolicy              = require('../modules/leave/models/LeavePolicy')(sequelize, DataTypes);
-const LeavePolicyAssignment    = require('../modules/leave/models/LeavePolicyAssignment')(sequelize, DataTypes);
-const LeaveAllocation          = require('../modules/leave/models/LeaveAllocation')(sequelize, DataTypes);
 const LeaveApplication         = require('../modules/leave/models/LeaveApplication')(sequelize, DataTypes);
 const CompensatoryLeaveRequest = require('../modules/leave/models/CompensatoryLeaveRequest')(sequelize, DataTypes);
 const LeaveEncashment          = require('../modules/leave/models/LeaveEncashment')(sequelize, DataTypes);
@@ -237,11 +224,9 @@ Company.hasMany(Designation,   { foreignKey: 'companyId',                   as: 
 EmploymentType.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
 Company.hasMany(EmploymentType,   { foreignKey: 'companyId',                   as: 'employmentTypes' });
 
-// ── EmployeeGrade → Company + LeavePolicy (default policy for this grade) ────
+// ── EmployeeGrade → Company  (default policy for this grade) ────
 EmployeeGrade.belongsTo(Company,     { foreignKey: 'companyId',         allowNull: false, as: 'company' });
 Company.hasMany(EmployeeGrade,       { foreignKey: 'companyId',                           as: 'employeeGrades' });
-EmployeeGrade.belongsTo(LeavePolicy, { foreignKey: 'defaultLeavePolicyId',                as: 'defaultLeavePolicy' });
-LeavePolicy.hasMany(EmployeeGrade,   { foreignKey: 'defaultLeavePolicyId',                as: 'employeeGrades' });
 
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -277,6 +262,9 @@ Employee.hasMany(DocumentVersion,   { foreignKey: 'uploadedById', as: 'documentV
 Employee.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasOne(Employee,    { foreignKey: 'userId', as: 'employee' });
 
+Employee.hasMany(Language, { foreignKey: 'employeeId', as: 'languages' });
+Language.belongsTo(Employee, { foreignKey: 'employeeId', as: 'employees' });
+
 // ── Employee → organization masters ──────────────────────────────────────────
 Employee.belongsTo(Company,        { foreignKey: 'companyId',        allowNull: false, as: 'company' });
 Employee.belongsTo(Branch,         { foreignKey: 'branchId',                           as: 'branch' });
@@ -310,14 +298,13 @@ EmployeeSeparation.belongsTo(Employee, { foreignKey: 'approvedById',            
 Employee.hasMany(EmployeeSeparation,   { foreignKey: 'employeeId',                    as: 'separations' });
 Employee.hasMany(EmployeeSeparation,   { foreignKey: 'approvedById',                  as: 'approvedSeparations' });
 
-// ── EmployeeSkillMap → Employee ───────────────────────────────────────────────
-//    hasMany — an employee may accumulate many skill records over time.
-EmployeeSkillMap.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
-Employee.hasMany(EmployeeSkillMap,   { foreignKey: 'employeeId',                   as: 'skillMaps' });
 
 // ── EmployeeEducation → Employee ──────────────────────────────────────────────
 EmployeeEducation.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
 Employee.hasMany(EmployeeEducation,   { foreignKey: 'employeeId',                   as: 'educationHistory' });
+EducationLevel.belongsTo(EmployeeEducation, { foreignKey: 'employeeEducationId',  as: 'employeeEducations' });
+EmployeeEducation.hasMany(EducationLevel, { foreignKey: 'employeeEducationId', as: 'educationLevels' });
+
 
 // ── EmployeeExternalWork → Employee ──────────────────────────────────────────
 EmployeeExternalWork.belongsTo(Employee, { foreignKey: 'employeeId', allowNull: false, as: 'employee' });
@@ -328,85 +315,25 @@ EmployeeEmergencyContact.belongsTo(Employee, { foreignKey: 'employeeId', allowNu
 Employee.hasMany(EmployeeEmergencyContact,   { foreignKey: 'employeeId',                   as: 'emergencyContacts' });
 
 // ═════════════════════════════════════════════════════════════════════════════
-//  3.5  ATTENDANCE MODULE
-// ═════════════════════════════════════════════════════════════════════════════
-
-// ── ShiftType → HolidayList  (cross-module: attendance reads leave holidays) ──
-ShiftType.belongsTo(HolidayList, { foreignKey: 'holidayListId', as: 'holidayList' });
-HolidayList.hasMany(ShiftType,   { foreignKey: 'holidayListId', as: 'shiftTypes' });
-
-// ── ShiftAssignment → Employee + ShiftType ────────────────────────────────────
-ShiftAssignment.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
-ShiftAssignment.belongsTo(ShiftType, { foreignKey: 'shiftTypeId', allowNull: false, as: 'shiftType' });
-Employee.hasMany(ShiftAssignment,    { foreignKey: 'employeeId',                    as: 'shiftAssignments' });
-ShiftType.hasMany(ShiftAssignment,   { foreignKey: 'shiftTypeId',                   as: 'shiftAssignments' });
-
-// ── ShiftRequest → Employee (requester & approver) + ShiftType ───────────────
-ShiftRequest.belongsTo(Employee,  { foreignKey: 'requesterId', allowNull: false, as: 'requester' });
-ShiftRequest.belongsTo(Employee,  { foreignKey: 'approverId',                    as: 'approver' });
-ShiftRequest.belongsTo(ShiftType, { foreignKey: 'shiftTypeId', allowNull: false, as: 'shiftType' });
-Employee.hasMany(ShiftRequest,    { foreignKey: 'requesterId',                    as: 'shiftRequests' });
-Employee.hasMany(ShiftRequest,    { foreignKey: 'approverId',                     as: 'approvedShiftRequests' });
-ShiftType.hasMany(ShiftRequest,   { foreignKey: 'shiftTypeId',                    as: 'shiftRequests' });
-
-// ── Attendance → Employee + ShiftType + LeaveApplication (cross-module) ───────
-Attendance.belongsTo(Employee,         { foreignKey: 'employeeId',        allowNull: false, as: 'employee' });
-Attendance.belongsTo(ShiftType,        { foreignKey: 'shiftTypeId',                         as: 'shiftType' });
-Attendance.belongsTo(LeaveApplication, { foreignKey: 'leaveApplicationId',                   as: 'leaveApplication' });
-Employee.hasMany(Attendance,           { foreignKey: 'employeeId',                           as: 'attendanceRecords' });
-ShiftType.hasMany(Attendance,          { foreignKey: 'shiftTypeId',                          as: 'attendanceRecords' });
-LeaveApplication.hasMany(Attendance,   { foreignKey: 'leaveApplicationId',                   as: 'attendanceRecords' });
-
-// ── EmployeeCheckin → Employee + ShiftType ────────────────────────────────────
-EmployeeCheckin.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
-EmployeeCheckin.belongsTo(ShiftType, { foreignKey: 'shiftTypeId',                   as: 'shiftType' });
-Employee.hasMany(EmployeeCheckin,    { foreignKey: 'employeeId',                    as: 'checkins' });
-ShiftType.hasMany(EmployeeCheckin,   { foreignKey: 'shiftTypeId',                   as: 'checkins' });
-
-// ── AttendanceRequest → Employee + Attendance ─────────────────────────────────
-AttendanceRequest.belongsTo(Employee,   { foreignKey: 'employeeId',   allowNull: false, as: 'employee' });
-AttendanceRequest.belongsTo(Attendance, { foreignKey: 'attendanceId',                   as: 'attendance' });
-Employee.hasMany(AttendanceRequest,     { foreignKey: 'employeeId',                     as: 'attendanceRequests' });
-Attendance.hasMany(AttendanceRequest,   { foreignKey: 'attendanceId',                   as: 'requests' });
-
-
-// ═════════════════════════════════════════════════════════════════════════════
 //  3.6  LEAVE MODULE
 // ═════════════════════════════════════════════════════════════════════════════
-
-// ── LeaveType → LeavePolicy ───────────────────────────────────────────────────
-LeaveType.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId', as: 'leavePolicy' });
-LeavePolicy.hasMany(LeaveType,   { foreignKey: 'leavePolicyId', as: 'leaveType' });
 
 // ── LeaveBlockList → Company  (block list is scoped to a company) ─────────────
 LeaveBlockList.belongsTo(Company, { foreignKey: 'companyId', allowNull: false, as: 'company' });
 Company.hasMany(LeaveBlockList,   { foreignKey: 'companyId',                   as: 'leaveBlockLists' });
-
-// ── LeavePolicyAssignment → Employee + LeavePolicy + LeavePeriod ─────────────
-LeavePolicyAssignment.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false, as: 'employee' });
-LeavePolicyAssignment.belongsTo(LeavePolicy, { foreignKey: 'leavePolicyId', allowNull: false, as: 'leavePolicy' });
-LeavePolicyAssignment.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false, as: 'leavePeriod' });
-Employee.hasMany(LeavePolicyAssignment,      { foreignKey: 'employeeId',                      as: 'leavePolicyAssignments' });
-LeavePolicy.hasMany(LeavePolicyAssignment,   { foreignKey: 'leavePolicyId',                   as: 'assignments' });
-LeavePeriod.hasMany(LeavePolicyAssignment,   { foreignKey: 'leavePeriodId',                   as: 'leavePolicyAssignments' });
-
-// ── LeaveAllocation → Employee + LeaveType + LeavePeriod ─────────────────────
-LeaveAllocation.belongsTo(Employee,    { foreignKey: 'employeeId',    allowNull: false, as: 'employee' });
-LeaveAllocation.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',   allowNull: false, as: 'leaveType' });
-LeaveAllocation.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId', allowNull: false, as: 'leavePeriod' });
-Employee.hasMany(LeaveAllocation,      { foreignKey: 'employeeId',                      as: 'leaveAllocations' });
-LeaveType.hasMany(LeaveAllocation,     { foreignKey: 'leaveTypeId',                     as: 'allocations' });
-LeavePeriod.hasMany(LeaveAllocation,   { foreignKey: 'leavePeriodId',                   as: 'leaveAllocations' });
 
 // ── LeaveApplication → Employee (applicant & approver) + LeaveType + HolidayList ──
 LeaveApplication.belongsTo(Employee,    { foreignKey: 'employeeId',   allowNull: false, as: 'applicant' });
 LeaveApplication.belongsTo(Employee,    { foreignKey: 'approverId',                     as: 'approver' });
 LeaveApplication.belongsTo(LeaveType,   { foreignKey: 'leaveTypeId',  allowNull: false, as: 'leaveType' });
 LeaveApplication.belongsTo(HolidayList, { foreignKey: 'holidayListId',                  as: 'holidayList' });
+LeaveApplication.belongsTo(LeavePeriod, { foreignKey: 'leavePeriodId',                  as: 'leavePeriod' });
+
 Employee.hasMany(LeaveApplication,      { foreignKey: 'employeeId',                     as: 'leaveApplications' });
 Employee.hasMany(LeaveApplication,      { foreignKey: 'approverId',                     as: 'approvedLeaveApplications' });
 LeaveType.hasMany(LeaveApplication,     { foreignKey: 'leaveTypeId',                    as: 'applications' });
 HolidayList.hasMany(LeaveApplication,   { foreignKey: 'holidayListId',                  as: 'leaveApplications' });
+LeavePeriod.hasMany(LeaveApplication,   { foreignKey: 'leavePeriodId',                  as: 'leaveApplications' });
 
 // ── CompensatoryLeaveRequest → Employee + LeaveType ───────────────────────────
 CompensatoryLeaveRequest.belongsTo(Employee,  { foreignKey: 'employeeId',  allowNull: false, as: 'employee' });
@@ -653,27 +580,18 @@ module.exports = {
   Employee,
   EmployeePromotion,
   EmployeeSeparation,
-  EmployeeSkillMap,
   EmployeeEducation,
+  EducationLevel,
   EmployeeExternalWork,
   EmployeeEmergencyContact,
-
-  // ── attendance ────────────────────────────────────────────────────────────
-  ShiftType,
-  ShiftAssignment,
-  ShiftRequest,
-  Attendance,
-  EmployeeCheckin,
-  AttendanceRequest,
+  Language,
 
   // ── leave ─────────────────────────────────────────────────────────────────
   HolidayList,
   LeaveType,
   LeavePeriod,
   LeaveBlockList,
-  LeavePolicy,
-  LeavePolicyAssignment,
-  LeaveAllocation,
+
   LeaveApplication,
   CompensatoryLeaveRequest,
   LeaveEncashment,

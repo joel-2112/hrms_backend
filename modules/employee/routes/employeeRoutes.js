@@ -4,7 +4,7 @@
  * modules/employee/routes/employeeRoutes.js
  *
  * Employee lifecycle routes — core profile, education, external work,
- * emergency contacts, skill map, separation, and promotion history.
+ * emergency contacts, separation, and promotion history.
  *
  * All routes require authentication.
  * Mutating routes are guarded by RBAC middleware.
@@ -20,7 +20,68 @@ const { uploadAvatar } = require("../../../middlewares/uploadMiddleware");
 //  All routes require authentication
 // ─────────────────────────────────────────────────────────────────────────────
 router.use(authenticate);
+/**
+ * @swagger
+ * /employees/pending-work-email:
+ *   get:
+ *     summary: Get employees pending work email assignment
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Pending work email employees retrieved
+ */
+router.get(
+  '/pending-work-email',
+  authorize('Employee', action.READ),
+  employeeController.getPendingWorkEmail,
+);
 
+/**
+ * @swagger
+ * /employees/{id}/assign-work-email:
+ *   patch:
+ *     summary: IT assigns work email to an employee
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [workEmail]
+ *             properties:
+ *               workEmail:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Work email assigned successfully
+ */
+router.patch(
+  '/:id/assign-work-email',
+  authorize('Employee', action.WRITE),
+  employeeController.assignWorkEmail,
+);
 /**
  * @swagger
  * tags:
@@ -32,13 +93,50 @@ router.use(authenticate);
  *     description: Previous employment history (external work)
  *   - name: EmployeeEmergencyContacts
  *     description: Emergency contact management per employee
- *   - name: EmployeeSkillMap
- *     description: Skills, certifications, and training records
  *   - name: EmployeeSeparation
  *     description: Separation / exit management workflow
  *   - name: EmployeePromotions
  *     description: Promotion / demotion history (read-only — writes via Performance module)
  */
+
+
+  /**
+ * @swagger
+ * /employees/education-levels:
+ *   get:
+ *     summary: Get all education levels
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Education levels retrieved
+ *   post:
+ *     summary: Create a new education level
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Bachelor"
+ *     responses:
+ *       201:
+ *         description: Education level created
+ *       409:
+ *         description: Education level already exists
+ */
+router
+  .route("/education-levels")
+  .get(authorize("Employee", action.READ), employeeController.getEducationLevels)
+  .post(authorize("Employee", action.WRITE), employeeController.createEducationLevel);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  CORE PROFILE
@@ -466,6 +564,50 @@ router.put('/:id/avatar',
   uploadAvatar.single('avatar'),
   employeeController.updateAvatar
 );
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LANGUAGES
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /employees/languages:
+ *   get:
+ *     summary: Get all languages
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Languages retrieved
+ *   post:
+ *     summary: Create a new language
+ *     tags: [Employees]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name]
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Amharic"
+ *     responses:
+ *       201:
+ *         description: Language created
+ *       409:
+ *         description: Language already exists
+ */
+router
+  .route("/languages")
+  .get(authorize("Employee", action.READ), employeeController.getLanguages)
+  .post(authorize("Employee", action.WRITE), employeeController.addLanguage);
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  DASHBOARD & STATISTICS (static routes — must be before /:id)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -659,7 +801,7 @@ router.get(
  *     summary: Get full employee profile by ID
  *     description: >
  *       Returns the employee with **all** sub-records (education, external work,
- *       emergency contacts, skill map, separations, recent promotions).
+ *       emergency contacts, languages, separations, recent promotions).
  *       Non-HR callers receive a stripped version without confidential fields.
  *     tags: [Employees]
  *     security:
@@ -1437,76 +1579,6 @@ router
     authorize("Employee", action.DELETE),
     employeeController.deleteEmergencyContact,
   );
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  SKILL MAP
-// ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * @swagger
- * /employees/{id}/skill-map:
- *   get:
- *     summary: Get the skill map record
- *     description: >
- *       Returns the skill map or an empty structure if none exists yet.
- *     tags: [EmployeeSkillMap]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Skill map
- *   put:
- *     summary: Create or replace the entire skill map
- *     description: >
- *       Full upsert — sends the complete `{ skills, certifications, languages }` object.
- *     tags: [EmployeeSkillMap]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               skills:
- *                 type: array
- *                 items:
- *                   type: object
- *               certifications:
- *                 type: array
- *                 items:
- *                   type: object
- *               certificateUrls:
- *                 type: array
- *                 items:
- *                   type: object
- *               languages:
- *                 type: array
- *                 items:
- *                   type: object
- *     responses:
- *       200:
- *         description: Skill map saved
- */
-router
-  .route("/:id/skill-map")
-  .get(authorize("Employee", action.READ), employeeController.getSkillMap)
-  .put(authorize("Employee", action.WRITE), employeeController.upsertSkillMap);
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  SEPARATION

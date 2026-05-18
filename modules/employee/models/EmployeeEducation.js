@@ -14,33 +14,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         comment: "FK → employees.id",
       },
-
-      // ── Qualification details ──────────────────────────────────
-      level: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        validate: {
-          isIn: [
-            [
-              "Primary",
-              "Secondary",
-              "Certificate",
-              "Diploma",
-              "Bachelor",
-              "Postgraduate Diploma",
-              "Master",
-              "Doctorate",
-              "Professional",
-            ],
-          ],
-        },
-        comment: 'Education level e.g. "Bachelor", "Master", "High School"',
-      },
-      qualification: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        comment: 'Degree / qualification name e.g. "BSc Computer Science"',
-      },
       majorOrField: {
         type: DataTypes.STRING,
         allowNull: true,
@@ -51,30 +24,24 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         comment: "School / university / college name",
       },
-
-      // ── Timeline ───────────────────────────────────────────────
-      fromDate: {
-        type: DataTypes.DATEONLY,
-        allowNull: true,
-        comment: "Enrolment date",
-      },
-      toDate: {
+      gratuationDate: {
         type: DataTypes.DATEONLY,
         allowNull: true,
         comment: "Graduation / completion date",
       },
-      // ── Outcome ────────────────────────────────────────────────
-      grade: {
-        type: DataTypes.STRING(50),
-        allowNull: true,
-        comment: 'Grade, GPA, classification e.g. "First Class", "3.8 / 4.0"',
-      },
-      certificateUrl: {
+      certificate: {
         type: DataTypes.STRING,
         allowNull: true,
         defaultValue: false,
         comment:
           "True when a document has been uploaded to verify this qualification",
+      },
+      keySkills: {
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: [],
+        comment:
+          "Array of key skills or subjects related to this qualification for search and recommendation purposes",
       },
     },
     {

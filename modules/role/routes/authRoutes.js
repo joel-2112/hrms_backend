@@ -1,8 +1,11 @@
-'use strict';
+"use strict";
 
-const router = require('express').Router();
-const authController = require('../controllers/authController');
-const { authenticate, requireSuperUser } = require('../../../middlewares/authMiddleware');
+const router = require("express").Router();
+const authController = require("../controllers/authController");
+const {
+  authenticate,
+  requireSuperUser,
+} = require("../../../middlewares/authMiddleware");
 
 /**
  * @swagger
@@ -10,6 +13,10 @@ const { authenticate, requireSuperUser } = require('../../../middlewares/authMid
  *   name: Auth
  *   description: Authentication — register, login, session management, and password
  */
+
+// ═══════════════════════════════════════════════════════════════
+//  PUBLIC ROUTES (no authentication required)
+// ═══════════════════════════════════════════════════════════════
 
 /**
  * @swagger
@@ -74,7 +81,7 @@ const { authenticate, requireSuperUser } = require('../../../middlewares/authMid
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/register', authController.register);
+router.post("/register", authController.register);
 
 /**
  * @swagger
@@ -98,7 +105,7 @@ router.post('/register', authController.register);
  *               password:
  *                 type: string
  *                 format: password
- *                 example: 1Q0p2#9o
+ *                 example: StrongPass@123
  *     responses:
  *       200:
  *         description: Login successful — token set in HTTP-only cookie
@@ -116,9 +123,10 @@ router.post('/register', authController.register);
  *                           type: object
  *                           properties:
  *                             id:        { type: string, format: uuid }
- *                             firstName: { type: string, example: Aisha }
- *                             lastName:  { type: string, example: Mensah }
- *                             email:     { type: string, example: aisha.mensah@company.com }
+ *                             firstName: { type: string, example: Eyuel }
+ *                             middleName: { type: string, example: Kassahun }
+ *                             lastName:  { type: string, example: Yenew }
+ *                             email:     { type: string, example: eyuel@gmail.com }
  *                         session:
  *                           type: object
  *                           properties:
@@ -142,7 +150,7 @@ router.post('/register', authController.register);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/login', authController.login);
+router.post("/login", authController.login);
 
 /**
  * @swagger
@@ -164,7 +172,7 @@ router.post('/login', authController.login);
  *       401:
  *         description: Not authenticated
  */
-router.post('/logout', authenticate, authController.logout);
+router.post("/logout", authenticate, authController.logout);
 
 /**
  * @swagger
@@ -188,9 +196,10 @@ router.post('/logout', authenticate, authController.logout);
  *                       type: object
  *                       properties:
  *                         id:             { type: string, format: uuid }
- *                         firstName:      { type: string, example: Aisha }
- *                         lastName:       { type: string, example: Mensah }
- *                         email:          { type: string, example: aisha.mensah@company.com }
+ *                         firstName:      { type: string, example: Eyuel }
+ *                         middleName:     { type: string, example: Kassahun }
+ *                         lastName:       { type: string, example: Yenew }
+ *                         email:          { type: string, example: eyuel@gmail.com }
  *                         currentSession:
  *                           type: object
  *                           properties:
@@ -202,7 +211,7 @@ router.post('/logout', authenticate, authController.logout);
  *       401:
  *         description: Missing or invalid token
  */
-router.get('/me', authenticate, authController.getMe);
+router.get("/me", authenticate, authController.getMe);
 
 /**
  * @swagger
@@ -236,7 +245,7 @@ router.get('/me', authenticate, authController.getMe);
  *       401:
  *         description: Not authenticated
  */
-router.get('/me/sessions', authenticate, authController.getMySessions);
+router.get("/me/sessions", authenticate, authController.getMySessions);
 
 /**
  * @swagger
@@ -264,8 +273,11 @@ router.get('/me/sessions', authenticate, authController.getMySessions);
  *       401:
  *         description: Not authenticated
  */
-router.delete('/me/sessions/:sessionId', authenticate, authController.terminateMySession);
-
+router.delete(
+  "/me/sessions/:sessionId",
+  authenticate,
+  authController.terminateMySession,
+);
 /**
  * @swagger
  * /auth/change-password:
@@ -302,8 +314,39 @@ router.delete('/me/sessions/:sessionId', authenticate, authController.terminateM
  *       422:
  *         description: New password does not meet requirements
  */
-router.patch('/change-password', authenticate, authController.changePassword);
+router.patch("/change-password", authenticate, authController.changePassword);
 
+/**
+ * @swagger
+ * /auth/create-username:
+ *   post:
+ *     summary: Create username for login (when no work email assigned)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 minLength: 4
+ *                 maxLength: 30
+ *                 pattern: '^[a-zA-Z0-9._-]+$'
+ *                 example: "kedir.abebe"
+ *     responses:
+ *       200:
+ *         description: Username created successfully
+ *       409:
+ *         description: Username already taken
+ *       422:
+ *         description: Invalid username or work email required
+ */
+router.post("/create-username", authenticate, authController.createUsername);
 // ═══════════════════════════════════════════════════════════════
 //  ADMIN ROUTES (require SuperUser)
 // ═══════════════════════════════════════════════════════════════
@@ -333,7 +376,12 @@ router.patch('/change-password', authenticate, authController.changePassword);
  *       403:
  *         description: SuperUser access required
  */
-router.get('/admin/sessions', authenticate, requireSuperUser, authController.getAllActiveSessions);
+router.get(
+  "/admin/sessions",
+  authenticate,
+  requireSuperUser,
+  authController.getAllActiveSessions,
+);
 
 /**
  * @swagger
@@ -358,6 +406,11 @@ router.get('/admin/sessions', authenticate, requireSuperUser, authController.get
  *       404:
  *         description: User not found
  */
-router.delete('/admin/users/:userId/sessions', authenticate, requireSuperUser, authController.forceLogoutUser);
+router.delete(
+  "/admin/users/:userId/sessions",
+  authenticate,
+  requireSuperUser,
+  authController.forceLogoutUser,
+);
 
 module.exports = router;
