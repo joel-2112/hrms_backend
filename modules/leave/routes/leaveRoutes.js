@@ -53,7 +53,6 @@ router.use(authenticate);
  *         description: My leave summary fetched
  */
 router.get("/my-leave/summary", leaveController.getMyLeaveSummary);
-
 /**
  * @swagger
  * /leaves/my-leave/applications:
