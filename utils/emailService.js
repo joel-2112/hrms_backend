@@ -1,11 +1,3 @@
-'use strict';
-
-/**
- * utils/emailService.js
- *
- * Nodemailer-based email service for sending transactional emails.
- * All employee emails are delivered to personalEmail.
- */
 
 const nodemailer = require('nodemailer');
 const logger = require('./logger');
