@@ -131,7 +131,7 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       // ─────────────────────────────────────────────
-      //  SECTION 4 — EMPLOYMENT DETAILS for the new employee form
+      //  SECTION 4 — EMPLOYMENT DETAILS 
       // ─────────────────────────────────────────────
       status: {
         type: DataTypes.STRING,
