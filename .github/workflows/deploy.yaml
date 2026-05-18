@@ -20,4 +20,3 @@ jobs:
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
         port: 21
-        # በ cPanel ላይ ፋይሉ እንዲቀመጥ የምትፈልግበት ፎልደር (ለምሳሌ public_html)
