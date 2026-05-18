@@ -23,7 +23,8 @@ const options = {
     //the servers local and remote server url
     servers: [
       {
-        url: 'https://api.erp.eyuelkassahun.com',
+        // url: 'https://api.erp.eyuelkassahun.com',
+        url: 'http://localhost:3000',
         description: 'Production API',
       },
     ],
