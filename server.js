@@ -2,7 +2,7 @@
 require('dotenv').config();
 
 const app = require('./app');
-const { sequelize }    = require('./models');
+const { sequelize } = require('./models');
 
 const PORT = process.env.PORT || 3000;
 
@@ -11,7 +11,7 @@ async function start() {
   console.log('✅  Database connected');
 
   // 2. Sync models (alter: true is safe for dev — never use force: true in production)
-  await sequelize.sync({ alter: true });
+  await sequelize.sync();
   console.log('✅  Models synced');
 
   // 3. Start listening
