@@ -1387,7 +1387,8 @@ router.get("/ledgers", authorize("LeaveLedgerEntry", action.READ), leaveControll
  *         name: employeeId
  *         required: true
  *         schema:
- *           type: string *           format: uuid
+ *           type: string
+ *           format: uuid
  *       - in: path
  *         name: leaveTypeId
  *         required: true
