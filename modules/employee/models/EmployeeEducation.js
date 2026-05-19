@@ -8,7 +8,6 @@ module.exports = (sequelize, DataTypes) => {
         primaryKey: true,
       },
 
-      // ── Parent FK (hasMany — multiple qualifications per employee) ──
       employeeId: {
         type: DataTypes.UUID,
         allowNull: false,
