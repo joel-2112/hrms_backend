@@ -8,12 +8,14 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
       ? console.log
       : false,
 
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
-  },
+  dialectOptions: process.env.NODE_ENV === 'production'
+    ? {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    }
+    : {},
 
   pool: {
     max: 10,

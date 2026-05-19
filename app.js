@@ -17,7 +17,7 @@ const fs = require('fs');
 
 // ── CORS Configuration ──────────────────────────────────────────────
 app.use(cors({
-    origin: ['https://erp.teamworksc.com', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080',],
+    origin: ['https://client.erp.eyuelkassahun.com', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080',],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
