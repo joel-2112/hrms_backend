@@ -19,6 +19,10 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: true,
       comment:      'Soft delete flag',
     },
+    description: {
+      type:      DataTypes.TEXT,
+      allowNull: true,
+    },
 
   }, {
     tableName: 'employment_types',

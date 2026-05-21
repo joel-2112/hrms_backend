@@ -267,13 +267,13 @@ const getDepartmentTree = async (companyId, parentDepartmentId = null) => {
 // ══════════════════════════════════════════════
 
 const createDesignation = async (data) => {
-  const { name } = data;
+  const { name, jobFunction } = data;
   if (!name) throw new AppError("name is required", 422);
 
   const exists = await Designation.findOne({ where: { name } });
   if (exists) throw new AppError(`Designation "${name}" already exists`, 409);
 
-  return Designation.create({ name });
+  return Designation.create({ name, jobFunction: jobFunction || null });
 };
 
 const getAllDesignations = async ({ search } = {}) => {
@@ -311,13 +311,13 @@ const deleteDesignation = async (id) => {
 // ══════════════════════════════════════════════
 
 const createEmploymentType = async (data) => {
-  const { name } = data;
+  const { name, description } = data;
   if (!name) throw new AppError("name is required", 422);
 
   const exists = await EmploymentType.findOne({ where: { name } });
   if (exists) throw new AppError(`Employment type "${name}" already exists`, 409);
 
-  return EmploymentType.create({ name });
+  return EmploymentType.create({ name, description: description || null });
 };
 
 const getAllEmploymentTypes = async () => {
@@ -352,7 +352,7 @@ const deleteEmploymentType = async (id) => {
 // ══════════════════════════════════════════════
 
 const createEmployeeGrade = async (data) => {
-  const { name, minBaseSalary, maxBaseSalary, sortOrder } = data;
+  const { name, description, minBaseSalary, maxBaseSalary, sortOrder } = data;
   if (!name) throw new AppError("name is required", 422);
 
   const exists = await EmployeeGrade.findOne({ where: { name } });
@@ -360,6 +360,7 @@ const createEmployeeGrade = async (data) => {
 
   return EmployeeGrade.create({
     name,
+    description: description || null,
     minBaseSalary: minBaseSalary ?? null,
     maxBaseSalary: maxBaseSalary ?? null,
     sortOrder: sortOrder ?? 0,

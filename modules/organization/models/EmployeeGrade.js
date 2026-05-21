@@ -29,6 +29,11 @@ module.exports = (sequelize, DataTypes) => {
       },
 
 
+      description: {
+        type:      DataTypes.TEXT,
+        allowNull: true,
+      },
+
       // ── Ordering ───────────────────────────────────────────────
       sortOrder: {
         type: DataTypes.INTEGER,

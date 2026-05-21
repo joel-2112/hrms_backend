@@ -13,6 +13,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       comment:   'Job title e.g. "Software Engineer", "HR Manager", "Finance Director"',
     },
+    jobFunction: {
+      type:      DataTypes.STRING(150),
+      allowNull: true,
+      comment:   'Functional area e.g. "Engineering", "Finance", "HR"',
+    },
   }, {
     tableName: 'designations',
     comment:   'Job title master — referenced by Employee, JobOpening, JobOffer, AppraisalTemplate',
