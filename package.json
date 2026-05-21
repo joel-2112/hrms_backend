@@ -12,7 +12,8 @@
     "start": "node server.js",
     "db:migrate": "sequelize-cli db:migrate",
     "db:seed": "sequelize-cli db:seed:all",
-    "db:reset": "sequelize-cli db:migrate:undo:all && npm run db:migrate"
+    "db:reset": "sequelize-cli db:migrate:undo:all && npm run db:migrate",
+    "seed:admin": "node scripts/seed-admin.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
