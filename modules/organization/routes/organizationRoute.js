@@ -323,6 +323,7 @@ router
   .route('/branches/:id')
   .get(authorize('Branch', action.READ), organizationController.getBranchById)
   .patch(authorize('Branch', action.WRITE), organizationController.updateBranch)
+  .put(authorize('Branch', action.WRITE), organizationController.updateBranch)
   .delete(authorize('Branch', action.DELETE), organizationController.deleteBranch);
 
 // ══════════════════════════════════════════════
