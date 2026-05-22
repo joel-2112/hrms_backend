@@ -8,8 +8,8 @@ const { catchAsync } = require('../../../utils/catchAsync');
 
 const createRole = async (req, res, next) => {
   try {
-    const { name, isSystemRole } = req.body;
-    const role = await roleService.createRole({ name, isSystemRole });
+    const { name, isSystemRole, description } = req.body;
+    const role = await roleService.createRole({ name, isSystemRole, description });
     created(res, role, 'Role created successfully');
   } catch (err) {
     next(err);
@@ -41,8 +41,8 @@ const getRole = async (req, res, next) => {
 
 const updateRole = async (req, res, next) => {
   try {
-    const { name, disabled } = req.body;
-    const role = await roleService.updateRole(req.params.id, { name, disabled });
+    const { name, disabled, description } = req.body;
+    const role = await roleService.updateRole(req.params.id, { name, disabled, description });
     ok(res, role, 'Role updated successfully');
   } catch (err) {
     next(err);

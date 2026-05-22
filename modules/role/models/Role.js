@@ -15,6 +15,11 @@ module.exports = (sequelize, DataTypes) => {
         // unique: true,
         comment: 'Human-readable role name e.g. "HR Manager", "System Manager"',
       },
+      description: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        defaultValue: null,
+      },
       // ── Behaviour flags ────────────────────────────────────────
       isSystemRole: {
         type: DataTypes.BOOLEAN,

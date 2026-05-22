@@ -129,7 +129,7 @@ const ACTION = Object.fromEntries(
  * Duplicate names are rejected at the service layer (DB unique constraint
  * would also catch it but we give a friendlier message here).
  */
-const createRole = async ({ name, isSystemRole = false }) => {
+const createRole = async ({ name, isSystemRole = false, description = null }) => {
   const trimmed = name?.trim();
   if (!trimmed) throw new AppError("Role name is required", 422);
 
@@ -141,7 +141,7 @@ const createRole = async ({ name, isSystemRole = false }) => {
 
   const role = await sequelize.transaction(async (t) => {
     const newRole = await Role.create(
-      { name: trimmed, isSystemRole, disabled: false },
+      { name: trimmed, isSystemRole, description: description || null, disabled: false },
       { transaction: t },
     );
 
@@ -218,7 +218,7 @@ const getRoleById = async (id) => {
  * Update a role's name and/or disabled flag.
  * System roles cannot be renamed or disabled.
  */
-const updateRole = async (id, { name, disabled }) => {
+const updateRole = async (id, { name, disabled, description }) => {
   const role = await Role.findByPk(id);
   if (!role) throw new AppError("Role not found", 404);
 
@@ -234,6 +234,7 @@ const updateRole = async (id, { name, disabled }) => {
   const updates = {};
   if (name !== undefined) updates.name = name.trim();
   if (disabled !== undefined) updates.disabled = disabled;
+  if (description !== undefined) updates.description = description || null;
 
   const updated = await role.update(updates);
 
